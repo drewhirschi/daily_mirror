@@ -41,7 +41,7 @@ client:
 # Format, compile, type-check, and test both Rust applications.
 check:
     cd device && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
-    cd server && cargo fmt --check && cargo clippy --all-targets -- -D warnings -A clippy::match-single-binding && npm run client:generate && npm run typecheck && cargo test
+    cd server && npm run client:generate && cargo fmt --check && cargo clippy --all-targets -- -D warnings -A clippy::match-single-binding && npm run typecheck && cargo test
     git diff --check
 
 # Cross-compile the Pi service on this computer.

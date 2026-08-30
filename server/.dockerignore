@@ -1,0 +1,7 @@
+/target
+/target-vercel
+/node_modules
+/public/dist
+/.git
+/.env
+/data

@@ -1,0 +1,14 @@
+/target
+/target-vercel
+/public/dist
+/node_modules
+/.vercel
+/.nextrs/client/
+/.nextrs/openapi.json
+.env
+.env.*.local
+npm-debug.log*
+/data/
+.vercel
+.env*
+!.env.example

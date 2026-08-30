@@ -1,0 +1,22 @@
+[package]
+name = "daily-mirror-device"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+anyhow = "1"
+async-stream = "0.3"
+axum = "0.8"
+chrono = "0.4"
+clap = { version = "4", features = ["derive"] }
+dotenvy = "0.15"
+libc = "0.2"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rppal = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+shlex = "1"
+tokio = { version = "1", features = ["net", "rt", "sync"] }
+uuid = { version = "1", features = ["v4"] }

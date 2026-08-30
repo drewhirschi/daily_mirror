@@ -1,0 +1,6 @@
+[alias]
+dev = "nextrs dev --bin server"
+
+# vercel-rust reads `config.build.target` whenever this file exists; keep an
+# empty build table so host-target Vercel builds do not crash while parsing it.
+[build]

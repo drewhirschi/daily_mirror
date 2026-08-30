@@ -57,6 +57,7 @@ fn configured_password() -> Option<String> {
 
 fn bypasses_view_auth(method: &Method, path: &str) -> bool {
     path == "/healthz"
+        || (method == Method::GET && path == "/api/maintenance/reconcile")
         || (method == Method::POST
             && (matches!(path, "/api/uploads" | "/api/photos")
                 || path.starts_with("/api/uploads/")))
@@ -71,6 +72,10 @@ mod tests {
     #[test]
     fn health_and_device_writes_bypass_gallery_login() {
         assert!(bypasses_view_auth(&Method::GET, "/healthz"));
+        assert!(bypasses_view_auth(
+            &Method::GET,
+            "/api/maintenance/reconcile"
+        ));
         assert!(bypasses_view_auth(&Method::POST, "/api/uploads"));
         assert!(bypasses_view_auth(
             &Method::POST,

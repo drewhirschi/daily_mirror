@@ -60,3 +60,11 @@ cargo run --release -- capture-once --no-upload
 After validating the ArduCam output, configure the server URL and test an
 upload before wiring GPIO. See `device/README.md` for pin assignments and LED
 behavior.
+
+## Quality gates
+
+Run `just check` to format-check, lint, generate and validate the typed client,
+type-check the gallery, and test both Rust applications. Run
+`just install-hooks` once per clone to make the same suite a mandatory local
+pre-push hook. GitHub Actions runs it again for every push and pull request,
+and production deployment refuses to start until it passes.

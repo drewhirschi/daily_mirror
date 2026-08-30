@@ -23,7 +23,12 @@ doctor:
 
 # Install the locked web dependencies, including the project-local Vercel CLI.
 install:
-    cd server && npm ci
+    cd server && node .nextrs/ensure-client.mjs && npm ci
+
+# Configure this clone to run the full quality suite before every Git push.
+install-hooks:
+    git config core.hooksPath .githooks
+    @echo "Daily Mirror pre-push quality gate installed"
 
 # Run the local NextRS gallery and API.
 dev:

@@ -30,6 +30,15 @@ enum CatalogLocation {
 }
 
 impl PhotoCatalog {
+    pub fn local(path: impl Into<String>) -> Self {
+        Self {
+            inner: Arc::new(CatalogInner {
+                location: CatalogLocation::Local(path.into()),
+                database: OnceCell::new(),
+            }),
+        }
+    }
+
     pub fn from_env() -> io::Result<Self> {
         let location = match std::env::var("DAILY_MIRROR_DATABASE_URL") {
             Ok(url) if url.starts_with("libsql://") || url.starts_with("https://") => {
@@ -46,11 +55,14 @@ impl PhotoCatalog {
                     .into_owned(),
             ),
         };
-        Ok(Self {
-            inner: Arc::new(CatalogInner {
-                location,
-                database: OnceCell::new(),
-            }),
+        Ok(match location {
+            CatalogLocation::Local(path) => Self::local(path),
+            location @ CatalogLocation::Remote { .. } => Self {
+                inner: Arc::new(CatalogInner {
+                    location,
+                    database: OnceCell::new(),
+                }),
+            },
         })
     }
 
@@ -283,13 +295,9 @@ fn invalid_config(message: impl Into<String>) -> io::Error {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use tokio::sync::OnceCell;
-
     use crate::photos::Photo;
 
-    use super::{CatalogInner, CatalogLocation, PendingPhoto, PhotoCatalog};
+    use super::{PendingPhoto, PhotoCatalog};
 
     #[tokio::test]
     async fn local_catalog_tracks_ready_rotation_and_deletion() {
@@ -298,12 +306,7 @@ mod tests {
             std::process::id()
         ));
         let _ = tokio::fs::remove_file(&path).await;
-        let catalog = PhotoCatalog {
-            inner: Arc::new(CatalogInner {
-                location: CatalogLocation::Local(path.to_string_lossy().into_owned()),
-                database: OnceCell::new(),
-            }),
-        };
+        let catalog = PhotoCatalog::local(path.to_string_lossy().into_owned());
         let id = "20260829T071500Z-catalog1";
 
         catalog.reserve(id, "photos/test.jpg", 1234).await.unwrap();

@@ -94,6 +94,12 @@ request imports the existing object archive once. Gallery reads also reconcile
 stranded `pending` rows when their complete objects are already present in
 storage; normal refreshes otherwise query only the database.
 
+Production also runs an authenticated daily reconciliation at
+`GET /api/maintenance/reconcile`. It repairs R2 objects missing catalog rows
+and completed uploads stranded in `pending`, while leaving size mismatches
+hidden for investigation. `CRON_SECRET` stays in Vercel; Vercel supplies it as
+a Bearer token when invoking the schedule declared in `vercel.json`.
+
 Set the variables documented in `.env.example`; R2 API credentials need object
 read/write plus bucket-list access.
 

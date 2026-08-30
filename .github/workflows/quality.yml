@@ -1,0 +1,41 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            device
+            server
+      - uses: extractions/setup-just@v3
+      - name: Restore generated client workspace
+        working-directory: server
+        run: node .nextrs/ensure-client.mjs
+      - name: Install web dependencies
+        working-directory: server
+        run: npm ci
+      - name: Run all checks
+        run: just check

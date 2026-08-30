@@ -9,9 +9,10 @@ The production data path is intentionally split:
 1. The Pi retains each capture in its local durable queue.
 2. It authenticates to the NextRS server and requests `POST /api/uploads`.
 3. The server returns a five-minute, single-object R2 `PUT` URL.
-4. The Pi uploads the JPEG directly to R2 and removes its queued copy only
-   after a successful response.
-5. The gallery lists the private bucket through the server. Image requests are
+4. The Pi uploads the JPEG directly to R2, then calls the server's completion
+   endpoint. The server verifies the object size and marks the Turso row ready.
+5. The Pi removes its queued copy only after completion succeeds.
+6. The gallery queries Turso through the server. Image requests are
    redirected to short-lived signed R2 `GET` URLs.
 
 Vercel therefore handles only small JSON requests, never the multi-megabyte
@@ -56,6 +57,7 @@ DAILY_MIRROR_R2_SECRET_ACCESS_KEY=<R2 secret key>
 DAILY_MIRROR_R2_PREFIX=photos
 DAILY_MIRROR_R2_PRESIGN_SECONDS=300
 DAILY_MIRROR_R2_URL_STYLE=virtual-host
+CRON_SECRET=<at least 16 random characters>
 ```
 
 Do not put these secrets in a checked-in `.env` file. Local development stays
@@ -63,6 +65,13 @@ on `DAILY_MIRROR_STORAGE_BACKEND=local`. Production refuses to start without
 both the device upload token and gallery password. The browser presents a
 standard Basic-auth login prompt; `/healthz` and the bearer-authenticated device
 upload path remain available without gallery credentials.
+
+`server/vercel.json` schedules `GET /api/maintenance/reconcile` once per day at
+09:00 UTC. Vercel sends `CRON_SECRET` as a Bearer authorization header. The
+server rejects missing or incorrect secrets, lists R2, repairs complete
+`pending` uploads, inserts objects that have no catalog row, and reports—but
+does not automatically delete—catalog rows whose objects are missing. The job
+is idempotent and is registered only by production deployments.
 
 ## Deploy and verify
 

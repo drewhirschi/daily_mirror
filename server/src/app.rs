@@ -7,8 +7,10 @@
 use axum::{Extension, extract::DefaultBodyLimit, middleware};
 
 pub mod catalog;
+pub mod cron_auth;
 pub mod photos;
 pub mod upload_auth;
+pub mod upload_flow;
 pub mod view_auth;
 
 include!(concat!(env!("OUT_DIR"), "/nextrs_routes.rs"));
@@ -25,6 +27,8 @@ pub fn app() -> axum::Router {
         .unwrap_or_else(|error| panic!("invalid upload authentication configuration: {error}"));
     view_auth::validate_configuration(&photo_store)
         .unwrap_or_else(|error| panic!("invalid gallery authentication configuration: {error}"));
+    cron_auth::validate_configuration()
+        .unwrap_or_else(|error| panic!("invalid cron authentication configuration: {error}"));
     nextrs::router::build_router_with_public(generated_registry(), &public_dir)
         .merge(nextrs::openapi::spec_router(generated_openapi()))
         .layer(DefaultBodyLimit::max(32 * 1024 * 1024))

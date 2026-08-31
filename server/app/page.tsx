@@ -12,61 +12,70 @@ export default function Page() {
   const items = [...rawItems]
     .filter((photo) => isInDateRange(photo.id, startDate, endDate))
     .sort(compareNewestFirst);
+  const groups = groupPhotosByMonth(items);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedPhoto = items.find((photo) => photo.id === selectedId);
+  const selectedIndex = selectedPhoto ? items.indexOf(selectedPhoto) : -1;
 
   useEffect(() => {
     if (!selectedId) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
+    const closeOrNavigate = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSelectedId(null);
+      if (event.key === "ArrowLeft") selectNeighbor(1);
+      if (event.key === "ArrowRight") selectNeighbor(-1);
     };
     document.body.classList.add("lightbox-open");
-    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", closeOrNavigate);
     return () => {
       document.body.classList.remove("lightbox-open");
-      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("keydown", closeOrNavigate);
     };
-  }, [selectedId]);
+  }, [selectedId, selectedIndex, items.length]);
 
   return (
     <main className="gallery-page">
       <header className="gallery-heading">
         <div>
-          <p className="eyebrow">A photograph at a time</p>
-          <h1>Daily Mirror</h1>
+          <p className="eyebrow">Your photo journal</p>
+          <h1>The days,<br /><em>as you were.</em></h1>
         </div>
         <p className="photo-count">
-          {photos.isLoading ? "Loading…" : `${items.length} ${items.length === 1 ? "photo" : "photos"}`}
+          {photos.isLoading ? "Loading…" : `${items.length} ${items.length === 1 ? "moment" : "moments"}`}
         </p>
       </header>
 
       <section className="gallery-tools" aria-label="Filter photographs">
-        <div className="date-range">
-          <label>
-            <span>From</span>
-            <input
-              type="date"
-              value={startDate}
-              max={endDate || undefined}
-              onChange={(event) => setStartDate(event.target.value)}
-            />
-          </label>
-          <span className="date-separator" aria-hidden="true">—</span>
-          <label>
-            <span>To</span>
-            <input
-              type="date"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(event) => setEndDate(event.target.value)}
-            />
-          </label>
-          {startDate || endDate ? (
-            <button className="clear-filter" type="button" onClick={() => { setStartDate(""); setEndDate(""); }}>
-              Clear
-            </button>
-          ) : null}
-        </div>
+        <details className="date-filter">
+          <summary>
+            <span>{startDate || endDate ? "Date range" : "All photos"}</span>
+            <span aria-hidden="true">⌄</span>
+          </summary>
+          <div className="date-range">
+            <label>
+              <span>From</span>
+              <input
+                type="date"
+                value={startDate}
+                max={endDate || undefined}
+                onChange={(event) => setStartDate(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>To</span>
+              <input
+                type="date"
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(event) => setEndDate(event.target.value)}
+              />
+            </label>
+            {startDate || endDate ? (
+              <button className="clear-filter" type="button" onClick={() => { setStartDate(""); setEndDate(""); }}>
+                Show all photos
+              </button>
+            ) : null}
+          </div>
+        </details>
         {editError ? <p className="edit-error" role="alert">{editError}</p> : null}
       </section>
 
@@ -77,21 +86,31 @@ export default function Page() {
           {rawItems.length ? "No photographs were taken in this date range." : "The first photograph will appear here after the button is pressed."}
         </p>
       ) : (
-        <section className="photo-grid" aria-label="Photograph archive">
-          {items.map((photo) => (
-            <figure className="photo-card" key={photo.id}>
-              <button
-                className="photo-open"
-                type="button"
-                aria-label={`Open photograph from ${formatCaptureId(photo.id)}`}
-                onClick={() => setSelectedId(photo.id)}
-              >
-                <img src={`${photo.url}?v=${editVersion}`} alt="Daily Mirror capture" loading="lazy" />
-              </button>
-              <figcaption>{formatCaptureId(photo.id)}</figcaption>
-            </figure>
+        <div className="photo-archive" aria-label="Photograph archive">
+          {groups.map((group) => (
+            <section className="photo-month" key={group.key} aria-labelledby={`month-${group.key}`}>
+              <header className="month-heading">
+                <h2 id={`month-${group.key}`}>{group.label}</h2>
+                <span>{group.photos.length}</span>
+              </header>
+              <div className="photo-grid">
+                {group.photos.map((photo) => (
+                  <figure className="photo-card" key={photo.id}>
+                    <button
+                      className="photo-open"
+                      type="button"
+                      aria-label={`Open photograph from ${formatCaptureId(photo.id)}`}
+                      onClick={() => setSelectedId(photo.id)}
+                    >
+                      <img src={`${photo.url}?v=${editVersion}`} alt="Daily Mirror capture" loading="lazy" />
+                    </button>
+                    <figcaption>{formatCaptureDay(photo.id)}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            </section>
           ))}
-        </section>
+        </div>
       )}
 
       {selectedPhoto ? (
@@ -104,6 +123,12 @@ export default function Page() {
             if (event.target === event.currentTarget) setSelectedId(null);
           }}
         >
+          {selectedIndex < items.length - 1 ? (
+            <button className="lightbox-nav lightbox-older" type="button" aria-label="Older photograph" onClick={() => selectNeighbor(1)}>‹</button>
+          ) : null}
+          {selectedIndex > 0 ? (
+            <button className="lightbox-nav lightbox-newer" type="button" aria-label="Newer photograph" onClick={() => selectNeighbor(-1)}>›</button>
+          ) : null}
           <figure className="lightbox-frame">
             <button
               className="lightbox-close"
@@ -117,11 +142,13 @@ export default function Page() {
               src={`${selectedPhoto.url}?v=${editVersion}`}
               alt={`Daily Mirror capture from ${formatCaptureId(selectedPhoto.id)}`}
             />
-            <figcaption>{formatCaptureId(selectedPhoto.id)}</figcaption>
-            <div className="photo-actions" aria-label="Edit photograph">
-              <button type="button" disabled={editingId === selectedPhoto.id} onClick={() => editPhoto(selectedPhoto.id, "rotate-left")}>↶ Rotate left</button>
-              <button type="button" disabled={editingId === selectedPhoto.id} onClick={() => editPhoto(selectedPhoto.id, "rotate-right")}>↷ Rotate right</button>
-              <button className="delete-photo" type="button" disabled={editingId === selectedPhoto.id} onClick={() => editPhoto(selectedPhoto.id, "delete")}>Delete</button>
+            <div className="lightbox-meta">
+              <figcaption>{formatCaptureId(selectedPhoto.id)}</figcaption>
+              <div className="photo-actions" aria-label="Edit photograph">
+                <button type="button" disabled={editingId === selectedPhoto.id} onClick={() => editPhoto(selectedPhoto.id, "rotate-left")}><span aria-hidden="true">↶</span> Left</button>
+                <button type="button" disabled={editingId === selectedPhoto.id} onClick={() => editPhoto(selectedPhoto.id, "rotate-right")}><span aria-hidden="true">↷</span> Right</button>
+                <button className="delete-photo" type="button" disabled={editingId === selectedPhoto.id} onClick={() => editPhoto(selectedPhoto.id, "delete")}>Delete</button>
+              </div>
             </div>
           </figure>
         </div>
@@ -154,6 +181,30 @@ export default function Page() {
       setEditingId(null);
     }
   }
+
+  function selectNeighbor(offset: number) {
+    const next = items[selectedIndex + offset];
+    if (next) setSelectedId(next.id);
+  }
+}
+
+function groupPhotosByMonth<T extends { id: string }>(photos: T[]) {
+  const groups: Array<{ key: string; label: string; photos: T[] }> = [];
+  for (const photo of photos) {
+    const date = captureDate(photo.id);
+    const key = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}` : "unknown";
+    const previous = groups[groups.length - 1];
+    if (previous?.key === key) {
+      previous.photos.push(photo);
+    } else {
+      groups.push({
+        key,
+        label: date ? new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(date) : "Earlier",
+        photos: [photo],
+      });
+    }
+  }
+  return groups;
 }
 
 function isInDateRange(id: string, startDate: string, endDate: string) {
@@ -170,18 +221,32 @@ function compareNewestFirst(left: { id: string }, right: { id: string }) {
 }
 
 function captureTime(id: string) {
+  return captureDate(id)?.getTime() ?? 0;
+}
+
+function captureDate(id: string) {
   const match = id.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/);
-  if (!match) return 0;
+  if (!match) return null;
   const [, year, month, day, hour, minute, second] = match;
-  return Date.parse(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
+  return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
 }
 
 function formatCaptureId(id: string) {
-  const match = id.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/);
-  if (!match) return id;
-  const [, year, month, day, hour, minute, second] = match;
+  const date = captureDate(id);
+  if (!date) return id;
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`));
+  }).format(date);
+}
+
+function formatCaptureDay(id: string) {
+  const date = captureDate(id);
+  if (!date) return id;
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }

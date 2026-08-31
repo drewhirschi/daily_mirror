@@ -34,7 +34,11 @@ pub async fn protect(
 fn bypasses_authentication(method: &Method, path: &str) -> bool {
     path == "/healthz"
         || path == "/login"
-        || matches!(path, "/style.css" | "/favicon.ico" | "/robots.txt")
+        || matches!(
+            path,
+            "/style.css" | "/favicon.ico" | "/robots.txt" | "/manifest.webmanifest" | "/sw.js"
+        )
+        || path.starts_with("/icons/")
         || path.starts_with("/dist/")
         || path.starts_with("/api/auth/login/")
         || (method == Method::GET && path == "/api/maintenance/reconcile")
@@ -54,6 +58,15 @@ mod tests {
         assert!(bypasses_authentication(&Method::GET, "/healthz"));
         assert!(bypasses_authentication(&Method::GET, "/login"));
         assert!(bypasses_authentication(&Method::GET, "/style.css"));
+        assert!(bypasses_authentication(
+            &Method::GET,
+            "/manifest.webmanifest"
+        ));
+        assert!(bypasses_authentication(&Method::GET, "/sw.js"));
+        assert!(bypasses_authentication(
+            &Method::GET,
+            "/icons/apple-touch-icon.png"
+        ));
         assert!(bypasses_authentication(&Method::GET, "/dist/page-login.js"));
         assert!(bypasses_authentication(
             &Method::POST,

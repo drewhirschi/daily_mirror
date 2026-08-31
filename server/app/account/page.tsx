@@ -49,6 +49,14 @@ export default function AccountPage() {
           </ul>
         ) : <p className="auth-note">No passkeys enrolled yet. Your password remains the recovery method.</p>}
       </section>
+
+      <section className="account-card install-card">
+        <img src="/icons/icon-192.png" alt="" width="72" height="72" />
+        <div>
+          <h2>Add to Home Screen</h2>
+          <p>On your iPhone or iPad, open Daily Mirror, tap the Share button, then choose <strong>Add to Home Screen</strong>. It will launch like an app and keep your 30-day sign-in.</p>
+        </div>
+      </section>
     </main>
   );
 

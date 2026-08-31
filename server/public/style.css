@@ -167,6 +167,23 @@ code {
 .passkey-list li span { color: #777066; font-size: 0.78rem; }
 .passkey-list li span:last-child { grid-column: 2; }
 
+.account-card + .account-card { margin-top: 20px; }
+
+.install-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 22px;
+}
+
+.install-card img {
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(50, 43, 33, 0.16);
+}
+
+.install-card h2 { margin-bottom: 7px; }
+.install-card p { margin: 0; }
+
 .gallery-page {
   width: min(1440px, calc(100vw - 36px));
   margin: clamp(38px, 7vw, 92px) auto 80px;
@@ -678,4 +695,15 @@ code {
 
   .lightbox-older { left: 12px; }
   .lightbox-newer { right: 12px; }
+
+  .install-card {
+    grid-template-columns: 58px 1fr;
+    gap: 16px;
+  }
+
+  .install-card img {
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+  }
 }

@@ -131,6 +131,15 @@ deploying. Temporary Vercel previews derive their origin from `VERCEL_URL`.
 `DAILY_MIRROR_AUTH_RP_ID` is optional and normally derives from the origin host.
 `/healthz` and bearer-authenticated device writes bypass gallery authentication.
 
+## Install on iPhone or iPad
+
+Daily Mirror includes an app manifest, Apple home-screen icon, standalone
+display metadata, and a network-only service worker. In iOS, open the production
+site, tap **Share**, then **Add to Home Screen**. The installed app uses the same
+30-day session as the browser that installed it. The service worker deliberately
+does not cache gallery HTML or photographs, so private archive data is not copied
+into a separate offline cache.
+
 ## Build and deploy
 
 From the repository root, `just` lists the supported workflows. The common

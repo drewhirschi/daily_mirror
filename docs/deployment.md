@@ -48,8 +48,7 @@ DAILY_MIRROR_STORAGE_BACKEND=r2
 DAILY_MIRROR_DATABASE_URL=libsql://daily-mirror-<org>.turso.io
 DAILY_MIRROR_DATABASE_AUTH_TOKEN=<Turso database token>
 DAILY_MIRROR_UPLOAD_TOKEN=<long random device token>
-DAILY_MIRROR_VIEW_USERNAME=daily-mirror
-DAILY_MIRROR_VIEW_PASSWORD=<long random gallery password>
+DAILY_MIRROR_AUTH_ORIGIN=https://daily-mirror-pearl.vercel.app
 DAILY_MIRROR_R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 DAILY_MIRROR_R2_BUCKET=daily-mirror
 DAILY_MIRROR_R2_ACCESS_KEY_ID=<R2 access key>
@@ -62,9 +61,18 @@ CRON_SECRET=<at least 16 random characters>
 
 Do not put these secrets in a checked-in `.env` file. Local development stays
 on `DAILY_MIRROR_STORAGE_BACKEND=local`. Production refuses to start without
-both the device upload token and gallery password. The browser presents a
-standard Basic-auth login prompt; `/healthz` and the bearer-authenticated device
-upload path remain available without gallery credentials.
+the device upload token or a canonical HTTPS authentication origin. Create the
+first gallery account against the same Turso database before production goes
+live:
+
+```sh
+just auth-create-user drew
+```
+
+The CLI prompts twice and never places the password in shell history. Gallery
+login creates a 30-day session; a signed-in user can enroll passkeys from the
+Account page. `/healthz` and the bearer-authenticated device upload path remain
+available without a gallery session.
 
 `server/vercel.json` schedules `GET /api/maintenance/reconcile` once per day at
 09:00 UTC. Vercel sends `CRON_SECRET` as a Bearer authorization header. The

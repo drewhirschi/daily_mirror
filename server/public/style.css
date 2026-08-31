@@ -52,6 +52,121 @@ code {
   box-shadow: 0 0 0 4px rgba(79, 138, 88, 0.13);
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.topbar-actions a {
+  color: #5f5a52;
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+
+.auth-page, .account-page {
+  width: min(680px, calc(100vw - 36px));
+  margin: clamp(36px, 8vw, 96px) auto 80px;
+}
+
+.auth-card, .account-card {
+  border: 1px solid #d7d1c5;
+  border-radius: 18px;
+  background: rgba(250, 248, 243, 0.8);
+  box-shadow: 0 24px 70px rgba(50, 43, 33, 0.08);
+  padding: clamp(26px, 6vw, 52px);
+}
+
+.auth-card h1, .account-heading h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.4rem, 8vw, 4.5rem);
+  font-weight: 400;
+  letter-spacing: -0.05em;
+}
+
+.auth-intro, .account-card > p, .account-heading p, .auth-note, .account-message {
+  color: #777066;
+  line-height: 1.55;
+}
+
+.auth-card form, .passkey-enroll {
+  display: grid;
+  gap: 16px;
+  margin-top: 30px;
+}
+
+.auth-field {
+  display: grid;
+  gap: 7px;
+}
+
+.auth-field span {
+  color: #676057;
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.auth-field input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfc8bc;
+  border-radius: 10px;
+  background: #fffdf8;
+  color: #26231f;
+  font: inherit;
+  padding: 13px 14px;
+}
+
+.auth-field input:focus {
+  border-color: #4f8a58;
+  outline: 3px solid rgba(79, 138, 88, 0.14);
+}
+
+.auth-primary, .auth-passkey, .quiet-button {
+  border: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 13px 16px;
+}
+
+.auth-primary { background: #386b42; color: white; }
+.auth-passkey { width: 100%; background: #26231f; color: white; }
+.auth-primary:disabled, .auth-passkey:disabled { cursor: wait; opacity: 0.5; }
+.quiet-button { border: 1px solid #cfc8bc; background: transparent; color: #514c45; }
+
+.auth-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  color: #918a80;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.auth-divider::before, .auth-divider::after { content: ""; border-top: 1px solid #d7d1c5; }
+.auth-error { margin: 18px 0 0; color: #a23b32; line-height: 1.45; }
+
+.account-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.account-card h2 { margin-top: 0; font-family: Georgia, "Times New Roman", serif; font-size: 2rem; font-weight: 400; }
+.passkey-list { list-style: none; margin: 28px 0 0; padding: 0; border-top: 1px solid #d7d1c5; }
+.passkey-list li { display: grid; grid-template-columns: 1fr auto; gap: 5px 16px; padding: 17px 0; border-bottom: 1px solid #d7d1c5; }
+.passkey-list li span { color: #777066; font-size: 0.78rem; }
+.passkey-list li span:last-child { grid-column: 2; }
+
 .gallery-page {
   width: min(1440px, calc(100vw - 36px));
   margin: clamp(38px, 7vw, 92px) auto 80px;

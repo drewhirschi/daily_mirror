@@ -6,8 +6,11 @@
 
 use axum::{Extension, extract::DefaultBodyLimit, middleware};
 
+pub mod auth;
+pub mod auth_http;
 pub mod catalog;
 pub mod cron_auth;
+pub mod passkeys;
 pub mod photos;
 pub mod upload_auth;
 pub mod upload_flow;
@@ -23,10 +26,12 @@ pub fn app() -> axum::Router {
         .unwrap_or_else(|error| panic!("invalid photo storage configuration: {error}"));
     let photo_catalog = catalog::PhotoCatalog::from_env()
         .unwrap_or_else(|error| panic!("invalid photo catalog configuration: {error}"));
+    let auth_store = auth::AuthStore::from_env()
+        .unwrap_or_else(|error| panic!("invalid authentication storage configuration: {error}"));
+    let passkey_service = passkeys::PasskeyService::from_env()
+        .unwrap_or_else(|error| panic!("invalid passkey configuration: {error}"));
     upload_auth::validate_configuration(&photo_store)
         .unwrap_or_else(|error| panic!("invalid upload authentication configuration: {error}"));
-    view_auth::validate_configuration(&photo_store)
-        .unwrap_or_else(|error| panic!("invalid gallery authentication configuration: {error}"));
     cron_auth::validate_configuration()
         .unwrap_or_else(|error| panic!("invalid cron authentication configuration: {error}"));
     nextrs::router::build_router_with_public(generated_registry(), &public_dir)
@@ -34,5 +39,10 @@ pub fn app() -> axum::Router {
         .layer(DefaultBodyLimit::max(32 * 1024 * 1024))
         .layer(Extension(photo_store))
         .layer(Extension(photo_catalog))
-        .layer(middleware::from_fn(view_auth::protect))
+        .layer(Extension(passkey_service))
+        .layer(Extension(auth_store.clone()))
+        .layer(middleware::from_fn_with_state(
+            auth_store,
+            view_auth::protect,
+        ))
 }

@@ -383,10 +383,10 @@ impl LocalStore {
             if path.extension().and_then(|extension| extension.to_str()) != Some(PHOTO_EXTENSION) {
                 continue;
             }
-            if let Some(id) = path.file_stem().and_then(|stem| stem.to_str()) {
-                if validate_capture_id(id).is_ok() {
-                    photos.push(photo(id));
-                }
+            if let Some(id) = path.file_stem().and_then(|stem| stem.to_str())
+                && validate_capture_id(id).is_ok()
+            {
+                photos.push(photo(id));
             }
         }
         Ok(photos)

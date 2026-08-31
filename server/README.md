@@ -108,10 +108,28 @@ read/write plus bucket-list access.
 `GET /healthz` returns the server software version and active storage backend.
 It is used by the deployment recipes and is intentionally lightweight.
 
-When R2 is enabled, `DAILY_MIRROR_VIEW_PASSWORD` is also required. Gallery and
-photo reads use HTTP Basic authentication (username defaults to
-`daily-mirror`); `/healthz` and bearer-authenticated device writes bypass that
-browser login. Local mode remains open by default for development.
+## Gallery accounts and passkeys
+
+The gallery uses named accounts rather than HTTP Basic authentication. Create
+an account from the repository root; the command prompts twice without putting
+the password in shell history:
+
+```sh
+just auth-create-user drew
+```
+
+Passwords must be at least 12 characters and are stored as Argon2id hashes.
+Successful password or passkey login mints a random 30-day session cookie; only
+its SHA-256 hash is stored in the database. From **Account**, a signed-in user
+can enroll one or more passkeys and use them on later visits. Passwords remain
+the recovery path. Passkey challenges are short-lived, single-use, and stored
+server-side so a replayed ceremony cannot create a session. Password failures
+are durably throttled per account and client after eight attempts in 15 minutes.
+
+Set `DAILY_MIRROR_AUTH_ORIGIN` to the canonical HTTPS production URL before
+deploying. Temporary Vercel previews derive their origin from `VERCEL_URL`.
+`DAILY_MIRROR_AUTH_RP_ID` is optional and normally derives from the origin host.
+`/healthz` and bearer-authenticated device writes bypass gallery authentication.
 
 ## Build and deploy
 

@@ -3,8 +3,9 @@ use std::convert::Infallible;
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Child, Command};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -81,19 +82,7 @@ impl Config {
             .ok()
             .map(|value| shlex::split(&value).ok_or_else(|| anyhow!("invalid camera arguments")))
             .transpose()?
-            .unwrap_or_else(|| {
-                [
-                    "--nopreview",
-                    "--immediate",
-                    "--encoding",
-                    "jpg",
-                    "--quality",
-                    "95",
-                ]
-                .into_iter()
-                .map(str::to_owned)
-                .collect()
-            });
+            .unwrap_or_else(default_camera_args);
 
         Ok(Self {
             server_url: std::env::var("DAILY_MIRROR_SERVER_URL").ok(),
@@ -267,15 +256,35 @@ impl Device {
             .operation_lock
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        set_runtime_status(
+            &self.runtime_status,
+            "countdown",
+            "Get ready — autofocus starting",
+        );
+        let pending = match self.camera.start_capture() {
+            Ok(pending) => pending,
+            Err(error) => {
+                eprintln!("capture failed: {error:#}");
+                set_runtime_status(
+                    &self.runtime_status,
+                    "error",
+                    format!("capture failed: {error:#}"),
+                );
+                leds.lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .error();
+                return;
+            }
+        };
         leds.lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .countdown();
         set_runtime_status(
             &self.runtime_status,
             "capturing",
-            "Hold still — focusing and capturing",
+            "Countdown complete — taking the photo",
         );
-        let capture = match self.camera.capture() {
+        let capture = match pending.finish() {
             Ok(path) => path,
             Err(error) => {
                 eprintln!("capture failed: {error:#}");
@@ -293,17 +302,18 @@ impl Device {
 
         set_runtime_status(
             &self.runtime_status,
-            "captured",
-            "Photo captured — you can move",
+            "processing",
+            "Uploading the new photo",
         );
-        leds.lock()
+        let mut pulse = leds
+            .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .captured();
-        leds.lock()
+            .begin_processing();
+        let upload = leds
+            .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .uploading();
-        set_runtime_status(&self.runtime_status, "uploading", "Uploading the new photo");
-        match self.uploader.upload(&capture) {
+            .while_processing(&mut pulse, || self.uploader.upload(&capture));
+        match upload {
             Ok(()) => {
                 set_runtime_status(
                     &self.runtime_status,
@@ -398,6 +408,10 @@ impl Camera {
     }
 
     fn capture(&self) -> Result<PathBuf> {
+        self.start_capture()?.finish()
+    }
+
+    fn start_capture(&self) -> Result<PendingCapture<'_>> {
         let _camera = self
             .camera_lock
             .lock()
@@ -410,28 +424,43 @@ impl Camera {
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .camera_args();
-        let status = Command::new(&self.command)
+        let child = Command::new(&self.command)
             .args(&self.args)
             .args(orientation_args)
             .arg("--output")
             .arg(&temporary)
-            .status()
+            .spawn()
             .with_context(|| format!("run camera command {}", self.command))?;
+        Ok(PendingCapture {
+            _camera,
+            child,
+            temporary,
+            final_path,
+            queue_dir: &self.queue_dir,
+        })
+    }
+
+    fn finish_capture(
+        queue_dir: &Path,
+        temporary: &Path,
+        final_path: &Path,
+        status: std::process::ExitStatus,
+    ) -> Result<PathBuf> {
         if !status.success() {
-            let _ = fs::remove_file(&temporary);
+            let _ = fs::remove_file(temporary);
             bail!("camera command exited with {status}");
         }
-        validate_jpeg_file(&temporary)?;
-        File::options().write(true).open(&temporary)?.sync_all()?;
-        fs::rename(&temporary, &final_path).with_context(|| {
+        validate_jpeg_file(temporary)?;
+        File::options().write(true).open(temporary)?.sync_all()?;
+        fs::rename(temporary, final_path).with_context(|| {
             format!(
                 "commit captured photo {} to {}",
                 temporary.display(),
                 final_path.display()
             )
         })?;
-        sync_directory(&self.queue_dir)?;
-        Ok(final_path)
+        sync_directory(queue_dir)?;
+        Ok(final_path.to_owned())
     }
 
     fn capture_lab(&self, settings: &LabSettings) -> Result<Vec<u8>> {
@@ -483,6 +512,21 @@ impl Camera {
         fs::rename(&temporary, &final_path)?;
         sync_directory(&self.queue_dir)?;
         Ok(final_path)
+    }
+}
+
+struct PendingCapture<'a> {
+    _camera: std::sync::MutexGuard<'a, ()>,
+    child: Child,
+    temporary: PathBuf,
+    final_path: PathBuf,
+    queue_dir: &'a Path,
+}
+
+impl PendingCapture<'_> {
+    fn finish(mut self) -> Result<PathBuf> {
+        let status = self.child.wait().context("wait for camera command")?;
+        Camera::finish_capture(self.queue_dir, &self.temporary, &self.final_path, status)
     }
 }
 
@@ -791,6 +835,12 @@ impl AdminState {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         self.led_test_active.store(false, Ordering::Relaxed);
+        set_runtime_status(
+            &self.runtime_status,
+            "countdown",
+            "Get ready — autofocus starting",
+        );
+        let pending = self.camera.start_capture()?;
         self.leds
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -798,10 +848,10 @@ impl AdminState {
         set_runtime_status(
             &self.runtime_status,
             "capturing",
-            "Hold still — focusing and capturing",
+            "Countdown complete — taking the photo",
         );
         let result = (|| {
-            let capture = self.camera.capture()?;
+            let capture = pending.finish()?;
             let capture_id = capture
                 .file_stem()
                 .and_then(|value| value.to_str())
@@ -809,19 +859,18 @@ impl AdminState {
                 .to_owned();
             set_runtime_status(
                 &self.runtime_status,
-                "captured",
-                "Photo captured — you can move",
+                "processing",
+                "Uploading the new photo",
             );
+            let mut pulse = self
+                .leds
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .begin_processing();
             self.leds
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .captured();
-            self.leds
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .uploading();
-            set_runtime_status(&self.runtime_status, "uploading", "Uploading the new photo");
-            self.uploader.upload(&capture)?;
+                .while_processing(&mut pulse, || self.uploader.upload(&capture))?;
             Ok(format!("Captured and uploaded {capture_id}"))
         })();
 
@@ -835,6 +884,10 @@ impl AdminState {
                 set_runtime_status(&self.runtime_status, "ready", "Ready");
             }
             Err(error) => {
+                self.leds
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .finish_processing();
                 set_runtime_status(
                     &self.runtime_status,
                     "error",
@@ -879,18 +932,25 @@ impl AdminState {
             "lab capture",
             "Hold still — capturing a full-resolution test image",
         );
-        self.leds
+        let mut pulse = self
+            .leds
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .uploading();
-        let result = self.camera.capture_lab(&self.lab.settings()).map(|jpeg| {
-            let size = jpeg.len();
-            self.lab.store_capture(jpeg);
-            format!(
-                "Test photo captured in memory ({:.1} MB); it was not uploaded",
-                size as f64 / 1024.0 / 1024.0
-            )
-        });
+            .begin_processing();
+        let result = self
+            .leds
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .while_processing(&mut pulse, || {
+                self.camera.capture_lab(&self.lab.settings()).map(|jpeg| {
+                    let size = jpeg.len();
+                    self.lab.store_capture(jpeg);
+                    format!(
+                        "Test photo captured in memory ({:.1} MB); it was not uploaded",
+                        size as f64 / 1024.0 / 1024.0
+                    )
+                })
+            });
         match &result {
             Ok(message) => {
                 set_runtime_status(&self.runtime_status, "lab captured", message);
@@ -921,14 +981,17 @@ impl AdminState {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         self.led_test_active.store(false, Ordering::Relaxed);
-        self.leds
+        let mut pulse = self
+            .leds
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .uploading();
+            .begin_processing();
         set_runtime_status(&self.runtime_status, "uploading", "Retrying queued uploads");
         let result = self
-            .uploader
-            .retry_all()
+            .leds
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .while_processing(&mut pulse, || self.uploader.retry_all())
             .map(|remaining| format!("Retry finished; {remaining} photo(s) remain queued"));
         match &result {
             Ok(message) => {
@@ -1256,8 +1319,8 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       <div class="phase" id="phase">starting</div>
       <p class="message" id="message">Connecting to the device…</p>
       <div class="signals" aria-label="Physical LED state">
-        <div class="signal"><span class="lamp green" id="green-led"></span><span>Ready</span></div>
-        <div class="signal"><span class="lamp yellow" id="yellow-led"></span><span>Working</span></div>
+        <div class="signal"><span class="lamp green" id="green-led"></span><span>Ready / processing</span></div>
+        <div class="signal"><span class="lamp yellow" id="yellow-led"></span><span>Countdown</span></div>
         <div class="signal"><span class="lamp red" id="red-led"></span><span>Error</span></div>
       </div>
     </section>
@@ -1549,6 +1612,10 @@ struct LedPanel {
     runtime_status: watch::Sender<RuntimeStatus>,
 }
 
+struct ProcessingPulse {
+    step: u32,
+}
+
 impl LedPanel {
     fn new(
         gpio: &Gpio,
@@ -1566,6 +1633,7 @@ impl LedPanel {
     }
 
     fn set(&mut self, green_on: bool, yellow_on: bool, red_on: bool) {
+        let _ = self.green.clear_pwm();
         if green_on {
             self.green.set_high();
         } else {
@@ -1604,14 +1672,48 @@ impl LedPanel {
         self.set(false, true, false);
     }
 
-    fn captured(&mut self) {
+    fn begin_processing(&mut self) -> ProcessingPulse {
         self.set(true, false, false);
-        thread::sleep(Duration::from_millis(450));
-        self.set(false, false, false);
+        let mut pulse = ProcessingPulse { step: 0 };
+        self.processing_tick(&mut pulse);
+        pulse
     }
 
-    fn uploading(&mut self) {
-        self.set(false, true, false);
+    fn processing_tick(&mut self, pulse: &mut ProcessingPulse) {
+        let duty_cycle = processing_duty_cycle(pulse.step);
+        if self.green.set_pwm_frequency(100.0, duty_cycle).is_err() {
+            self.green.set_high();
+        }
+        pulse.step = pulse.step.wrapping_add(1);
+    }
+
+    fn while_processing<T: Send>(
+        &mut self,
+        pulse: &mut ProcessingPulse,
+        operation: impl FnOnce() -> T + Send,
+    ) -> T {
+        let result = thread::scope(|scope| {
+            let (sender, receiver) = mpsc::sync_channel(1);
+            scope.spawn(move || {
+                let _ = sender.send(operation());
+            });
+            loop {
+                match receiver.recv_timeout(Duration::from_millis(40)) {
+                    Ok(result) => break result,
+                    Err(mpsc::RecvTimeoutError::Timeout) => self.processing_tick(pulse),
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        panic!("processing operation stopped without a result")
+                    }
+                }
+            }
+        });
+        self.finish_processing();
+        result
+    }
+
+    fn finish_processing(&mut self) {
+        let _ = self.green.clear_pwm();
+        self.set(false, false, false);
     }
 
     fn success(&mut self) {
@@ -1628,6 +1730,30 @@ impl LedPanel {
     fn error(&mut self) {
         self.set(false, false, true);
     }
+}
+
+fn processing_duty_cycle(step: u32) -> f64 {
+    let phase = (step % 100) as f64 / 100.0 * std::f64::consts::TAU;
+    0.12 + 0.58 * ((phase - std::f64::consts::FRAC_PI_2).sin() + 1.0) / 2.0
+}
+
+fn default_camera_args() -> Vec<String> {
+    [
+        "--nopreview",
+        "--timeout",
+        "3000",
+        "--encoding",
+        "jpg",
+        "--quality",
+        "95",
+        "--autofocus-mode",
+        "auto",
+        "--autofocus-speed",
+        "fast",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect()
 }
 
 fn capture_id() -> String {
@@ -1755,7 +1881,9 @@ fn filesystem_usage(path: &Path) -> Option<(u64, u64, u64)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ADMIN_PAGE, capture_id, validate_jpeg_file};
+    use super::{
+        ADMIN_PAGE, capture_id, default_camera_args, processing_duty_cycle, validate_jpeg_file,
+    };
     use std::io::Write;
 
     #[test]
@@ -1788,5 +1916,44 @@ mod tests {
         assert!(ADMIN_PAGE.contains("/api/lab/preview/start"));
         assert!(ADMIN_PAGE.contains("/api/lab/capture"));
         assert!(ADMIN_PAGE.contains("/api/lab/settings"));
+        assert!(ADMIN_PAGE.contains("Ready / processing"));
+        assert!(ADMIN_PAGE.contains("Countdown"));
+    }
+
+    #[test]
+    fn default_capture_focuses_during_the_three_second_countdown() {
+        let args = default_camera_args();
+        let timeout = args.iter().position(|arg| arg == "--timeout").unwrap();
+        let autofocus = args
+            .iter()
+            .position(|arg| arg == "--autofocus-mode")
+            .unwrap();
+
+        assert_eq!(args.get(timeout + 1).map(String::as_str), Some("3000"));
+        assert_eq!(args.get(autofocus + 1).map(String::as_str), Some("auto"));
+        let autofocus_speed = args
+            .iter()
+            .position(|arg| arg == "--autofocus-speed")
+            .unwrap();
+        assert_eq!(
+            args.get(autofocus_speed + 1).map(String::as_str),
+            Some("fast")
+        );
+        assert!(!args.iter().any(|arg| arg == "--autofocus-on-capture"));
+        assert!(!args.iter().any(|arg| arg == "--immediate"));
+    }
+
+    #[test]
+    fn processing_green_breathes_within_a_safe_duty_cycle() {
+        let duty_cycles = (0..100).map(processing_duty_cycle).collect::<Vec<_>>();
+        let minimum = duty_cycles.iter().copied().fold(f64::INFINITY, f64::min);
+        let maximum = duty_cycles
+            .iter()
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
+
+        assert!((minimum - 0.12).abs() < 0.000_001);
+        assert!((maximum - 0.70).abs() < 0.000_001);
+        assert!((processing_duty_cycle(0) - processing_duty_cycle(100)).abs() < f64::EPSILON);
     }
 }

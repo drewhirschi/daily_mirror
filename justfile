@@ -34,6 +34,10 @@ install-hooks:
 dev:
     cd server && cargo dev
 
+# Create a gallery account, prompting securely for its password.
+auth-create-user username:
+    cd server && cargo run --locked --bin daily-mirror-auth -- create-user "{{username}}"
+
 # Regenerate the typed web client after changing a Rust API route.
 client:
     cd server && npm run client:generate

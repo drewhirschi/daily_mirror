@@ -28,7 +28,7 @@ Use `DAILY_MIRROR_CAMERA_ARGS` for sensor-specific tuning after inspecting the
 ArduCam. The default is:
 
 ```text
---nopreview --immediate --encoding jpg --quality 95
+--nopreview --timeout 3000 --encoding jpg --quality 95 --autofocus-mode auto --autofocus-speed fast
 ```
 
 ## GPIO service
@@ -42,14 +42,19 @@ resistors.
 cargo run --release -- run
 ```
 
-- Green: ready. Face-in-frame detection is not part of the first prototype yet.
-- Yellow: three one-second countdown pulses, then solid while focusing/capturing
-  and again while uploading.
+- Green: solid when ready, slowly breathing while the JPEG is finalized and
+  uploaded, and two quick flashes when the complete workflow succeeds.
+- Yellow: three one-second countdown pulses only.
 - Red: a capture/upload error or at least one photograph awaiting retry.
 
-After the third yellow pulse, hold still while yellow remains solid. A short
-green flash means the JPEG has been captured and it is safe to move. Yellow then
-means upload in progress; solid green returns when the device is ready again.
+The camera process and autofocus start before the first yellow pulse. Yellow
+stays solid after the third pulse only until the actual full-resolution frame
+arrives, so it remains an unambiguous “hold still” indicator. Green starts only
+after the shutter, breathes during local JPEG validation and upload, flashes
+twice on success, then returns to solid ready. Yellow is never reused for
+background work. Do not add
+`--autofocus-on-capture` to this default: `auto` already sweeps at startup, and
+that flag requests a redundant second sweep at the shutter.
 
 The physical button always takes a picture. Holding it cannot trigger multiple
 captures because the service waits for release and debounces both edges.

@@ -18,8 +18,10 @@ export function PwaMetadata() {
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       <meta name="apple-mobile-web-app-title" content="Daily Mirror" />
       <link rel="manifest" href="/manifest.webmanifest" />
-      <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png" />
-      <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+      <link rel="icon" href="/icons/daily-mirror-icon.svg" type="image/svg+xml" />
+      <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
+      <link rel="shortcut icon" href="/favicon.ico" />
+      <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180" />
     </>
   );
 }

@@ -1,8 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#386b42"/>
-  <circle cx="256" cy="242" r="153" fill="#f2efe8"/>
-  <circle cx="256" cy="242" r="124" fill="#dce5dc"/>
-  <path d="M162 214c28-60 95-91 159-68 22 8 41 21 56 37-25-21-57-33-91-33-56 0-105 32-124 78-3 7-5 15-7 22 0-12 2-24 7-36Z" fill="#fffdf8" opacity=".9"/>
-  <rect x="229" y="382" width="54" height="47" rx="20" fill="#f2efe8"/>
-  <circle cx="359" cy="349" r="24" fill="#d69a45"/>
+  <rect width="512" height="512" fill="#386b42"/>
+  <defs>
+    <clipPath id="page"><rect x="43" y="58" width="300" height="318" rx="42"/></clipPath>
+  </defs>
+  <rect x="43" y="58" width="300" height="318" rx="42" fill="#f2efe8"/>
+  <rect x="43" y="112" width="300" height="58" fill="#d69a45" clip-path="url(#page)"/>
+  <rect x="94" y="28" width="34" height="78" rx="17" fill="#f2efe8"/>
+  <rect x="258" y="28" width="34" height="78" rx="17" fill="#f2efe8"/>
+  <g fill="#386b42">
+    <rect x="76" y="199" width="48" height="42" rx="10"/>
+    <rect x="150" y="199" width="48" height="42" rx="10"/>
+    <rect x="224" y="199" width="48" height="42" rx="10"/>
+    <rect x="76" y="263" width="48" height="42" rx="10"/>
+    <rect x="150" y="263" width="48" height="42" rx="10"/>
+    <rect x="224" y="263" width="48" height="42" rx="10"/>
+    <rect x="76" y="327" width="48" height="25" rx="10"/>
+    <rect x="150" y="327" width="48" height="25" rx="10"/>
+    <rect x="224" y="327" width="48" height="25" rx="10"/>
+  </g>
+
+  <path d="M270 284l25-40h94l25 40h16c27 0 49 22 49 49v104c0 27-22 49-49 49H240c-27 0-49-22-49-49V333c0-27 22-49 49-49h30Z" fill="#f2efe8" stroke="#386b42" stroke-width="14" stroke-linejoin="round"/>
+  <rect x="216" y="258" width="54" height="28" rx="14" fill="#d69a45"/>
+  <circle cx="335" cy="379" r="75" fill="#386b42"/>
+  <circle cx="335" cy="379" r="53" fill="#dce5dc"/>
+  <circle cx="335" cy="379" r="28" fill="#fffdf8"/>
+  <path d="M309 358c12-13 32-18 49-12 6 2 11 5 16 9-9-5-18-8-28-8-18 0-33 8-42 21 1-4 2-7 5-10Z" fill="#fff" opacity=".85"/>
+  <circle cx="433" cy="327" r="14" fill="#d69a45"/>
 </svg>

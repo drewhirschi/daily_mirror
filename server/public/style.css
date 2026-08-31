@@ -4,6 +4,274 @@
   font-family: "Avenir Next", Avenir, ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Semantic archive prototype */
+.gallery-page {
+  width: min(1480px, calc(100vw - 32px));
+  margin: clamp(34px, 5vw, 72px) auto 96px;
+}
+
+.archive-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 2px 20px;
+}
+
+.archive-heading h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.9rem, 4vw, 2.7rem);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.archive-heading > p {
+  margin: 0 0 4px;
+  color: #777066;
+  font-size: 0.82rem;
+}
+
+.gallery-toolbar {
+  position: sticky;
+  top: 72px;
+  z-index: 8;
+  width: fit-content;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 28px;
+  padding: 6px;
+  border: 1px solid rgba(193, 185, 173, 0.85);
+  border-radius: 999px;
+  background: rgba(250, 248, 243, 0.9);
+  box-shadow: 0 9px 28px rgba(50, 43, 33, 0.1);
+  backdrop-filter: blur(18px);
+}
+
+.density-control {
+  display: flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: #e7e2d9;
+}
+
+.density-control button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #716a61;
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.density-control button[aria-pressed="true"] {
+  background: #fffdf8;
+  color: #26231f;
+  box-shadow: 0 2px 8px rgba(50, 43, 33, 0.12);
+}
+
+.gallery-toolbar .date-filter { width: auto; }
+.gallery-toolbar .date-filter summary {
+  min-height: 38px;
+  border: 0;
+  background: transparent;
+  padding: 0 11px;
+}
+.gallery-toolbar .date-range { top: calc(100% + 11px); }
+
+.demo-badge {
+  padding: 0 11px;
+  color: #477253;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.photo-archive {
+  display: grid;
+  gap: 34px;
+  touch-action: pan-y;
+}
+
+.photo-period { min-width: 0; }
+
+.period-heading {
+  position: sticky;
+  top: 126px;
+  z-index: 3;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0;
+  padding: 11px 2px 9px;
+  border-bottom: 1px solid #d7d1c5;
+  background: rgba(242, 239, 232, 0.92);
+  backdrop-filter: blur(12px);
+}
+
+.period-heading h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.35rem, 3vw, 2.1rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
+.period-heading span { color: #8e877c; font-size: 0.7rem; }
+
+.photo-archive .photo-grid { display: grid; gap: 3px; }
+.photo-archive[data-density="year"] .photo-grid { grid-template-columns: repeat(28, minmax(0, 1fr)); }
+.photo-archive[data-density="year"] { gap: 3px; }
+.photo-archive[data-density="month"] .photo-grid { grid-template-columns: repeat(14, minmax(0, 1fr)); }
+.photo-archive[data-density="day"] .photo-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.photo-archive[data-density="day"] { gap: 4px; }
+
+.photo-archive .photo-open { border-radius: 0; }
+.photo-archive .photo-open img { height: auto; aspect-ratio: 1; }
+.photo-archive[data-density="day"] .photo-open img { aspect-ratio: 4 / 3; }
+.photo-archive[data-density="year"] .photo-open:hover img,
+.photo-archive[data-density="month"] .photo-open:hover img { transform: scale(1.06); }
+.photo-archive[data-density="day"] .photo-card figcaption { margin: 0; padding: 7px 4px 12px; }
+.virtual-spacer { width: 100%; }
+
+.lightbox-newer { grid-column: 1; grid-row: 1; }
+.lightbox-older { grid-column: 3; grid-row: 1; }
+
+.lightbox {
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+}
+
+.lightbox-nav:disabled {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.lightbox-frame {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.lightbox-frame img {
+  max-height: calc(100dvh - 32px);
+}
+
+.lightbox-meta {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  min-height: 0;
+  display: block;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(20, 19, 17, 0.66);
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.lightbox-tools {
+  position: absolute;
+  top: 10px;
+  right: 62px;
+  z-index: 2;
+}
+
+.lightbox-tools summary {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 0 0 7px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(20, 19, 17, 0.72);
+  color: white;
+  font: 700 1.25rem/1 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  list-style: none;
+}
+
+.lightbox-tools summary::-webkit-details-marker { display: none; }
+.lightbox-tools summary:hover,
+.lightbox-tools summary:focus-visible,
+.lightbox-tools[open] summary { background: rgba(255, 255, 255, 0.18); }
+
+.lightbox-tools-menu {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 190px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(28, 26, 23, 0.94);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px);
+}
+
+.lightbox-tools-menu p,
+.lightbox-tools-menu small { margin: 0; }
+.lightbox-tools-menu p { color: #f2efe8; font-size: 0.76rem; font-weight: 650; }
+.lightbox-tools-menu small { color: #aaa39a; font-size: 0.68rem; line-height: 1.35; }
+.lightbox-tools-menu .photo-actions { width: 100%; display: grid; gap: 6px; }
+.lightbox-tools-menu .photo-actions button { width: 100%; min-height: 38px; text-align: left; }
+
+
+@media (max-width: 639px) {
+  .gallery-page { width: 100%; margin: 26px auto 70px; }
+  .archive-heading { align-items: baseline; padding: 12px 16px 18px; }
+  .archive-heading h1 { font-size: 2rem; }
+
+  .gallery-toolbar {
+    top: 62px;
+    max-width: calc(100vw - 20px);
+    margin: 0 10px 18px;
+    overflow: visible;
+  }
+  .density-control button { min-height: 32px; padding: 0 10px; }
+  .gallery-toolbar .date-filter summary { min-height: 36px; padding: 0 8px; }
+  .gallery-toolbar .date-filter summary span:last-child { display: none; }
+  .demo-badge { display: none; }
+
+  .photo-archive { gap: 26px; }
+  .period-heading { top: 116px; padding: 9px 12px 7px; }
+  .photo-archive[data-density="year"] .photo-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .photo-archive[data-density="month"] .photo-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .photo-archive[data-density="day"] .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .photo-archive[data-density="day"] .photo-card figcaption { padding-left: 8px; }
+
+  .lightbox-newer { left: 12px; right: auto; }
+  .lightbox-older { right: 12px; left: auto; }
+  .lightbox-frame { grid-template-rows: minmax(0, 1fr); }
+  .lightbox-frame img { max-height: calc(100dvh - 16px); }
+  .lightbox-meta { display: block; padding: 7px 11px; }
+  .lightbox-tools { top: 8px; right: 58px; }
+}
+
+/* Final lightbox overlay sizing, after the legacy responsive rules. */
+.lightbox .lightbox-meta {
+  width: max-content;
+  max-width: calc(100% - 32px);
+  min-height: 0;
+  display: block;
+  box-sizing: border-box;
+  padding: 6px 16px;
+}
+
+.lightbox .lightbox-meta figcaption {
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
 body {
   margin: 0;
 }
@@ -705,5 +973,33 @@ code {
     width: 58px;
     height: 58px;
     border-radius: 14px;
+  }
+}
+
+/* Keep prototype positioning after the legacy gallery compatibility rules. */
+.gallery-page { margin: clamp(34px, 5vw, 72px) auto 96px; }
+.photo-archive { gap: 34px; }
+.lightbox-newer { grid-column: 1; grid-row: 1; }
+.lightbox-older { grid-column: 3; grid-row: 1; }
+
+@media (max-width: 639px) {
+  .gallery-page { margin: 26px auto 70px; }
+  .photo-archive { gap: 26px; }
+  .lightbox-newer { left: 12px; right: auto; }
+  .lightbox-older { right: 12px; left: auto; }
+}
+
+/* Share one sticky band between the archive label and controls on wide screens. */
+@media (min-width: 720px) {
+  .gallery-toolbar {
+    top: 68px;
+    margin: 0 8px -52px auto;
+  }
+
+  .period-heading {
+    top: 68px;
+    min-height: 52px;
+    box-sizing: border-box;
+    padding: 8px 450px 8px 2px;
   }
 }

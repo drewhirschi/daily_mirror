@@ -54,7 +54,7 @@ export default function AccountPage() {
         <img src="/icons/icon-192.png" alt="" width="72" height="72" />
         <div>
           <h2>Add to Home Screen</h2>
-          <p>On your iPhone or iPad, open Daily Mirror, tap the Share button, then choose <strong>Add to Home Screen</strong>. It will launch like an app and keep your 30-day sign-in.</p>
+          <p>On your iPhone or iPad, tap Share, choose <strong>Add to Home Screen</strong>, turn on <strong>Open as Web App</strong>, then tap Add. The installed app has its own storage, so sign in once there; it will remember you for 30 days.</p>
         </div>
       </section>
     </main>

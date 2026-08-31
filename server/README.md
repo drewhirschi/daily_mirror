@@ -135,10 +135,11 @@ deploying. Temporary Vercel previews derive their origin from `VERCEL_URL`.
 
 Daily Mirror includes an app manifest, Apple home-screen icon, standalone
 display metadata, and a network-only service worker. In iOS, open the production
-site, tap **Share**, then **Add to Home Screen**. The installed app uses the same
-30-day session as the browser that installed it. The service worker deliberately
-does not cache gallery HTML or photographs, so private archive data is not copied
-into a separate offline cache.
+site, tap **Share**, choose **Add to Home Screen**, turn on **Open as Web App**,
+then tap **Add**. iOS gives the installed app separate cookies and storage, so it
+may require one sign-in after installation; that app session then lasts 30 days.
+The service worker deliberately does not cache gallery HTML or photographs, so
+private archive data is not copied into a separate offline cache.
 
 ## Build and deploy
 

@@ -20,22 +20,31 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            server/package-lock.json
+            realtime/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.96.0
           components: clippy,rustfmt
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             device
             server
+            realtime
+      - name: Install the Rust Worker build adapter
+        run: cargo install worker-build --version 0.8.5 --locked
       - uses: extractions/setup-just@v3
       - name: Restore generated client workspace
         working-directory: server
         run: node .nextrs/ensure-client.mjs
       - name: Install web dependencies
         working-directory: server
+        run: npm ci
+      - name: Install Worker deployment tools
+        working-directory: realtime
         run: npm ci
       - name: Run all checks
         run: just check

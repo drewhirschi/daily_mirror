@@ -1,0 +1,2 @@
+TICKET_SECRET=replace-with-the-same-random-secret-used-by-the-gallery-server
+PUBLISH_TOKEN=replace-with-a-different-random-secret

@@ -12,6 +12,8 @@ identity recognition, comparison, notes, alignment, or time-lapse generation.
   three LEDs, durable upload queue, and retries.
 - `server/` — new NextRS/Axum API, local filesystem storage, React gallery,
   and Docker Compose configuration.
+- `realtime/` — Rust `workers-rs` proof of concept for household-scoped live
+  gallery events through Cloudflare Durable Objects (also compatible with celld).
 - `src/`, `snapr/`, and `view/` — the original 2022 Python, Rust/OpenCV, and
   React prototypes retained for reference.
 - `data/` — photographs and face-recognition experiments from the original
@@ -22,6 +24,7 @@ identity recognition, comparison, notes, alignment, or time-lapse generation.
 ```text
 button -> LED countdown -> ArduCam JPEG -> durable Pi queue
        -> signed upload grant -> local storage or private R2 -> web gallery
+       -> household Durable Object -> connected galleries refresh immediately
 ```
 
 The device writes a completed JPEG to its queue before uploading. It removes

@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "daily-mirror-realtime",
+  "main": "build/worker/shim.mjs",
+  "compatibility_date": "2026-08-20",
+  "build": {
+    "command": "worker-build --release"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "HOUSEHOLDS",
+        "class_name": "HouseholdRealtime"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["HouseholdRealtime"]
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "http://127.0.0.1:3000,http://localhost:3000"
+  }
+}

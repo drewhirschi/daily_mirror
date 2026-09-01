@@ -8,6 +8,7 @@ use utoipa::ToSchema;
 
 use crate::photos::{Photo, PhotoStore};
 use crate::catalog::PhotoCatalog;
+use crate::realtime::RealtimeHub;
 use crate::upload_auth;
 use crate::upload_flow::gallery_photos;
 
@@ -35,6 +36,7 @@ pub async fn get(
 pub async fn post(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,
+    Extension(realtime): Extension<RealtimeHub>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<(StatusCode, Json<UploadResponse>), StatusCode> {
@@ -59,6 +61,7 @@ pub async fn post(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     catalog.mark_thumbnail_ready(&saved.id).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    realtime.publish_photo("photo.created", &saved.id).await;
 
     Ok((
         StatusCode::CREATED,

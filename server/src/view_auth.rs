@@ -89,6 +89,10 @@ mod tests {
         assert!(!bypasses_authentication(&Method::GET, "/account"));
         assert!(!bypasses_authentication(&Method::GET, "/api/photos"));
         assert!(!bypasses_authentication(
+            &Method::GET,
+            "/api/realtime/session"
+        ));
+        assert!(!bypasses_authentication(
             &Method::POST,
             "/api/auth/passkeys/register/start"
         ));

@@ -10,12 +10,13 @@ default:
 
 # Check the local tools used for development and deployment.
 doctor:
-    @command -v cargo >/dev/null || { echo "missing: cargo" >&2; exit 1; }
+    @CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:$PATH" command -v cargo >/dev/null || { echo "missing: cargo" >&2; exit 1; }
     @command -v nextrs >/dev/null || { echo "missing: cargo-nextrs" >&2; exit 1; }
     @command -v cargo-zigbuild >/dev/null || { echo "missing: cargo-zigbuild" >&2; exit 1; }
     @command -v zig >/dev/null || { echo "missing: zig" >&2; exit 1; }
     @command -v node >/dev/null || { echo "missing: node" >&2; exit 1; }
     @command -v npm >/dev/null || { echo "missing: npm" >&2; exit 1; }
+    @CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:$PATH" command -v worker-build >/dev/null || { echo "missing: worker-build (cargo install worker-build --version 0.8.5 --locked)" >&2; exit 1; }
     @command -v curl >/dev/null || { echo "missing: curl" >&2; exit 1; }
     @command -v ssh >/dev/null || { echo "missing: ssh" >&2; exit 1; }
     @command -v scp >/dev/null || { echo "missing: scp" >&2; exit 1; }
@@ -24,6 +25,7 @@ doctor:
 # Install the locked web dependencies, including the project-local Vercel CLI.
 install:
     cd server && node .nextrs/ensure-client.mjs && npm ci
+    cd realtime && npm ci
 
 # Configure this clone to run the full quality suite before every Git push.
 install-hooks:
@@ -32,25 +34,26 @@ install-hooks:
 
 # Run the local NextRS gallery and API.
 dev:
-    cd server && cargo dev
+    cd server && export CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:$PATH" && cargo dev
 
 # Create a gallery account, prompting securely for its password.
 auth-create-user username:
-    cd server && cargo run --locked --bin daily-mirror-auth -- create-user "{{username}}"
+    cd server && export CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:$PATH" && cargo run --locked --bin daily-mirror-auth -- create-user "{{username}}"
 
 # Regenerate the typed web client after changing a Rust API route.
 client:
-    cd server && npm run client:generate
+    cd server && export CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:$PATH" && npm run client:generate
 
 # Format, compile, type-check, and test both Rust applications.
 check:
-    cd device && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
-    cd server && npm run client:generate && cargo fmt --check && cargo clippy --all-targets -- -D warnings -A clippy::match-single-binding && npm run typecheck && cargo test
+    cd device && export CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:$PATH" && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+    cd server && export CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:$PATH" && npm run client:generate && cargo fmt --check && cargo clippy --all-targets -- -D warnings -A clippy::match-single-binding && npm run typecheck && cargo test
+    cd realtime && export CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:$PATH" && cargo fmt --check && cargo clippy --target wasm32-unknown-unknown -- -D warnings && cargo test && worker-build --release && npm run test:e2e
     git diff --check
 
 # Cross-compile the Pi service on this computer.
 device-build:
-    cd device && cargo zigbuild --locked --release --target {{device_target}}
+    cd device && export CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:$PATH" && cargo zigbuild --locked --release --target {{device_target}}
 
 # Cross-compile, install atomically on rpi1, restart, and verify its health endpoint.
 pi-deploy: device-build
@@ -79,11 +82,11 @@ deploy-check: check
 
 # Build locally and deploy the server to the linked Vercel production project.
 deploy: deploy-check
-    cd server && PATH="node_modules/.bin:$PATH" ./scripts/deploy-prebuilt.sh
+    cd server && CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:node_modules/.bin:$PATH" ./scripts/deploy-prebuilt.sh
 
 # Build locally and deploy an unaliased Vercel preview.
 deploy-preview: deploy-check
-    cd server && PATH="node_modules/.bin:$PATH" ./scripts/deploy-prebuilt.sh --preview
+    cd server && CARGO_HOME="$HOME/.cargo" PATH="$HOME/.cargo/bin:node_modules/.bin:$PATH" ./scripts/deploy-prebuilt.sh --preview
 
 # Verify a deployed server. Example: just server-health https://example.vercel.app
 server-health server_url:

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TouchEvent, WheelEvent } from "react";
 import { useGetApiPhotos } from "@server/client/react-query";
+import { useHouseholdRealtime } from "../components/household-realtime";
 
 type Density = "year" | "month" | "day";
 type GalleryPhoto = { id: string; url: string; thumbnail_url?: string };
@@ -19,6 +20,7 @@ export default function Page() {
   const [anchorId, setAnchorId] = useState<string | null>(null);
   const pinch = useRef<{ distance: number; anchorId: string | null } | null>(null);
   const viewportWidth = useViewportWidth();
+  const realtime = useHouseholdRealtime(!demoMode, () => { void photos.refetch(); });
 
   useEffect(() => setDemoMode(new URLSearchParams(window.location.search).get("demo") === "1"), []);
 
@@ -79,7 +81,14 @@ export default function Page() {
           </div>
         </details>
         {demoMode ? <span className="demo-badge">Demo archive</span> : null}
+        {!demoMode && realtime.status !== "disabled" ? (
+          <span className={`realtime-badge realtime-${realtime.status}`} aria-live="polite">
+            <span aria-hidden="true" />{realtime.status === "connected" ? "Live" : realtime.status === "connecting" ? "Connecting" : "Reconnecting"}
+          </span>
+        ) : null}
       </section>
+
+      {realtime.notice ? <p className="household-notice" role="status">{realtime.notice}</p> : null}
 
       {editError ? <p className="edit-error" role="alert">{editError}</p> : null}
       {photos.isError && !demoMode ? <p className="empty-state">The photo archive could not be loaded.</p>

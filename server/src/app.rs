@@ -12,6 +12,7 @@ pub mod catalog;
 pub mod cron_auth;
 pub mod passkeys;
 pub mod photos;
+pub mod realtime;
 pub mod upload_auth;
 pub mod upload_flow;
 pub mod view_auth;
@@ -30,6 +31,8 @@ pub fn app() -> axum::Router {
         .unwrap_or_else(|error| panic!("invalid authentication storage configuration: {error}"));
     let passkey_service = passkeys::PasskeyService::from_env()
         .unwrap_or_else(|error| panic!("invalid passkey configuration: {error}"));
+    let realtime_hub = realtime::RealtimeHub::from_env()
+        .unwrap_or_else(|error| panic!("invalid realtime configuration: {error}"));
     upload_auth::validate_configuration(&photo_store)
         .unwrap_or_else(|error| panic!("invalid upload authentication configuration: {error}"));
     cron_auth::validate_configuration()
@@ -39,6 +42,7 @@ pub fn app() -> axum::Router {
         .layer(DefaultBodyLimit::max(32 * 1024 * 1024))
         .layer(Extension(photo_store))
         .layer(Extension(photo_catalog))
+        .layer(Extension(realtime_hub))
         .layer(Extension(passkey_service))
         .layer(Extension(auth_store.clone()))
         .layer(middleware::from_fn_with_state(

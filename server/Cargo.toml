@@ -33,11 +33,12 @@ nextrs = { version = "0.6.0", features = ["vercel"] }
 axum = "0.8"
 argon2 = "0.5.3"
 base64 = "0.22"
+hmac = "0.12"
 dotenvy = "0.15"
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
 http = "1"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rusty-s3 = { version = "0.10.2", default-features = false, features = ["rustcrypto", "xml"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "webp"] }
 libsql = { version = "0.9", default-features = false, features = ["core", "remote", "tls"] }

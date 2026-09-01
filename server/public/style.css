@@ -92,6 +92,38 @@
   white-space: nowrap;
 }
 
+.realtime-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 6px;
+  color: #716a61;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.realtime-badge > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b38b43;
+}
+
+.realtime-connected > span {
+  background: #4c8b5e;
+  box-shadow: 0 0 0 3px rgba(76, 139, 94, 0.13);
+}
+
+.household-notice {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border: 1px solid #d7d1c5;
+  border-radius: 12px;
+  background: #faf8f3;
+  color: #5e574e;
+  font-size: 0.82rem;
+}
+
 .photo-archive {
   display: grid;
   gap: 34px;
@@ -241,6 +273,7 @@
   .gallery-toolbar .date-filter summary { min-height: 36px; padding: 0 8px; }
   .gallery-toolbar .date-filter summary span:last-child { display: none; }
   .demo-badge { display: none; }
+  .realtime-badge { padding-right: 6px; font-size: 0; }
 
   .photo-archive { gap: 26px; }
   .period-heading { top: 116px; padding: 9px 12px 7px; }

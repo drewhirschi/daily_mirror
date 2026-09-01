@@ -1,0 +1,13 @@
+{
+  "name": "daily-mirror-realtime-tools",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test:e2e": "node tests/live.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.127.1",
+    "ws": "8.21.3"
+  }
+}

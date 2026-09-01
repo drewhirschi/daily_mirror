@@ -101,6 +101,20 @@ size mismatches hidden for investigation. `CRON_SECRET` stays in Vercel; Vercel
 supplies it as a Bearer token when invoking the schedule declared in
 `vercel.json`.
 
+## Household realtime proof of concept
+
+The optional Rust Worker in `../realtime` gives each household one Durable
+Object and one ordered WebSocket broadcast channel. After a database mutation
+has succeeded, this server posts a small event to that household; connected
+galleries refetch their catalog immediately. The database remains the source of
+truth and the existing 60-second poll remains enabled, so a failed event does
+not lose a photo or leave the gallery permanently stale.
+
+Browsers never receive the Worker publisher token. An authenticated gallery
+requests `GET /api/realtime/session`; this server returns a household-bound,
+HMAC-signed WebSocket ticket that expires in 60 seconds. Reconnection obtains a
+fresh ticket. See `../realtime/README.md` for local and Cloudflare setup.
+
 Set the variables documented in `.env.example`; R2 API credentials need object
 read/write plus bucket-list access.
 

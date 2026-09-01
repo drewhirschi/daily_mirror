@@ -9,6 +9,7 @@ use serde::Deserialize;
 
 use crate::photos::{PhotoRead, PhotoStore};
 use crate::catalog::PhotoCatalog;
+use crate::realtime::RealtimeHub;
 
 pub async fn get(Extension(store): Extension<PhotoStore>, Path(id): Path<String>) -> Response {
     match store.read(&id).await {
@@ -48,12 +49,16 @@ pub struct RotatePhoto {
 pub async fn patch(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,
+    Extension(realtime): Extension<RealtimeHub>,
     Path(id): Path<String>,
     Json(edit): Json<RotatePhoto>,
 ) -> StatusCode {
     match store.rotate(&id, edit.degrees).await {
         Ok(()) => match catalog.record_rotation(&id, edit.degrees).await {
-            Ok(()) => StatusCode::NO_CONTENT,
+            Ok(()) => {
+                realtime.publish_photo("photo.updated", &id).await;
+                StatusCode::NO_CONTENT
+            }
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
         },
         Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => StatusCode::BAD_REQUEST,
@@ -65,11 +70,15 @@ pub async fn patch(
 pub async fn delete(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,
+    Extension(realtime): Extension<RealtimeHub>,
     Path(id): Path<String>,
 ) -> StatusCode {
     match store.delete(&id).await {
         Ok(true) => match catalog.delete(&id).await {
-            Ok(()) => StatusCode::NO_CONTENT,
+            Ok(()) => {
+                realtime.publish_photo("photo.deleted", &id).await;
+                StatusCode::NO_CONTENT
+            }
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
         },
         Ok(false) => StatusCode::NOT_FOUND,

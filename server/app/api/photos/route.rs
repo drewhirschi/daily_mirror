@@ -24,10 +24,9 @@ pub struct UploadResponse {
 
 #[nextrs::api]
 pub async fn get(
-    Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,
 ) -> Result<Json<PhotoList>, StatusCode> {
-    let photos = gallery_photos(&store, &catalog)
+    let photos = gallery_photos(&catalog)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(PhotoList { photos }))
@@ -52,7 +51,13 @@ pub async fn post(
             std::io::ErrorKind::Unsupported => StatusCode::UPGRADE_REQUIRED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         })?;
+    store
+        .ensure_thumbnail(&saved.id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     catalog.register_ready(&saved.id, &storage_key, body.len() as u64).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    catalog.mark_thumbnail_ready(&saved.id).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok((

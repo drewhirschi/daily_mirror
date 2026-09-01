@@ -58,6 +58,8 @@ pub struct ReconcileReport {
     pub imported_orphans: usize,
     pub unresolved_pending: usize,
     pub missing_storage_objects: usize,
+    pub generated_thumbnails: usize,
+    pub thumbnail_failures: usize,
 }
 
 pub async fn finalize_upload(
@@ -81,30 +83,24 @@ pub async fn finalize_upload(
     if actual != expected {
         return Err(FinalizeError::SizeMismatch { expected, actual });
     }
+    store
+        .ensure_thumbnail(id)
+        .await
+        .map_err(FinalizeError::Storage)?;
     catalog.mark_ready(id).await.map_err(|error| {
         if error.kind() == io::ErrorKind::NotFound {
             FinalizeError::ReservationNotFound
         } else {
             FinalizeError::Catalog(error)
         }
-    })
+    })?;
+    catalog
+        .mark_thumbnail_ready(id)
+        .await
+        .map_err(FinalizeError::Catalog)
 }
 
-pub async fn gallery_photos(store: &PhotoStore, catalog: &PhotoCatalog) -> io::Result<Vec<Photo>> {
-    let mut unresolved = HashSet::new();
-    for pending in catalog.pending().await? {
-        match store.uploaded_size(&pending.id).await? {
-            Some(size) if size == pending.byte_size => catalog.mark_ready(&pending.id).await?,
-            _ => {
-                unresolved.insert(pending.id);
-            }
-        }
-    }
-
-    if catalog.ready_is_empty().await? {
-        let stored = storage_records(store, &unresolved).await?;
-        catalog.import(&stored).await?;
-    }
+pub async fn gallery_photos(catalog: &PhotoCatalog) -> io::Result<Vec<Photo>> {
     catalog.list().await
 }
 
@@ -130,12 +126,24 @@ pub async fn reconcile_all(
         .collect::<HashSet<_>>();
 
     let mut recovered_pending = 0;
+    let mut generated_thumbnails = 0;
+    let mut thumbnail_failures = 0;
     let mut unresolved = HashSet::new();
     for (id, expected_size) in &pending {
         match store.uploaded_size(id).await? {
             Some(actual_size) if actual_size == *expected_size => {
-                catalog.mark_ready(id).await?;
-                recovered_pending += 1;
+                match store.ensure_thumbnail(id).await {
+                    Ok(generated) => {
+                        catalog.mark_ready(id).await?;
+                        catalog.mark_thumbnail_ready(id).await?;
+                        recovered_pending += 1;
+                        generated_thumbnails += usize::from(generated);
+                    }
+                    Err(_) => {
+                        thumbnail_failures += 1;
+                        unresolved.insert(id.as_str());
+                    }
+                }
             }
             _ => {
                 unresolved.insert(id.as_str());
@@ -154,6 +162,19 @@ pub async fn reconcile_all(
         .collect::<io::Result<Vec<_>>>()?;
     catalog.import(&orphan_records).await?;
 
+    for id in catalog.thumbnails_pending().await? {
+        if !stored_ids.contains(id.as_str()) {
+            continue;
+        }
+        match store.ensure_thumbnail(&id).await {
+            Ok(generated) => {
+                catalog.mark_thumbnail_ready(&id).await?;
+                generated_thumbnails += usize::from(generated);
+            }
+            Err(_) => thumbnail_failures += 1,
+        }
+    }
+
     let ready_after = catalog.list().await?;
     let missing_storage_objects = ready_after
         .iter()
@@ -167,29 +188,17 @@ pub async fn reconcile_all(
         imported_orphans: orphan_records.len(),
         unresolved_pending: unresolved.len(),
         missing_storage_objects,
+        generated_thumbnails,
+        thumbnail_failures,
     })
-}
-
-async fn storage_records(
-    store: &PhotoStore,
-    excluded: &HashSet<String>,
-) -> io::Result<Vec<(Photo, String)>> {
-    store
-        .list()
-        .await?
-        .into_iter()
-        .filter(|photo| !excluded.contains(&photo.id))
-        .map(|photo| {
-            let key = store.storage_key(&photo.id)?;
-            Ok((photo, key))
-        })
-        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use std::io;
     use std::path::PathBuf;
+
+    use image::{Rgb, RgbImage};
 
     use super::{FinalizeError, ReconcileReport, finalize_upload, gallery_photos, reconcile_all};
     use crate::catalog::PhotoCatalog;
@@ -226,10 +235,13 @@ mod tests {
     }
 
     fn jpeg(payload: &[u8]) -> Vec<u8> {
-        let mut jpeg = vec![0xff, 0xd8];
-        jpeg.extend_from_slice(payload);
-        jpeg.extend_from_slice(&[0xff, 0xd9]);
-        jpeg
+        let color = payload.first().copied().unwrap_or(0);
+        let image = RgbImage::from_pixel(4, 3, Rgb([color, 96, 180]));
+        let mut bytes = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new(&mut bytes)
+            .encode_image(&image)
+            .unwrap();
+        bytes
     }
 
     #[test]
@@ -290,7 +302,10 @@ mod tests {
         finalize_upload(&fixture.store, &fixture.catalog, id)
             .await
             .unwrap();
-        assert_eq!(fixture.catalog.list().await.unwrap()[0].id, id);
+        let photo = &fixture.catalog.list().await.unwrap()[0];
+        assert_eq!(photo.id, id);
+        assert!(photo.thumbnail_url.is_some());
+        assert!(fixture.store.read_thumbnail(id).await.unwrap().is_some());
         fixture.cleanup().await;
     }
 
@@ -320,7 +335,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn gallery_recovers_complete_pending_uploads() {
+    async fn gallery_reads_do_not_reconcile_complete_pending_uploads() {
         let fixture = Fixture::new("gallery-recovery").await;
         let id = "20260830T210200Z-recover01";
         let bytes = jpeg(&[4, 5]);
@@ -335,17 +350,14 @@ mod tests {
             .unwrap();
         fixture.store.save(id, &bytes).await.unwrap();
 
-        let photos = gallery_photos(&fixture.store, &fixture.catalog)
-            .await
-            .unwrap();
-        assert_eq!(photos.len(), 1);
-        assert_eq!(photos[0].id, id);
-        assert!(fixture.catalog.pending().await.unwrap().is_empty());
+        let photos = gallery_photos(&fixture.catalog).await.unwrap();
+        assert!(photos.is_empty());
+        assert_eq!(fixture.catalog.pending().await.unwrap()[0].id, id);
         fixture.cleanup().await;
     }
 
     #[tokio::test]
-    async fn gallery_hides_mismatch_without_blocking_orphan_backfill() {
+    async fn gallery_reads_do_not_import_storage_orphans() {
         let fixture = Fixture::new("gallery-orphan").await;
         let pending_id = "20260830T210300Z-mismatch2";
         let orphan_id = "20260830T210301Z-orphan001";
@@ -362,11 +374,8 @@ mod tests {
         fixture.store.save(pending_id, &bytes).await.unwrap();
         fixture.store.save(orphan_id, &jpeg(&[7])).await.unwrap();
 
-        let photos = gallery_photos(&fixture.store, &fixture.catalog)
-            .await
-            .unwrap();
-        assert_eq!(photos.len(), 1);
-        assert_eq!(photos[0].id, orphan_id);
+        let photos = gallery_photos(&fixture.catalog).await.unwrap();
+        assert!(photos.is_empty());
         assert_eq!(fixture.catalog.pending().await.unwrap()[0].id, pending_id);
         fixture.cleanup().await;
     }
@@ -414,6 +423,8 @@ mod tests {
                 imported_orphans: 1,
                 unresolved_pending: 1,
                 missing_storage_objects: 0,
+                generated_thumbnails: 2,
+                thumbnail_failures: 0,
             }
         );
         let second = reconcile_all(&fixture.store, &fixture.catalog)
@@ -442,6 +453,34 @@ mod tests {
             .unwrap();
         assert_eq!(report.ready_after, 1);
         assert_eq!(report.missing_storage_objects, 1);
+        assert_eq!(report.generated_thumbnails, 0);
+        assert_eq!(report.thumbnail_failures, 0);
+        fixture.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn thumbnail_reconciliation_reports_corrupt_images_without_hiding_them() {
+        let fixture = Fixture::new("corrupt-thumbnail").await;
+        let id = "20260830T210600Z-corrupt01";
+        let corrupt = vec![0xff, 0xd8, 7, 0xff, 0xd9];
+        fixture.store.save(id, &corrupt).await.unwrap();
+        fixture
+            .catalog
+            .register_ready(
+                id,
+                &fixture.store.storage_key(id).unwrap(),
+                corrupt.len() as u64,
+            )
+            .await
+            .unwrap();
+
+        let report = reconcile_all(&fixture.store, &fixture.catalog)
+            .await
+            .unwrap();
+        assert_eq!(report.ready_after, 1);
+        assert_eq!(report.generated_thumbnails, 0);
+        assert_eq!(report.thumbnail_failures, 1);
+        assert_eq!(fixture.catalog.list().await.unwrap()[0].thumbnail_url, None);
         fixture.cleanup().await;
     }
 }

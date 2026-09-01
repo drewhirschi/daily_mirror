@@ -98,6 +98,8 @@ impl PhotoCatalog {
                     byte_size INTEGER,
                     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'ready')),
                     rotation_degrees INTEGER NOT NULL DEFAULT 0,
+                    thumbnail_status TEXT NOT NULL DEFAULT 'pending',
+                    media_revision INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
@@ -106,6 +108,13 @@ impl PhotoCatalog {
                     )
                     .await
                     .map_err(io::Error::other)?;
+                ensure_column(
+                    &connection,
+                    "thumbnail_status",
+                    "TEXT NOT NULL DEFAULT 'pending'",
+                )
+                .await?;
+                ensure_column(&connection, "media_revision", "INTEGER NOT NULL DEFAULT 0").await?;
                 Ok(database)
             })
             .await
@@ -179,7 +188,7 @@ impl PhotoCatalog {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         let mut rows = connection
             .query(
-                "SELECT id FROM photos WHERE status = 'ready' ORDER BY captured_at DESC, id DESC",
+                "SELECT id, thumbnail_status, media_revision FROM photos WHERE status = 'ready' ORDER BY captured_at DESC, id DESC",
                 (),
             )
             .await
@@ -187,8 +196,15 @@ impl PhotoCatalog {
         let mut photos = Vec::new();
         while let Some(row) = rows.next().await.map_err(io::Error::other)? {
             let id: String = row.get(0).map_err(io::Error::other)?;
+            let thumbnail_status: String = row.get(1).map_err(io::Error::other)?;
+            let media_revision: i64 = row.get(2).map_err(io::Error::other)?;
+            let revision = u64::try_from(media_revision).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidData, "invalid photo media revision")
+            })?;
             photos.push(Photo {
-                url: format!("/api/photos/{id}"),
+                url: format!("/api/photos/{id}?rev={revision}"),
+                thumbnail_url: (thumbnail_status == "ready")
+                    .then(|| format!("/api/photos/{id}/thumbnail?rev={revision}")),
                 id,
             });
         }
@@ -234,10 +250,38 @@ impl PhotoCatalog {
         self.mark_ready(id).await
     }
 
+    pub async fn thumbnails_pending(&self) -> io::Result<Vec<String>> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let mut rows = connection
+            .query(
+                "SELECT id FROM photos WHERE status = 'ready' AND thumbnail_status != 'ready' ORDER BY captured_at",
+                (),
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let mut ids = Vec::new();
+        while let Some(row) = rows.next().await.map_err(io::Error::other)? {
+            ids.push(row.get(0).map_err(io::Error::other)?);
+        }
+        Ok(ids)
+    }
+
+    pub async fn mark_thumbnail_ready(&self, id: &str) -> io::Result<()> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        connection
+            .execute(
+                "UPDATE photos SET thumbnail_status = 'ready', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+                params![id],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        Ok(())
+    }
+
     pub async fn record_rotation(&self, id: &str, degrees: i16) -> io::Result<()> {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         connection.execute(
-            "UPDATE photos SET rotation_degrees = (rotation_degrees + ?2 + 360) % 360, updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+            "UPDATE photos SET rotation_degrees = (rotation_degrees + ?2 + 360) % 360, media_revision = media_revision + 1, thumbnail_status = 'ready', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
             params![id, degrees],
         ).await.map_err(io::Error::other)?;
         Ok(())
@@ -250,6 +294,29 @@ impl PhotoCatalog {
             .await
             .map_err(io::Error::other)?;
         Ok(())
+    }
+}
+
+async fn ensure_column(
+    connection: &libsql::Connection,
+    name: &str,
+    definition: &str,
+) -> io::Result<()> {
+    let mut rows = connection
+        .query("PRAGMA table_info(photos)", ())
+        .await
+        .map_err(io::Error::other)?;
+    while let Some(row) = rows.next().await.map_err(io::Error::other)? {
+        let existing: String = row.get(1).map_err(io::Error::other)?;
+        if existing == name {
+            return Ok(());
+        }
+    }
+    let statement = format!("ALTER TABLE photos ADD COLUMN {name} {definition}");
+    match connection.execute(&statement, ()).await {
+        Ok(_) => Ok(()),
+        Err(error) if error.to_string().contains("duplicate column name") => Ok(()),
+        Err(error) => Err(io::Error::other(error)),
     }
 }
 
@@ -323,8 +390,23 @@ mod tests {
         catalog.mark_ready(id).await.unwrap();
         assert!(!catalog.ready_is_empty().await.unwrap());
         assert!(catalog.pending().await.unwrap().is_empty());
-        assert_eq!(catalog.list().await.unwrap()[0].id, id);
+        assert_eq!(catalog.thumbnails_pending().await.unwrap(), vec![id]);
+        let photo = &catalog.list().await.unwrap()[0];
+        assert_eq!(photo.id, id);
+        assert_eq!(photo.url, format!("/api/photos/{id}?rev=0"));
+        assert_eq!(photo.thumbnail_url, None);
+        catalog.mark_thumbnail_ready(id).await.unwrap();
+        assert_eq!(
+            catalog.list().await.unwrap()[0].thumbnail_url,
+            Some(format!("/api/photos/{id}/thumbnail?rev=0"))
+        );
         catalog.record_rotation(id, 90).await.unwrap();
+        let rotated = &catalog.list().await.unwrap()[0];
+        assert_eq!(rotated.url, format!("/api/photos/{id}?rev=1"));
+        assert_eq!(
+            rotated.thumbnail_url,
+            Some(format!("/api/photos/{id}/thumbnail?rev=1"))
+        );
         catalog.delete(id).await.unwrap();
         assert!(catalog.list().await.unwrap().is_empty());
         let missing = catalog.mark_ready(id).await.unwrap_err();
@@ -336,12 +418,57 @@ mod tests {
                 Photo {
                     id: id.to_owned(),
                     url: format!("/api/photos/{id}"),
+                    thumbnail_url: None,
                 },
                 "photos/test.jpg".to_owned(),
             )])
             .await
             .unwrap();
         assert_eq!(catalog.list().await.unwrap()[0].id, id);
+
+        drop(catalog);
+        let _ = tokio::fs::remove_file(path).await;
+    }
+
+    #[tokio::test]
+    async fn existing_catalogs_gain_thumbnail_columns_without_losing_photos() {
+        let path = std::env::temp_dir().join(format!(
+            "daily-mirror-catalog-migration-test-{}.db",
+            std::process::id()
+        ));
+        let _ = tokio::fs::remove_file(&path).await;
+        let database = libsql::Builder::new_local(&path).build().await.unwrap();
+        let connection = database.connect().unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE photos (
+                    id TEXT PRIMARY KEY,
+                    storage_key TEXT NOT NULL,
+                    captured_at TEXT NOT NULL,
+                    content_type TEXT NOT NULL DEFAULT 'image/jpeg',
+                    byte_size INTEGER,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    rotation_degrees INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                INSERT INTO photos (id, storage_key, captured_at, byte_size, status)
+                VALUES ('20260829T071500Z-migrate1', 'photos/migrate.jpg', '2026-08-29T07:15:00Z', 123, 'ready');",
+            )
+            .await
+            .unwrap();
+        drop(connection);
+        drop(database);
+
+        let catalog = PhotoCatalog::local(path.to_string_lossy().into_owned());
+        let photos = catalog.list().await.unwrap();
+        assert_eq!(photos.len(), 1);
+        assert_eq!(photos[0].url, "/api/photos/20260829T071500Z-migrate1?rev=0");
+        assert_eq!(photos[0].thumbnail_url, None);
+        assert_eq!(
+            catalog.thumbnails_pending().await.unwrap(),
+            vec!["20260829T071500Z-migrate1"]
+        );
 
         drop(catalog);
         let _ = tokio::fs::remove_file(path).await;

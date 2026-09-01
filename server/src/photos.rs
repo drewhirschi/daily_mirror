@@ -12,6 +12,9 @@ use tokio::io::AsyncWriteExt;
 use utoipa::ToSchema;
 
 const PHOTO_EXTENSION: &str = "jpg";
+const THUMBNAIL_EXTENSION: &str = "webp";
+const THUMBNAIL_DIRECTORY: &str = ".thumbnails";
+pub const THUMBNAIL_MAX_EDGE: u32 = 320;
 pub const MAX_PHOTO_BYTES: u64 = 32 * 1024 * 1024;
 const DEFAULT_PRESIGN_SECONDS: u64 = 300;
 
@@ -44,6 +47,8 @@ struct R2Store {
 pub struct Photo {
     pub id: String,
     pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thumbnail_url: Option<String>,
 }
 
 #[derive(Debug)]
@@ -279,31 +284,104 @@ impl PhotoStore {
         }
     }
 
+    pub async fn ensure_thumbnail(&self, id: &str) -> io::Result<bool> {
+        validate_capture_id(id)?;
+        if self.thumbnail_size(id).await?.is_some_and(|size| size > 0) {
+            return Ok(false);
+        }
+        self.regenerate_thumbnail(id).await?;
+        Ok(true)
+    }
+
+    pub async fn regenerate_thumbnail(&self, id: &str) -> io::Result<()> {
+        let jpeg = self
+            .original_bytes(id)
+            .await?
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "photo not found"))?;
+        let webp = tokio::task::spawn_blocking(move || thumbnail_webp(&jpeg))
+            .await
+            .map_err(io::Error::other)??;
+        self.write_thumbnail(id, webp).await
+    }
+
+    pub async fn read_thumbnail(&self, id: &str) -> io::Result<Option<Vec<u8>>> {
+        validate_capture_id(id)?;
+        match self.backend.as_ref() {
+            Backend::Local(store) => match tokio::fs::read(store.thumbnail_path_for(id)).await {
+                Ok(bytes) => Ok(Some(bytes)),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+                Err(error) => Err(error),
+            },
+            Backend::R2(store) => store.get_object(&store.thumbnail_key_for(id)).await,
+        }
+    }
+
+    async fn original_bytes(&self, id: &str) -> io::Result<Option<Vec<u8>>> {
+        validate_capture_id(id)?;
+        match self.backend.as_ref() {
+            Backend::Local(store) => match tokio::fs::read(store.path_for(id)).await {
+                Ok(bytes) => Ok(Some(bytes)),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+                Err(error) => Err(error),
+            },
+            Backend::R2(store) => store.get_object(&store.key_for(id)).await,
+        }
+    }
+
+    async fn thumbnail_size(&self, id: &str) -> io::Result<Option<u64>> {
+        match self.backend.as_ref() {
+            Backend::Local(store) => {
+                match tokio::fs::metadata(store.thumbnail_path_for(id)).await {
+                    Ok(metadata) => Ok(Some(metadata.len())),
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+                    Err(error) => Err(error),
+                }
+            }
+            Backend::R2(store) => {
+                store
+                    .object_size_for_key(&store.thumbnail_key_for(id))
+                    .await
+            }
+        }
+    }
+
+    async fn write_thumbnail(&self, id: &str, webp: Vec<u8>) -> io::Result<()> {
+        match self.backend.as_ref() {
+            Backend::Local(store) => {
+                let directory = store.thumbnail_directory();
+                tokio::fs::create_dir_all(&directory).await?;
+                let path = store.thumbnail_path_for(id);
+                let temporary = directory.join(format!(".{id}.{}.tmp", std::process::id()));
+                tokio::fs::write(&temporary, webp).await?;
+                tokio::fs::rename(temporary, path).await
+            }
+            Backend::R2(store) => {
+                store
+                    .put_object(&store.thumbnail_key_for(id), "image/webp", webp)
+                    .await
+            }
+        }
+    }
+
     pub async fn delete(&self, id: &str) -> io::Result<bool> {
         validate_capture_id(id)?;
         match self.backend.as_ref() {
-            Backend::Local(store) => match tokio::fs::remove_file(store.path_for(id)).await {
-                Ok(()) => Ok(true),
-                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
-                Err(error) => Err(error),
-            },
-            Backend::R2(store) => {
-                let key = store.key_for(id);
-                let action = store.bucket.delete_object(Some(&store.credentials), &key);
-                let response = store
-                    .client
-                    .delete(action.sign(store.presign_ttl))
-                    .send()
-                    .await
-                    .map_err(io::Error::other)?;
-                if response.status().is_success() {
-                    Ok(true)
-                } else {
-                    Err(io::Error::other(format!(
-                        "R2 delete failed with {}",
-                        response.status()
-                    )))
+            Backend::Local(store) => {
+                match tokio::fs::remove_file(store.thumbnail_path_for(id)).await {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error),
                 }
+                match tokio::fs::remove_file(store.path_for(id)).await {
+                    Ok(()) => Ok(true),
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+                    Err(error) => Err(error),
+                }
+            }
+            Backend::R2(store) => {
+                store.delete_object(&store.thumbnail_key_for(id)).await?;
+                store.delete_object(&store.key_for(id)).await?;
+                Ok(true)
             }
         }
     }
@@ -316,20 +394,10 @@ impl PhotoStore {
                 "degrees must be -90, 90, or 180",
             ));
         }
-        let bytes = match self.backend.as_ref() {
-            Backend::Local(store) => tokio::fs::read(store.path_for(id)).await?,
-            Backend::R2(store) => {
-                let response = store
-                    .client
-                    .get(store.signed_get_url(id))
-                    .send()
-                    .await
-                    .map_err(io::Error::other)?
-                    .error_for_status()
-                    .map_err(io::Error::other)?;
-                response.bytes().await.map_err(io::Error::other)?.to_vec()
-            }
-        };
+        let bytes = self
+            .original_bytes(id)
+            .await?
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "photo not found"))?;
         let image = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
             .map_err(io::Error::other)?;
         let rotated = match degrees {
@@ -342,29 +410,21 @@ impl PhotoStore {
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 92)
             .encode_image(&rotated)
             .map_err(io::Error::other)?;
+        let webp = thumbnail_webp_from_image(&rotated)?;
 
         match self.backend.as_ref() {
             Backend::Local(store) => {
                 let path = store.path_for(id);
                 let temporary = path.with_extension("jpg.tmp");
                 tokio::fs::write(&temporary, jpeg).await?;
-                tokio::fs::rename(temporary, path).await
+                tokio::fs::rename(temporary, path).await?;
+                self.write_thumbnail(id, webp).await
             }
             Backend::R2(store) => {
-                let key = store.key_for(id);
-                let mut action = store.bucket.put_object(Some(&store.credentials), &key);
-                action.headers_mut().insert("content-type", "image/jpeg");
                 store
-                    .client
-                    .put(action.sign(store.presign_ttl))
-                    .header("content-type", "image/jpeg")
-                    .body(jpeg)
-                    .send()
-                    .await
-                    .map_err(io::Error::other)?
-                    .error_for_status()
-                    .map_err(io::Error::other)?;
-                Ok(())
+                    .put_object(&store.key_for(id), "image/jpeg", jpeg)
+                    .await?;
+                self.write_thumbnail(id, webp).await
             }
         }
     }
@@ -403,6 +463,15 @@ impl LocalStore {
     fn path_for(&self, id: &str) -> PathBuf {
         self.root.join(format!("{id}.{PHOTO_EXTENSION}"))
     }
+
+    fn thumbnail_directory(&self) -> PathBuf {
+        self.root.join(THUMBNAIL_DIRECTORY)
+    }
+
+    fn thumbnail_path_for(&self, id: &str) -> PathBuf {
+        self.thumbnail_directory()
+            .join(format!("{id}.{THUMBNAIL_EXTENSION}"))
+    }
 }
 
 impl R2Store {
@@ -418,11 +487,63 @@ impl R2Store {
             .to_string()
     }
 
+    fn thumbnail_key_for(&self, id: &str) -> String {
+        format!(
+            "{}{THUMBNAIL_DIRECTORY}/{id}.{THUMBNAIL_EXTENSION}",
+            self.prefix
+        )
+    }
+
+    async fn get_object(&self, key: &str) -> io::Result<Option<Vec<u8>>> {
+        let action = self.bucket.get_object(Some(&self.credentials), key);
+        let response = self
+            .client
+            .get(action.sign(self.presign_ttl))
+            .send()
+            .await
+            .map_err(io::Error::other)?;
+        if response.status() == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        let response = response.error_for_status().map_err(io::Error::other)?;
+        Ok(Some(
+            response.bytes().await.map_err(io::Error::other)?.to_vec(),
+        ))
+    }
+
+    async fn put_object(&self, key: &str, content_type: &str, bytes: Vec<u8>) -> io::Result<()> {
+        let mut action = self.bucket.put_object(Some(&self.credentials), key);
+        action.headers_mut().insert("content-type", content_type);
+        self.client
+            .put(action.sign(self.presign_ttl))
+            .header("content-type", content_type)
+            .body(bytes)
+            .send()
+            .await
+            .map_err(io::Error::other)?
+            .error_for_status()
+            .map_err(io::Error::other)?;
+        Ok(())
+    }
+
+    async fn delete_object(&self, key: &str) -> io::Result<()> {
+        let action = self.bucket.delete_object(Some(&self.credentials), key);
+        self.client
+            .delete(action.sign(self.presign_ttl))
+            .send()
+            .await
+            .map_err(io::Error::other)?
+            .error_for_status()
+            .map_err(io::Error::other)?;
+        Ok(())
+    }
+
     async fn object_size(&self, id: &str) -> io::Result<Option<u64>> {
-        let key = self.key_for(id);
-        let action = self
-            .bucket
-            .head_object(Some(&self.credentials), key.as_str());
+        self.object_size_for_key(&self.key_for(id)).await
+    }
+
+    async fn object_size_for_key(&self, key: &str) -> io::Result<Option<u64>> {
+        let action = self.bucket.head_object(Some(&self.credentials), key);
         let response = self
             .client
             .head(action.sign(self.presign_ttl))
@@ -492,7 +613,35 @@ fn photo(id: &str) -> Photo {
     Photo {
         id: id.to_owned(),
         url: format!("/api/photos/{id}"),
+        thumbnail_url: None,
     }
+}
+
+fn thumbnail_webp(jpeg: &[u8]) -> io::Result<Vec<u8>> {
+    let image = image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg)
+        .map_err(io::Error::other)?;
+    thumbnail_webp_from_image(&image)
+}
+
+fn thumbnail_webp_from_image(image: &image::DynamicImage) -> io::Result<Vec<u8>> {
+    let resized = image
+        .resize(
+            THUMBNAIL_MAX_EDGE,
+            THUMBNAIL_MAX_EDGE,
+            image::imageops::FilterType::Lanczos3,
+        )
+        .to_rgb8();
+    let (width, height) = resized.dimensions();
+    let mut webp = Vec::new();
+    image::codecs::webp::WebPEncoder::new_lossless(&mut webp)
+        .encode(
+            resized.as_raw(),
+            width,
+            height,
+            image::ExtendedColorType::Rgb8,
+        )
+        .map_err(io::Error::other)?;
+    Ok(webp)
 }
 
 pub fn validate_capture_id(id: &str) -> io::Result<()> {
@@ -552,7 +701,10 @@ mod tests {
     use reqwest::Client;
     use rusty_s3::{Bucket, Credentials, UrlStyle};
 
-    use super::{Backend, PhotoRead, PhotoStore, R2Store, normalized_prefix};
+    use super::{
+        Backend, PhotoRead, PhotoStore, R2Store, THUMBNAIL_DIRECTORY, THUMBNAIL_MAX_EDGE,
+        normalized_prefix,
+    };
 
     fn jpeg(payload: u8) -> Vec<u8> {
         vec![0xff, 0xd8, payload, 0xff, 0xd9]
@@ -646,6 +798,23 @@ mod tests {
         let id = "20260829T071500Z-edit1234";
         store.save(id, &decodable_jpeg()).await.unwrap();
 
+        assert!(store.ensure_thumbnail(id).await.unwrap());
+        assert!(!store.ensure_thumbnail(id).await.unwrap());
+        let thumbnail = store.read_thumbnail(id).await.unwrap().unwrap();
+        let thumbnail =
+            image::load_from_memory_with_format(&thumbnail, image::ImageFormat::WebP).unwrap();
+        assert_eq!(thumbnail.width(), THUMBNAIL_MAX_EDGE);
+        assert!(thumbnail.height() <= THUMBNAIL_MAX_EDGE);
+
+        tokio::fs::write(
+            root.join(THUMBNAIL_DIRECTORY).join(format!("{id}.webp")),
+            [],
+        )
+        .await
+        .unwrap();
+        assert!(store.ensure_thumbnail(id).await.unwrap());
+        assert!(!store.read_thumbnail(id).await.unwrap().unwrap().is_empty());
+
         store.rotate(id, 90).await.unwrap();
         let Some(PhotoRead::Bytes(bytes)) = store.read(id).await.unwrap() else {
             panic!("rotated photo should remain readable");
@@ -654,8 +823,14 @@ mod tests {
             image::load_from_memory(&bytes).unwrap().dimensions(),
             (2, 3)
         );
+        let thumbnail = store.read_thumbnail(id).await.unwrap().unwrap();
+        let thumbnail =
+            image::load_from_memory_with_format(&thumbnail, image::ImageFormat::WebP).unwrap();
+        assert_eq!(thumbnail.height(), THUMBNAIL_MAX_EDGE);
+        assert!(thumbnail.width() <= THUMBNAIL_MAX_EDGE);
         assert!(store.delete(id).await.unwrap());
         assert!(store.read(id).await.unwrap().is_none());
+        assert!(store.read_thumbnail(id).await.unwrap().is_none());
         assert!(!store.delete(id).await.unwrap());
 
         tokio::fs::remove_dir_all(root).await.unwrap();

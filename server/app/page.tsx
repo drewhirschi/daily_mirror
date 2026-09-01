@@ -8,13 +8,12 @@ type PhotoGroup = { key: string; label: string; photos: GalleryPhoto[]; headingC
 const DENSITIES: Density[] = ["year", "month", "day"];
 
 export default function Page() {
-  const photos = useGetApiPhotos({ query: { refetchInterval: 10_000 } });
+  const photos = useGetApiPhotos({ query: { refetchInterval: 60_000, refetchIntervalInBackground: false, staleTime: 30_000 } });
   const [demoMode, setDemoMode] = useState(false);
   const [density, setDensity] = useState<Density>("month");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editVersion, setEditVersion] = useState(0);
   const [editError, setEditError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [anchorId, setAnchorId] = useState<string | null>(null);
@@ -86,7 +85,7 @@ export default function Page() {
       {photos.isError && !demoMode ? <p className="empty-state">The photo archive could not be loaded.</p>
         : items.length === 0 && !(photos.isLoading && !demoMode) ? <p className="empty-state">{rawItems.length ? "No photographs were taken in this date range." : "The first photograph will appear here after the button is pressed."}</p>
         : <div className="photo-archive" data-density={density} aria-label="Photograph archive" onTouchStart={startPinch} onTouchMove={movePinch} onTouchEnd={() => { pinch.current = null; }} onWheel={zoomWithTrackpad}>
-          {groups.map((group) => <VirtualGroup key={group.key} group={group} density={density} viewportWidth={viewportWidth} anchorId={anchorId} editVersion={editVersion} onSelect={setSelectedId} />)}
+          {groups.map((group) => <VirtualGroup key={group.key} group={group} density={density} viewportWidth={viewportWidth} anchorId={anchorId} onSelect={setSelectedId} />)}
         </div>}
 
       {selectedPhoto ? (
@@ -107,7 +106,7 @@ export default function Page() {
                 {demoMode ? <small>Editing is disabled in the demo.</small> : null}
               </div>
             </details>
-            <img src={`${selectedPhoto.url}?v=${editVersion}`} alt={`Daily Mirror capture from ${formatCaptureId(selectedPhoto.id)}`} />
+            <img src={selectedPhoto.url} style={{ backgroundImage: selectedPhoto.thumbnail_url ? `url(${selectedPhoto.thumbnail_url})` : undefined }} alt={`Daily Mirror capture from ${formatCaptureId(selectedPhoto.id)}`} />
             <div className="lightbox-meta">
               <figcaption>{formatCaptureId(selectedPhoto.id)}</figcaption>
             </div>
@@ -155,7 +154,8 @@ export default function Page() {
     try {
       const response = await fetch(`/api/photos/${encodeURIComponent(id)}`, action === "delete" ? { method: "DELETE" } : { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ degrees: action === "rotate-left" ? -90 : 90 }) });
       if (!response.ok) throw new Error(`The server returned ${response.status}.`);
-      if (action === "delete") { setSelectedId(null); await photos.refetch(); } else setEditVersion((version) => version + 1);
+      if (action === "delete") setSelectedId(null);
+      await photos.refetch();
     } catch (error) {
       setEditError(error instanceof Error ? `The photograph could not be edited. ${error.message}` : "The photograph could not be edited.");
     } finally { setEditingId(null); }
@@ -167,7 +167,7 @@ export default function Page() {
   }
 }
 
-function VirtualGroup({ group, density, viewportWidth, anchorId, editVersion, onSelect }: { group: PhotoGroup; density: Density; viewportWidth: number; anchorId: string | null; editVersion: number; onSelect: (id: string) => void }) {
+function VirtualGroup({ group, density, viewportWidth, anchorId, onSelect }: { group: PhotoGroup; density: Density; viewportWidth: number; anchorId: string | null; onSelect: (id: string) => void }) {
   const section = useRef<HTMLElement>(null);
   const [nearViewport, setNearViewport] = useState(false);
   const containsAnchor = anchorId ? group.photos.some((photo) => photo.id === anchorId) : false;
@@ -182,7 +182,7 @@ function VirtualGroup({ group, density, viewportWidth, anchorId, editVersion, on
     {density !== "day" && group.label ? <header className="period-heading"><h2 id={`period-${group.key}`}>{group.label}</h2><span>{group.headingCount ?? group.photos.length}</span></header> : null}
     {nearViewport || containsAnchor ? <div className="photo-grid">{group.photos.map((photo) => <figure className="photo-card" key={photo.id} data-photo-id={photo.id}>
       <button className="photo-open" type="button" aria-label={`Open photograph from ${formatCaptureId(photo.id)}`} onClick={() => onSelect(photo.id)}>
-        <img src={`${photo.thumbnail_url ?? photo.url}?v=${editVersion}`} alt="" width="320" height="240" loading="lazy" decoding="async" />
+        <img src={photo.thumbnail_url ?? photo.url} alt="" width="320" height="240" loading="lazy" decoding="async" />
       </button>
       {density === "day" ? <figcaption>{formatCaptureDay(photo.id)}</figcaption> : null}
     </figure>)}</div> : <div className="virtual-spacer" style={{ height: estimateGridHeight(group.photos.length, density, viewportWidth) }} aria-hidden="true" />}

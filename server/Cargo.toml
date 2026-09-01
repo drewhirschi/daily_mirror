@@ -1,6 +1,6 @@
 [package]
 name = "server"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 rust-version = "1.88"
 publish = false
@@ -39,7 +39,7 @@ tower = "0.5"
 http = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 rusty-s3 = { version = "0.10.2", default-features = false, features = ["rustcrypto", "xml"] }
-image = { version = "0.25", default-features = false, features = ["jpeg"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "webp"] }
 libsql = { version = "0.9", default-features = false, features = ["core", "remote", "tls"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 rpassword = "7.4"

@@ -824,6 +824,9 @@ code {
   min-height: 0;
   max-height: calc(100dvh - 86px);
   border-radius: 4px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
 .lightbox-meta {

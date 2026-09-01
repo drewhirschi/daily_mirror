@@ -74,11 +74,11 @@ the server verifies the stored object and its byte size before marking the row
 so retrying the entire exchange is safe and idempotent. Database and permanent
 R2 credentials remain on the server; the device receives neither.
 
-`GET /api/photos` queries the libSQL photo catalog newest-first by capture time,
-and `GET /api/photos/:id` returns an image. The gallery also
-enforces capture-time ordering client-side as a defensive measure. Clicking a
-thumbnail opens the original in a full-window viewer; Escape, the close button,
-or clicking the backdrop dismisses it.
+`GET /api/photos` queries the libSQL photo catalog newest-first by capture time.
+Each ready catalog entry includes a versioned 320-pixel WebP thumbnail URL;
+`GET /api/photos/:id` returns the original only when the viewer opens it. The
+gallery also enforces capture-time ordering client-side as a defensive measure.
+Escape, the close button, or clicking the backdrop dismisses the viewer.
 
 ## Storage
 
@@ -89,16 +89,17 @@ its S3-compatible API, and redirects image reads to short-lived signed URLs.
 `src/catalog.rs` stores image IDs, object keys, capture times, byte sizes,
 upload state, and applied rotation in Turso/libSQL. Local development defaults
 to `data/daily-mirror.db`. Production uses `DAILY_MIRROR_DATABASE_URL` and
-`DAILY_MIRROR_DATABASE_AUTH_TOKEN`. If the catalog is empty, the first gallery
-request imports the existing object archive once. Gallery reads also reconcile
-stranded `pending` rows when their complete objects are already present in
-storage; normal refreshes otherwise query only the database.
+`DAILY_MIRROR_DATABASE_AUTH_TOKEN`. Gallery reads query only the database.
+Upload completion creates the thumbnail and marks the row ready; maintenance
+repairs stranded uploads, orphaned originals, and missing thumbnails without
+putting storage scans on the interactive gallery path.
 
 Production also runs an authenticated daily reconciliation at
-`GET /api/maintenance/reconcile`. It repairs R2 objects missing catalog rows
-and completed uploads stranded in `pending`, while leaving size mismatches
-hidden for investigation. `CRON_SECRET` stays in Vercel; Vercel supplies it as
-a Bearer token when invoking the schedule declared in `vercel.json`.
+`GET /api/maintenance/reconcile`. It repairs R2 objects missing catalog rows,
+completed uploads stranded in `pending`, and missing thumbnails, while leaving
+size mismatches hidden for investigation. `CRON_SECRET` stays in Vercel; Vercel
+supplies it as a Bearer token when invoking the schedule declared in
+`vercel.json`.
 
 Set the variables documented in `.env.example`; R2 API credentials need object
 read/write plus bucket-list access.

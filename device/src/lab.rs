@@ -64,8 +64,14 @@ pub struct LabSettings {
     pub exposure: String,
     pub shutter_us: u64,
     pub gain: f64,
+    pub autofocus_mode: String,
     pub autofocus_range: String,
     pub autofocus_speed: String,
+    pub lens_position: f64,
+    pub autofocus_window_x: f64,
+    pub autofocus_window_y: f64,
+    pub autofocus_window_width: f64,
+    pub autofocus_window_height: f64,
 }
 
 impl Default for LabSettings {
@@ -85,8 +91,14 @@ impl Default for LabSettings {
             exposure: "normal".to_owned(),
             shutter_us: 0,
             gain: 0.0,
+            autofocus_mode: "continuous".to_owned(),
             autofocus_range: "normal".to_owned(),
-            autofocus_speed: "normal".to_owned(),
+            autofocus_speed: "fast".to_owned(),
+            lens_position: 0.82,
+            autofocus_window_x: 0.2,
+            autofocus_window_y: 0.15,
+            autofocus_window_width: 0.6,
+            autofocus_window_height: 0.7,
         }
     }
 }
@@ -115,6 +127,26 @@ impl LabSettings {
         validate_number("saturation", self.saturation, 0.0, 3.0)?;
         validate_number("sharpness", self.sharpness, 0.0, 4.0)?;
         validate_number("gain", self.gain, 0.0, 16.0)?;
+        validate_number("lens position", self.lens_position, 0.0, 32.0)?;
+        validate_number("autofocus window x", self.autofocus_window_x, 0.0, 1.0)?;
+        validate_number("autofocus window y", self.autofocus_window_y, 0.0, 1.0)?;
+        validate_number(
+            "autofocus window width",
+            self.autofocus_window_width,
+            0.01,
+            1.0,
+        )?;
+        validate_number(
+            "autofocus window height",
+            self.autofocus_window_height,
+            0.01,
+            1.0,
+        )?;
+        if self.autofocus_window_x + self.autofocus_window_width > 1.0
+            || self.autofocus_window_y + self.autofocus_window_height > 1.0
+        {
+            bail!("autofocus window must stay within the camera frame");
+        }
         if self.shutter_us > 1_000_000 {
             bail!("shutter must be automatic or at most 1,000,000 microseconds");
         }
@@ -138,6 +170,11 @@ impl LabSettings {
         )?;
         validate_choice("metering", &self.metering, &["centre", "average", "spot"])?;
         validate_choice("exposure", &self.exposure, &["normal", "sport"])?;
+        validate_choice(
+            "autofocus mode",
+            &self.autofocus_mode,
+            &["continuous", "auto", "manual"],
+        )?;
         validate_choice(
             "autofocus range",
             &self.autofocus_range,
@@ -171,10 +208,6 @@ impl LabSettings {
             self.metering.clone(),
             "--exposure".to_owned(),
             self.exposure.clone(),
-            "--autofocus-range".to_owned(),
-            self.autofocus_range.clone(),
-            "--autofocus-speed".to_owned(),
-            self.autofocus_speed.clone(),
         ];
         if self.shutter_us > 0 {
             args.push("--shutter".to_owned());
@@ -185,6 +218,33 @@ impl LabSettings {
             args.push(self.gain.to_string());
         }
         args.extend(self.orientation().camera_args());
+        args
+    }
+
+    pub fn focus_args(&self, capture: bool) -> Vec<String> {
+        let mut args = vec!["--autofocus-mode".to_owned(), self.autofocus_mode.clone()];
+        if self.autofocus_mode == "manual" {
+            args.extend(["--lens-position".to_owned(), self.lens_position.to_string()]);
+            return args;
+        }
+
+        args.extend([
+            "--autofocus-range".to_owned(),
+            self.autofocus_range.clone(),
+            "--autofocus-speed".to_owned(),
+            self.autofocus_speed.clone(),
+            "--autofocus-window".to_owned(),
+            format!(
+                "{},{},{},{}",
+                self.autofocus_window_x,
+                self.autofocus_window_y,
+                self.autofocus_window_width,
+                self.autofocus_window_height
+            ),
+        ]);
+        if capture && self.autofocus_mode == "auto" {
+            args.push("--autofocus-on-capture".to_owned());
+        }
         args
     }
 }
@@ -237,6 +297,7 @@ pub struct CameraLab {
     settings: Arc<Mutex<LabSettings>>,
     preview: Arc<PreviewState>,
     capture: Arc<RwLock<Option<Vec<u8>>>>,
+    capture_metadata: Arc<RwLock<Option<serde_json::Value>>>,
 }
 
 struct PreviewState {
@@ -273,6 +334,7 @@ impl CameraLab {
                 last_error: Mutex::new(None),
             }),
             capture: Arc::new(RwLock::new(None)),
+            capture_metadata: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -302,6 +364,14 @@ impl CameraLab {
         *self
             .preview
             .frame
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+        *self
+            .capture
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+        *self
+            .capture_metadata
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
         if restart {
@@ -393,11 +463,22 @@ impl CameraLab {
             .clone()
     }
 
-    pub fn store_capture(&self, jpeg: Vec<u8>) {
+    pub fn store_capture(&self, jpeg: Vec<u8>, metadata: Option<serde_json::Value>) {
         *self
             .capture
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(jpeg);
+        *self
+            .capture_metadata
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = metadata;
+    }
+
+    pub fn capture_metadata(&self) -> Option<serde_json::Value> {
+        self.capture_metadata
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
     }
 
     pub fn capture(&self) -> Option<Vec<u8>> {
@@ -446,12 +527,11 @@ fn run_preview(
             "--quality",
             PREVIEW_QUALITY,
             "--flush",
-            "--autofocus-mode",
-            "continuous",
             "--output",
             "-",
         ])
         .args(settings.camera_args())
+        .args(settings.focus_args(false))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -569,6 +649,66 @@ mod tests {
         let args = settings.camera_args();
         assert!(!args.iter().any(|arg| arg == "--shutter"));
         assert!(!args.iter().any(|arg| arg == "--gain"));
+    }
+
+    #[test]
+    fn focus_modes_build_expected_camera_arguments() {
+        let continuous = LabSettings::default();
+        let continuous_args = continuous.focus_args(false);
+        assert!(
+            continuous_args
+                .windows(2)
+                .any(|pair| pair == ["--autofocus-mode", "continuous"])
+        );
+        assert!(
+            continuous_args
+                .windows(2)
+                .any(|pair| pair == ["--autofocus-window", "0.2,0.15,0.6,0.7"])
+        );
+        assert!(
+            !continuous_args
+                .iter()
+                .any(|arg| arg == "--autofocus-on-capture")
+        );
+
+        let automatic = LabSettings {
+            autofocus_mode: "auto".to_owned(),
+            ..LabSettings::default()
+        };
+        assert!(
+            automatic
+                .focus_args(true)
+                .iter()
+                .any(|arg| arg == "--autofocus-on-capture")
+        );
+
+        let manual = LabSettings {
+            autofocus_mode: "manual".to_owned(),
+            lens_position: 0.82,
+            ..LabSettings::default()
+        };
+        let manual_args = manual.focus_args(true);
+        assert!(
+            manual_args
+                .windows(2)
+                .any(|pair| pair == ["--autofocus-mode", "manual"])
+        );
+        assert!(
+            manual_args
+                .windows(2)
+                .any(|pair| pair == ["--lens-position", "0.82"])
+        );
+        assert!(!manual_args.iter().any(|arg| arg == "--autofocus-window"));
+    }
+
+    #[test]
+    fn rejects_focus_windows_outside_the_frame() {
+        let settings = LabSettings {
+            autofocus_window_x: 0.8,
+            autofocus_window_width: 0.4,
+            ..LabSettings::default()
+        };
+        assert!(settings.validate().is_err());
     }
 
     #[test]

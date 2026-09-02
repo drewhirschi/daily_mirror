@@ -89,9 +89,13 @@ running Rust package. It does not capture a photograph.
 The admin's camera lab forces the IMX519's full-field 2328×1748 binned sensor
 mode, then scales it to a persistent 960×720 MJPEG viewfinder in memory. It
 can adjust exposure compensation, brightness, contrast, saturation, sharpness,
-denoising, white balance, metering, exposure profile, autofocus range/speed,
-and optional manual shutter/gain. Applying settings restarts an active preview
-so the camera algorithms settle under the new configuration.
+denoising, white balance, metering, exposure profile, manual shutter/gain, and
+the complete focus strategy. Focus controls include continuous, single, or
+manual modes; range and speed; normalized autofocus-window coordinates; direct
+lens position; and one-click fixed-focus presets for 3, 4, and 5 feet. The live
+image overlays the selected autofocus region. Starting preview or taking a test
+snap automatically applies every visible control, while Apply settings restarts
+an active preview so the camera algorithms settle under the new configuration.
 
 The lab also provides persistent 0°/180° rotation and horizontal or vertical
 mirroring. Applying settings writes those mounting controls to
@@ -100,8 +104,11 @@ them to the live preview, full-resolution test snaps, and normal button
 captures. Override the file location with
 `DAILY_MIRROR_CAMERA_SETTINGS_PATH` when packaging the device differently.
 
-`Test snap · no upload` stops preview, captures one 4656×3496 JPEG with the lab
-settings, and retains only its bytes in service memory. It does not touch the
-durable queue, local disk, or gallery upload endpoint. Starting preview again or
-pressing the physical button safely releases/reclaims the camera; a physical
-capture always stops lab preview before running the normal workflow.
+`Apply + test snap` stops preview, captures one 4656×3496 JPEG with the visible
+lab settings, and retains only its bytes and camera metadata in service memory.
+The page shows autofocus state, lens position, focus score, exposure, analogue
+gain, the complete metadata JSON, and a link that opens the full-resolution
+image for 100% inspection. It does not touch the durable queue, local photo
+storage, or gallery upload endpoint. Starting preview again or pressing the
+physical button safely releases/reclaims the camera; a physical capture always
+stops lab preview before running the normal workflow.

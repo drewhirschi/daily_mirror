@@ -28,7 +28,7 @@ Use `DAILY_MIRROR_CAMERA_ARGS` for sensor-specific tuning after inspecting the
 ArduCam. The default is:
 
 ```text
---nopreview --timeout 3000 --encoding jpg --quality 95 --autofocus-mode auto --autofocus-speed fast
+--nopreview --timeout 3000 --encoding jpg --quality 95 --autofocus-mode continuous --autofocus-range normal --autofocus-speed fast --autofocus-window 0.2,0.15,0.6,0.7 --metadata-format json --metadata -
 ```
 
 ## GPIO service
@@ -47,14 +47,20 @@ cargo run --release -- run
 - Yellow: three one-second countdown pulses only.
 - Red: a capture/upload error or at least one photograph awaiting retry.
 
-The camera process and autofocus start before the first yellow pulse. Yellow
-stays solid after the third pulse only until the actual full-resolution frame
-arrives, so it remains an unambiguous “hold still” indicator. Green starts only
-after the shutter, breathes during local JPEG validation and upload, flashes
-twice on success, then returns to solid ready. Yellow is never reused for
-background work. Do not add
-`--autofocus-on-capture` to this default: `auto` already sweeps at startup, and
-that flag requests a redundant second sweep at the shutter.
+The camera process and continuous autofocus start before the first yellow pulse.
+Focus keeps tracking throughout the countdown, allowing the person who pressed
+the button to move into the expected 3–5 foot portrait position. The default
+focus window covers the central 60% of the frame width and 70% of its height,
+rather than only the camera stack's middle third. Yellow stays solid after the
+third pulse only until the actual full-resolution frame arrives, so it remains
+an unambiguous “hold still” indicator. Green starts only after the shutter,
+breathes during local JPEG validation and upload, flashes twice on success,
+then returns to solid ready. Yellow is never reused for background work.
+
+Each normal capture also writes the camera metadata JSON to standard output,
+which makes fields supplied by the camera stack such as `AfState`,
+`LensPosition`, and `FocusFoM` available in the service journal. Available
+fields depend on the installed camera and camera software.
 
 The physical button always takes a picture. Holding it cannot trigger multiple
 captures because the service waits for release and debounces both edges.

@@ -1747,9 +1747,17 @@ fn default_camera_args() -> Vec<String> {
         "--quality",
         "95",
         "--autofocus-mode",
-        "auto",
+        "continuous",
+        "--autofocus-range",
+        "normal",
         "--autofocus-speed",
         "fast",
+        "--autofocus-window",
+        "0.2,0.15,0.6,0.7",
+        "--metadata-format",
+        "json",
+        "--metadata",
+        "-",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -1921,7 +1929,7 @@ mod tests {
     }
 
     #[test]
-    fn default_capture_focuses_during_the_three_second_countdown() {
+    fn default_capture_tracks_portrait_focus_during_the_three_second_countdown() {
         let args = default_camera_args();
         let timeout = args.iter().position(|arg| arg == "--timeout").unwrap();
         let autofocus = args
@@ -1930,7 +1938,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(args.get(timeout + 1).map(String::as_str), Some("3000"));
-        assert_eq!(args.get(autofocus + 1).map(String::as_str), Some("auto"));
+        assert_eq!(
+            args.get(autofocus + 1).map(String::as_str),
+            Some("continuous")
+        );
         let autofocus_speed = args
             .iter()
             .position(|arg| arg == "--autofocus-speed")
@@ -1939,6 +1950,27 @@ mod tests {
             args.get(autofocus_speed + 1).map(String::as_str),
             Some("fast")
         );
+        let autofocus_range = args
+            .iter()
+            .position(|arg| arg == "--autofocus-range")
+            .unwrap();
+        assert_eq!(
+            args.get(autofocus_range + 1).map(String::as_str),
+            Some("normal")
+        );
+        let autofocus_window = args
+            .iter()
+            .position(|arg| arg == "--autofocus-window")
+            .unwrap();
+        assert_eq!(
+            args.get(autofocus_window + 1).map(String::as_str),
+            Some("0.2,0.15,0.6,0.7")
+        );
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["--metadata-format", "json"])
+        );
+        assert!(args.windows(2).any(|pair| pair == ["--metadata", "-"]));
         assert!(!args.iter().any(|arg| arg == "--autofocus-on-capture"));
         assert!(!args.iter().any(|arg| arg == "--immediate"));
     }

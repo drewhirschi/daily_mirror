@@ -79,7 +79,7 @@ enum EngineKind {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenvy::dotenv().ok();
+    load_environment()?;
     let cli = Cli::parse();
     let client = configured_client()?;
     let pipeline = configured_pipeline_version();
@@ -151,6 +151,34 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+fn load_environment() -> Result<()> {
+    let Ok(environment) = std::env::var("DAILY_MIRROR_ENV") else {
+        dotenvy::dotenv().ok();
+        return Ok(());
+    };
+    let path = environment_path(&environment)?;
+    dotenvy::from_path(&path).with_context(|| {
+        format!(
+            "could not load processor environment from {}",
+            path.display()
+        )
+    })?;
+    eprintln!("processor environment: {environment} ({})", path.display());
+    Ok(())
+}
+
+fn environment_path(environment: &str) -> Result<PathBuf> {
+    let valid = !environment.is_empty()
+        && environment.len() <= 40
+        && environment
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'));
+    if !valid {
+        anyhow::bail!("processor environment must use only letters, numbers, '-' or '_'");
+    }
+    Ok(PathBuf::from(format!(".env.{environment}")))
+}
+
 impl From<Device> for InferenceTarget {
     fn from(value: Device) -> Self {
         match value {
@@ -183,4 +211,21 @@ fn install_shutdown_handler() -> Arc<AtomicBool> {
         }
     });
     shutdown
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::environment_path;
+
+    #[test]
+    fn environment_names_map_to_local_dotenv_files() {
+        assert_eq!(
+            environment_path("production").unwrap(),
+            Path::new(".env.production")
+        );
+        assert!(environment_path("../server/.env.local").is_err());
+        assert!(environment_path("").is_err());
+    }
 }

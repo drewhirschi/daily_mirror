@@ -50,13 +50,17 @@ check:
     cd server && npm run client:generate && cargo fmt --check && cargo clippy --all-targets -- -D warnings -A clippy::match-single-binding && npm run typecheck && cargo test
     git diff --check
 
-# Show the pending, leased, complete, and failed face-processing counts.
-process-status:
-    cd processor && cargo run --locked -- status
+# Show one environment's pending, leased, complete, and failed processing counts.
+# Examples: `just process-status` or `just process-status production`.
+process-status environment="local":
+    @test -f "processor/.env.{{environment}}" || { echo "missing processor/.env.{{environment}}; copy processor/.env.example and configure it" >&2; exit 1; }
+    cd processor && DAILY_MIRROR_ENV="{{environment}}" cargo run --locked -- status
 
-# Drain face-processing work. This refuses to claim until an inference engine is configured.
-process:
-    cd processor && cargo run --locked -- process
+# Drain one environment's face-processing queue with the optimized binary.
+# Examples: `just process` or `just process production`.
+process environment="local":
+    @test -f "processor/.env.{{environment}}" || { echo "missing processor/.env.{{environment}}; copy processor/.env.example and configure it" >&2; exit 1; }
+    cd processor && DAILY_MIRROR_ENV="{{environment}}" cargo run --locked --release -- process
 
 # Cross-compile the Pi service on this computer.
 device-build:

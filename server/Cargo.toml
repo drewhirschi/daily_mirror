@@ -30,6 +30,7 @@ nextrs = { version = "0.6.0", features = ["build", "tsx"] }
 
 [dependencies]
 nextrs = { version = "0.6.0", features = ["vercel"] }
+daily-mirror-vision-contract = { path = "../crates/vision-contract" }
 axum = "0.8"
 argon2 = "0.5.3"
 base64 = "0.22"

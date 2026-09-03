@@ -707,6 +707,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "daily-mirror-vision-contract"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "dashmap"
 version = "6.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4070,6 +4077,7 @@ dependencies = [
  "argon2",
  "axum",
  "base64 0.22.1",
+ "daily-mirror-vision-contract",
  "dotenvy",
  "http 1.5.0",
  "image",

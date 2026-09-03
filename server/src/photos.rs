@@ -316,7 +316,7 @@ impl PhotoStore {
         }
     }
 
-    async fn original_bytes(&self, id: &str) -> io::Result<Option<Vec<u8>>> {
+    pub(crate) async fn original_bytes(&self, id: &str) -> io::Result<Option<Vec<u8>>> {
         validate_capture_id(id)?;
         match self.backend.as_ref() {
             Backend::Local(store) => match tokio::fs::read(store.path_for(id)).await {
@@ -386,7 +386,7 @@ impl PhotoStore {
         }
     }
 
-    pub async fn rotate(&self, id: &str, degrees: i16) -> io::Result<()> {
+    pub async fn rotate(&self, id: &str, degrees: i16) -> io::Result<u64> {
         validate_capture_id(id)?;
         if !matches!(degrees, -90 | 90 | 180) {
             return Err(io::Error::new(
@@ -410,6 +410,8 @@ impl PhotoStore {
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 92)
             .encode_image(&rotated)
             .map_err(io::Error::other)?;
+        let byte_size = u64::try_from(jpeg.len())
+            .map_err(|_| io::Error::other("rotated JPEG is too large to record"))?;
         let webp = thumbnail_webp_from_image(&rotated)?;
 
         match self.backend.as_ref() {
@@ -418,15 +420,16 @@ impl PhotoStore {
                 let temporary = path.with_extension("jpg.tmp");
                 tokio::fs::write(&temporary, jpeg).await?;
                 tokio::fs::rename(temporary, path).await?;
-                self.write_thumbnail(id, webp).await
+                self.write_thumbnail(id, webp).await?;
             }
             Backend::R2(store) => {
                 store
                     .put_object(&store.key_for(id), "image/jpeg", jpeg)
                     .await?;
-                self.write_thumbnail(id, webp).await
+                self.write_thumbnail(id, webp).await?;
             }
         }
+        Ok(byte_size)
     }
 }
 
@@ -815,10 +818,11 @@ mod tests {
         assert!(store.ensure_thumbnail(id).await.unwrap());
         assert!(!store.read_thumbnail(id).await.unwrap().unwrap().is_empty());
 
-        store.rotate(id, 90).await.unwrap();
+        let rotated_size = store.rotate(id, 90).await.unwrap();
         let Some(PhotoRead::Bytes(bytes)) = store.read(id).await.unwrap() else {
             panic!("rotated photo should remain readable");
         };
+        assert_eq!(rotated_size, bytes.len() as u64);
         assert_eq!(
             image::load_from_memory(&bytes).unwrap().dimensions(),
             (2, 3)

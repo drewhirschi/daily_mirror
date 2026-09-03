@@ -1,0 +1,2 @@
+[env]
+OPENCV_PKGCONFIG_NAME = "opencv5"

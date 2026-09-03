@@ -4,3 +4,6 @@ snapr/target/
 .wrangler/
 captures/
 device/target/
+processor/target/
+processor/models/*.onnx
+processor/models/*.task

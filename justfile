@@ -19,6 +19,7 @@ doctor:
     @command -v curl >/dev/null || { echo "missing: curl" >&2; exit 1; }
     @command -v ssh >/dev/null || { echo "missing: ssh" >&2; exit 1; }
     @command -v scp >/dev/null || { echo "missing: scp" >&2; exit 1; }
+    test -f processor/Cargo.toml
     @echo "Daily Mirror development tools are ready"
 
 # Install the locked web dependencies, including the project-local Vercel CLI.
@@ -45,8 +46,17 @@ client:
 # Format, compile, type-check, and test both Rust applications.
 check:
     cd device && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+    cd processor && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
     cd server && npm run client:generate && cargo fmt --check && cargo clippy --all-targets -- -D warnings -A clippy::match-single-binding && npm run typecheck && cargo test
     git diff --check
+
+# Show the pending, leased, complete, and failed face-processing counts.
+process-status:
+    cd processor && cargo run --locked -- status
+
+# Drain face-processing work. This refuses to claim until an inference engine is configured.
+process:
+    cd processor && cargo run --locked -- process
 
 # Cross-compile the Pi service on this computer.
 device-build:

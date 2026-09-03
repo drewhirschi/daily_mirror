@@ -8,6 +8,7 @@ use utoipa::ToSchema;
 
 use crate::catalog::PhotoCatalog;
 use crate::photos::{Photo, PhotoStore};
+use crate::processing::ProcessingQueue;
 
 #[derive(Debug)]
 pub enum FinalizeError {
@@ -65,6 +66,7 @@ pub struct ReconcileReport {
 pub async fn finalize_upload(
     store: &PhotoStore,
     catalog: &PhotoCatalog,
+    processing: &ProcessingQueue,
     id: &str,
 ) -> Result<(), FinalizeError> {
     store
@@ -97,7 +99,12 @@ pub async fn finalize_upload(
     catalog
         .mark_thumbnail_ready(id)
         .await
-        .map_err(FinalizeError::Catalog)
+        .map_err(FinalizeError::Catalog)?;
+    processing
+        .enqueue_active_photo(id)
+        .await
+        .map_err(FinalizeError::Catalog)?;
+    Ok(())
 }
 
 pub async fn gallery_photos(catalog: &PhotoCatalog) -> io::Result<Vec<Photo>> {
@@ -203,12 +210,14 @@ mod tests {
     use super::{FinalizeError, ReconcileReport, finalize_upload, gallery_photos, reconcile_all};
     use crate::catalog::PhotoCatalog;
     use crate::photos::PhotoStore;
+    use crate::processing::ProcessingQueue;
     use axum::http::StatusCode;
 
     struct Fixture {
         root: PathBuf,
         store: PhotoStore,
         catalog: PhotoCatalog,
+        processing: ProcessingQueue,
     }
 
     impl Fixture {
@@ -219,16 +228,18 @@ mod tests {
             ));
             let _ = tokio::fs::remove_dir_all(&root).await;
             tokio::fs::create_dir_all(&root).await.unwrap();
+            let catalog =
+                PhotoCatalog::local(root.join("catalog.db").to_string_lossy().into_owned());
             Self {
                 store: PhotoStore::new(root.join("photos")),
-                catalog: PhotoCatalog::local(
-                    root.join("catalog.db").to_string_lossy().into_owned(),
-                ),
+                processing: ProcessingQueue::new(catalog.clone()),
+                catalog,
                 root,
             }
         }
 
         async fn cleanup(self) {
+            drop(self.processing);
             drop(self.catalog);
             let _ = tokio::fs::remove_dir_all(self.root).await;
         }
@@ -278,7 +289,7 @@ mod tests {
         let bytes = jpeg(&[1, 2, 3]);
 
         assert!(matches!(
-            finalize_upload(&fixture.store, &fixture.catalog, id).await,
+            finalize_upload(&fixture.store, &fixture.catalog, &fixture.processing, id).await,
             Err(FinalizeError::ReservationNotFound)
         ));
         fixture
@@ -291,21 +302,27 @@ mod tests {
             .await
             .unwrap();
         assert!(matches!(
-            finalize_upload(&fixture.store, &fixture.catalog, id).await,
+            finalize_upload(&fixture.store, &fixture.catalog, &fixture.processing, id).await,
             Err(FinalizeError::ObjectNotFound)
         ));
 
         fixture.store.save(id, &bytes).await.unwrap();
-        finalize_upload(&fixture.store, &fixture.catalog, id)
+        finalize_upload(&fixture.store, &fixture.catalog, &fixture.processing, id)
             .await
             .unwrap();
-        finalize_upload(&fixture.store, &fixture.catalog, id)
+        finalize_upload(&fixture.store, &fixture.catalog, &fixture.processing, id)
             .await
             .unwrap();
         let photo = &fixture.catalog.list().await.unwrap()[0];
         assert_eq!(photo.id, id);
         assert!(photo.thumbnail_url.is_some());
         assert!(fixture.store.read_thumbnail(id).await.unwrap().is_some());
+        let processing = fixture
+            .processing
+            .status(daily_mirror_vision_contract::DEFAULT_PIPELINE_VERSION)
+            .await
+            .unwrap();
+        assert_eq!((processing.pending, processing.complete), (1, 0));
         fixture.cleanup().await;
     }
 
@@ -326,7 +343,7 @@ mod tests {
         fixture.store.save(id, &bytes).await.unwrap();
 
         assert!(matches!(
-            finalize_upload(&fixture.store, &fixture.catalog, id).await,
+            finalize_upload(&fixture.store, &fixture.catalog, &fixture.processing, id).await,
             Err(FinalizeError::SizeMismatch { .. })
         ));
         assert!(fixture.catalog.list().await.unwrap().is_empty());

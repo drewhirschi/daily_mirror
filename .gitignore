@@ -5,5 +5,7 @@ snapr/target/
 captures/
 device/target/
 processor/target/
+processor/.env.*
+!processor/.env.example
 processor/models/*.onnx
 processor/models/*.task

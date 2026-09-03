@@ -41,6 +41,7 @@ fn bypasses_authentication(method: &Method, path: &str) -> bool {
         || path.starts_with("/icons/")
         || path.starts_with("/dist/")
         || path.starts_with("/api/auth/login/")
+        || path.starts_with("/api/processing/")
         || (method == Method::GET && path == "/api/maintenance/reconcile")
         || (method == Method::POST
             && (matches!(path, "/api/uploads" | "/api/photos")
@@ -83,11 +84,36 @@ mod tests {
         assert!(bypasses_authentication(&Method::POST, "/api/uploads"));
         assert!(bypasses_authentication(
             &Method::POST,
+            "/api/processing/claim"
+        ));
+        assert!(bypasses_authentication(
+            &Method::GET,
+            "/api/processing/photos/20260829T071500Z-def67890"
+        ));
+        assert!(bypasses_authentication(
+            &Method::POST,
             "/api/uploads/20260829T071500Z-def67890"
         ));
         assert!(!bypasses_authentication(&Method::GET, "/"));
         assert!(!bypasses_authentication(&Method::GET, "/account"));
         assert!(!bypasses_authentication(&Method::GET, "/api/photos"));
+        assert!(!bypasses_authentication(&Method::GET, "/api/admin/faces"));
+        assert!(!bypasses_authentication(
+            &Method::GET,
+            "/api/admin/households"
+        ));
+        assert!(!bypasses_authentication(
+            &Method::POST,
+            "/api/admin/households"
+        ));
+        assert!(!bypasses_authentication(
+            &Method::PATCH,
+            "/api/admin/households/household-id"
+        ));
+        assert!(!bypasses_authentication(
+            &Method::PATCH,
+            "/api/admin/faces/face-id"
+        ));
         assert!(!bypasses_authentication(
             &Method::POST,
             "/api/auth/passkeys/register/start"

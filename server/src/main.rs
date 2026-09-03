@@ -1,6 +1,8 @@
 // Local process entry point. Application routes and domain wiring live in
 // src/app.rs so deployment adapters can run the exact same Router.
 
+use std::net::{IpAddr, Ipv4Addr};
+
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
@@ -11,7 +13,11 @@ async fn main() {
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
-    let listener = bind_with_fallback(port).await;
+    let host = std::env::var("HOST")
+        .ok()
+        .and_then(|value| value.parse::<IpAddr>().ok())
+        .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+    let listener = bind_with_fallback(host, port).await;
     let local = listener.local_addr().expect("listener has a local addr");
     println!("listening on http://{local}");
 
@@ -22,9 +28,9 @@ async fn main() {
 }
 
 /// Bind `0.0.0.0:start`, or the next free port up to `start + 20` if it's taken.
-async fn bind_with_fallback(start: u16) -> tokio::net::TcpListener {
+async fn bind_with_fallback(host: IpAddr, start: u16) -> tokio::net::TcpListener {
     for port in start..start.saturating_add(20) {
-        match tokio::net::TcpListener::bind(("0.0.0.0", port)).await {
+        match tokio::net::TcpListener::bind((host, port)).await {
             Ok(listener) => {
                 if port != start {
                     eprintln!("Port {start} is in use; bound {port} instead (set PORT to choose).");
@@ -33,7 +39,7 @@ async fn bind_with_fallback(start: u16) -> tokio::net::TcpListener {
             }
             Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => continue,
             Err(e) => {
-                eprintln!("Failed to bind 0.0.0.0:{port}: {e}");
+                eprintln!("Failed to bind {host}:{port}: {e}");
                 std::process::exit(1);
             }
         }

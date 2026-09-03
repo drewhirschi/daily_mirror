@@ -10,6 +10,7 @@ use crate::photos::{Photo, PhotoStore};
 use crate::catalog::PhotoCatalog;
 use crate::upload_auth;
 use crate::upload_flow::gallery_photos;
+use crate::processing::ProcessingQueue;
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct PhotoList {
@@ -35,6 +36,7 @@ pub async fn get(
 pub async fn post(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,
+    Extension(processing): Extension<ProcessingQueue>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<(StatusCode, Json<UploadResponse>), StatusCode> {
@@ -58,6 +60,8 @@ pub async fn post(
     catalog.register_ready(&saved.id, &storage_key, body.len() as u64).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     catalog.mark_thumbnail_ready(&saved.id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    processing.enqueue_active_photo(&saved.id).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok((

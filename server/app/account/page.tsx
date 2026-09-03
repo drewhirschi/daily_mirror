@@ -96,6 +96,7 @@ export default function AccountPage() {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
+    navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_PRIVATE_MEDIA" });
     window.location.assign("/login");
   }
 }

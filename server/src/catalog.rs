@@ -120,6 +120,10 @@ impl PhotoCatalog {
             .await
     }
 
+    pub(crate) async fn connection(&self) -> io::Result<libsql::Connection> {
+        self.database().await?.connect().map_err(io::Error::other)
+    }
+
     pub async fn reserve(&self, id: &str, storage_key: &str, byte_size: u64) -> io::Result<()> {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         connection.execute(
@@ -278,13 +282,43 @@ impl PhotoCatalog {
         Ok(())
     }
 
-    pub async fn record_rotation(&self, id: &str, degrees: i16) -> io::Result<()> {
+    pub async fn record_rotation(&self, id: &str, degrees: i16, byte_size: u64) -> io::Result<()> {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
-        connection.execute(
-            "UPDATE photos SET rotation_degrees = (rotation_degrees + ?2 + 360) % 360, media_revision = media_revision + 1, thumbnail_status = 'ready', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
-            params![id, degrees],
+        let byte_size = i64::try_from(byte_size)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "photo is too large"))?;
+        let changed = connection.execute(
+            "UPDATE photos SET rotation_degrees = (rotation_degrees + ?2 + 360) % 360, byte_size = ?3, media_revision = media_revision + 1, thumbnail_status = 'ready', updated_at = CURRENT_TIMESTAMP WHERE id = ?1 AND status = 'ready'",
+            params![id, degrees, byte_size],
         ).await.map_err(io::Error::other)?;
-        Ok(())
+        if changed == 0 {
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("no ready photo exists for {id}"),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub async fn repair_ready_size(&self, id: &str, byte_size: u64) -> io::Result<()> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let byte_size = i64::try_from(byte_size)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "photo is too large"))?;
+        let changed = connection
+            .execute(
+                "UPDATE photos SET byte_size = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?1 AND status = 'ready'",
+                params![id, byte_size],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        if changed == 0 {
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("no ready photo exists for {id}"),
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     pub async fn delete(&self, id: &str) -> io::Result<()> {
@@ -400,7 +434,8 @@ mod tests {
             catalog.list().await.unwrap()[0].thumbnail_url,
             Some(format!("/api/photos/{id}/thumbnail?rev=0"))
         );
-        catalog.record_rotation(id, 90).await.unwrap();
+        catalog.record_rotation(id, 90, 987).await.unwrap();
+        assert_eq!(catalog.expected_size(id).await.unwrap(), Some(987));
         let rotated = &catalog.list().await.unwrap()[0];
         assert_eq!(rotated.url, format!("/api/photos/{id}?rev=1"));
         assert_eq!(

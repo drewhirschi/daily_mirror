@@ -1,0 +1,48 @@
+# Daily Mirror processor
+
+This Rust CLI is the intermittent compute client for face processing. It talks
+to the deployed Daily Mirror server; it does not connect directly to R2 or
+Turso.
+
+Configure it from this directory:
+
+```sh
+cp .env.example .env
+```
+
+The server and processor must share `DAILY_MIRROR_PROCESSOR_TOKEN` and
+`DAILY_MIRROR_PROCESSING_PIPELINE` values.
+
+Read queue status with:
+
+```sh
+cargo run --locked -- status
+```
+
+The default engine combines a full-frame MediaPipe pass with scaled OpenCV
+YuNet detections used as additional region proposals. It runs the MediaPipe
+Face Landmarker on each proposed crop, deduplicates overlapping results, and
+generates aligned 128-dimensional SFace recognition embeddings. This hybrid is
+important for distant or blurred faces: the full-frame landmarker can miss
+them even though it works well once given the correct region.
+
+The inference pipeline runs inside the Rust process. MediaPipe uses its XNNPACK
+CPU delegate; local measurements found that faster and quieter than its Linux
+OpenGL GPU delegate for this one-photo-at-a-time workload. The `--engine yu-net`
+fallback retains the five-landmark OpenCV-only path. Model files live under
+`processor/models/` and are intentionally ignored by Git. Their source URLs,
+licenses, and checksums are recorded in `models/README.md`.
+
+Drain the queue with:
+
+```sh
+cargo run --locked --release -- process
+```
+
+Run its checks with:
+
+```sh
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+```

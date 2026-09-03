@@ -1,0 +1,19 @@
+[package]
+name = "daily-mirror-processor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+clap = { version = "4", features = ["derive", "env"] }
+daily-mirror-vision-contract = { path = "../crates/vision-contract" }
+dotenvy = "0.15"
+mediapipe = "0.1"
+opencv = { version = "0.100", default-features = false, features = ["dnn", "features", "imgcodecs", "imgproc", "objdetect"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }

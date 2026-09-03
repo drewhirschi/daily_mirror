@@ -101,6 +101,20 @@ size mismatches hidden for investigation. `CRON_SECRET` stays in Vercel; Vercel
 supplies it as a Bearer token when invoking the schedule declared in
 `vercel.json`.
 
+Every ready photo also has one `photo_processing` row for the active face
+pipeline. Upload completion creates it; reconciliation inserts any missing
+rows. The Rust processor authenticates with `DAILY_MIRROR_PROCESSOR_TOKEN`,
+claims at most 20 five-minute leases, and commits each photo's analysis and
+faces in its own transaction. Expired leases are eligible for a later run.
+
+Signed-in users can open `/admin` to inspect the queue, processing errors,
+normalized face boxes and landmarks, and model metadata. Faces can be assigned
+to named people there. Each person gets a centered flipbook containing the
+highest-confidence confirmed face from each calendar day; the crop is rendered
+on demand from the immutable original and cached by face ID. Household
+flipbooks combine those daily frames into configurable four- or six-slot grids;
+admins choose the members, their slot order, and the layout in the same view.
+
 Set the variables documented in `.env.example`; R2 API credentials need object
 read/write plus bucket-list access.
 

@@ -35,9 +35,18 @@ color to make exceptional states unambiguous.
 | Complete | Return to solid white | Ready for another capture. |
 | Error | Repeating red triple-pulse | The local admin page has details. |
 
-The normal capture path must explicitly request single autofocus immediately
-before capture. The current physical-button path uses an immediate still and
-does not trigger `--autofocus-on-capture`; the camera-lab path already does.
+The normal capture path keeps continuous autofocus active throughout the
+three-second countdown so focus can follow a person moving from the button into
+the portrait position. Its initial portrait focus window is intentionally wider
+and lower than the camera stack's default middle third. Validate that window
+with people at 3, 4, and 5 feet in the installed framing. Also compare calibrated
+manual lens positions from roughly 0.66 to 1.1 dioptres; a fixed position may be
+more repeatable if the appliance has one controlled working distance. Capture
+metadata in the device journal provides the autofocus state, lens position, and
+focus metric when the camera stack reports them. The Pi admin camera lab exposes
+continuous, single, and manual focus modes; 3/4/5-foot presets; direct lens
+position and autofocus-window inputs; a live window overlay; and full-resolution
+no-upload results so this calibration can be completed without SSH.
 
 ### Premium button option
 

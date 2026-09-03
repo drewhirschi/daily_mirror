@@ -28,7 +28,7 @@ Use `DAILY_MIRROR_CAMERA_ARGS` for sensor-specific tuning after inspecting the
 ArduCam. The default is:
 
 ```text
---nopreview --timeout 3000 --encoding jpg --quality 95 --autofocus-mode auto --autofocus-speed fast
+--nopreview --timeout 3000 --encoding jpg --quality 95 --autofocus-mode continuous --autofocus-range normal --autofocus-speed fast --autofocus-window 0.2,0.15,0.6,0.7 --metadata-format json --metadata -
 ```
 
 ## GPIO service
@@ -47,14 +47,20 @@ cargo run --release -- run
 - Yellow: three one-second countdown pulses only.
 - Red: a capture/upload error or at least one photograph awaiting retry.
 
-The camera process and autofocus start before the first yellow pulse. Yellow
-stays solid after the third pulse only until the actual full-resolution frame
-arrives, so it remains an unambiguous “hold still” indicator. Green starts only
-after the shutter, breathes during local JPEG validation and upload, flashes
-twice on success, then returns to solid ready. Yellow is never reused for
-background work. Do not add
-`--autofocus-on-capture` to this default: `auto` already sweeps at startup, and
-that flag requests a redundant second sweep at the shutter.
+The camera process and continuous autofocus start before the first yellow pulse.
+Focus keeps tracking throughout the countdown, allowing the person who pressed
+the button to move into the expected 3–5 foot portrait position. The default
+focus window covers the central 60% of the frame width and 70% of its height,
+rather than only the camera stack's middle third. Yellow stays solid after the
+third pulse only until the actual full-resolution frame arrives, so it remains
+an unambiguous “hold still” indicator. Green starts only after the shutter,
+breathes during local JPEG validation and upload, flashes twice on success,
+then returns to solid ready. Yellow is never reused for background work.
+
+Each normal capture also writes the camera metadata JSON to standard output,
+which makes fields supplied by the camera stack such as `AfState`,
+`LensPosition`, and `FocusFoM` available in the service journal. Available
+fields depend on the installed camera and camera software.
 
 The physical button always takes a picture. Holding it cannot trigger multiple
 captures because the service waits for release and debounces both edges.
@@ -83,9 +89,13 @@ running Rust package. It does not capture a photograph.
 The admin's camera lab forces the IMX519's full-field 2328×1748 binned sensor
 mode, then scales it to a persistent 960×720 MJPEG viewfinder in memory. It
 can adjust exposure compensation, brightness, contrast, saturation, sharpness,
-denoising, white balance, metering, exposure profile, autofocus range/speed,
-and optional manual shutter/gain. Applying settings restarts an active preview
-so the camera algorithms settle under the new configuration.
+denoising, white balance, metering, exposure profile, manual shutter/gain, and
+the complete focus strategy. Focus controls include continuous, single, or
+manual modes; range and speed; normalized autofocus-window coordinates; direct
+lens position; and one-click fixed-focus presets for 3, 4, and 5 feet. The live
+image overlays the selected autofocus region. Starting preview or taking a test
+snap automatically applies every visible control, while Apply settings restarts
+an active preview so the camera algorithms settle under the new configuration.
 
 The lab also provides persistent 0°/180° rotation and horizontal or vertical
 mirroring. Applying settings writes those mounting controls to
@@ -94,8 +104,11 @@ them to the live preview, full-resolution test snaps, and normal button
 captures. Override the file location with
 `DAILY_MIRROR_CAMERA_SETTINGS_PATH` when packaging the device differently.
 
-`Test snap · no upload` stops preview, captures one 4656×3496 JPEG with the lab
-settings, and retains only its bytes in service memory. It does not touch the
-durable queue, local disk, or gallery upload endpoint. Starting preview again or
-pressing the physical button safely releases/reclaims the camera; a physical
-capture always stops lab preview before running the normal workflow.
+`Apply + test snap` stops preview, captures one 4656×3496 JPEG with the visible
+lab settings, and retains only its bytes and camera metadata in service memory.
+The page shows autofocus state, lens position, focus score, exposure, analogue
+gain, the complete metadata JSON, and a link that opens the full-resolution
+image for 100% inspection. It does not touch the durable queue, local photo
+storage, or gallery upload endpoint. Starting preview again or pressing the
+physical button safely releases/reclaims the camera; a physical capture always
+stops lab preview before running the normal workflow.

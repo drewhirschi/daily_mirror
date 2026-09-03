@@ -463,12 +463,14 @@ impl Camera {
         Ok(final_path.to_owned())
     }
 
-    fn capture_lab(&self, settings: &LabSettings) -> Result<Vec<u8>> {
+    fn capture_lab(&self, settings: &LabSettings) -> Result<(Vec<u8>, Option<serde_json::Value>)> {
         settings.validate()?;
         let _camera = self
             .camera_lock
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let metadata_path =
+            std::env::temp_dir().join(format!("daily-mirror-lab-{}.json", capture_id()));
         let output = Command::new(&self.command)
             .args([
                 "--nopreview",
@@ -482,15 +484,18 @@ impl Camera {
                 "jpg",
                 "--quality",
                 "95",
-                "--autofocus-mode",
-                "auto",
-                "--autofocus-on-capture",
-                "--output",
-                "-",
             ])
             .args(settings.camera_args())
-            .output()
-            .with_context(|| format!("run lab capture with {}", self.command))?;
+            .args(settings.focus_args(true))
+            .args(["--metadata-format", "json", "--metadata"])
+            .arg(&metadata_path)
+            .args(["--output", "-"])
+            .output();
+        let metadata = fs::read_to_string(&metadata_path).ok().map(|raw| {
+            serde_json::from_str(&raw).unwrap_or_else(|_| serde_json::json!({ "Raw": raw.trim() }))
+        });
+        let _ = fs::remove_file(&metadata_path);
+        let output = output.with_context(|| format!("run lab capture with {}", self.command))?;
         if !output.status.success() {
             let error = String::from_utf8_lossy(&output.stderr);
             let tail = error.chars().rev().take(800).collect::<String>();
@@ -498,7 +503,7 @@ impl Camera {
             bail!("lab camera exited with {}: {tail}", output.status);
         }
         validate_jpeg_bytes(&output.stdout)?;
-        Ok(output.stdout)
+        Ok((output.stdout, metadata))
     }
 
     fn queue_existing(&self, source: &Path) -> Result<PathBuf> {
@@ -762,6 +767,7 @@ struct AdminStatus {
     lab_preview_running: bool,
     lab_preview_error: Option<String>,
     lab_has_capture: bool,
+    lab_capture_metadata: Option<serde_json::Value>,
     lab_settings: LabSettings,
 }
 
@@ -824,6 +830,7 @@ impl AdminState {
             lab_preview_running: self.lab.preview_running(),
             lab_preview_error: self.lab.preview_error(),
             lab_has_capture: self.lab.has_capture(),
+            lab_capture_metadata: self.lab.capture_metadata(),
             lab_settings: self.lab.settings(),
         }
     }
@@ -942,14 +949,16 @@ impl AdminState {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .while_processing(&mut pulse, || {
-                self.camera.capture_lab(&self.lab.settings()).map(|jpeg| {
-                    let size = jpeg.len();
-                    self.lab.store_capture(jpeg);
-                    format!(
-                        "Test photo captured in memory ({:.1} MB); it was not uploaded",
-                        size as f64 / 1024.0 / 1024.0
-                    )
-                })
+                self.camera
+                    .capture_lab(&self.lab.settings())
+                    .map(|(jpeg, metadata)| {
+                        let size = jpeg.len();
+                        self.lab.store_capture(jpeg, metadata);
+                        format!(
+                            "Test photo captured in memory ({:.1} MB); it was not uploaded",
+                            size as f64 / 1024.0 / 1024.0
+                        )
+                    })
             });
         match &result {
             Ok(message) => {
@@ -1259,6 +1268,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
   <style>
     :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     body { margin: 0; min-height: 100vh; background: #0b1110; color: #eaf4ef; }
     main { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 72px; }
     header { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 28px; }
@@ -1296,6 +1306,8 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
     .lab-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 22px; align-items: start; }
     .lab-screen { position: relative; aspect-ratio: 4 / 3; display: grid; place-items: center; overflow: hidden; border: 1px solid #263a31; border-radius: 14px; background: #070b09; }
     .lab-screen img { width: 100%; height: 100%; display: block; object-fit: contain; }
+    .focus-window { position: absolute; z-index: 2; border: 2px solid #78dfa8; border-radius: 8px; box-shadow: 0 0 0 1px #07100c, 0 0 18px rgba(120, 223, 168, .35); pointer-events: none; }
+    .focus-window::after { content: "AF"; position: absolute; top: -2px; left: -2px; padding: 3px 6px; border-radius: 6px 0 6px 0; background: #78dfa8; color: #08110d; font-size: 10px; font-weight: 800; }
     .lab-placeholder { max-width: 32ch; padding: 24px; color: #71857b; line-height: 1.5; text-align: center; }
     .lab-toolbar { margin-top: 12px; }
     .lab-status { min-height: 22px; margin: 12px 0 0; color: #9cb1a7; line-height: 1.4; }
@@ -1307,6 +1319,18 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
     input[type="range"] { padding: 0; accent-color: #78dfa8; }
     input[type="checkbox"] { width: auto; margin-right: 7px; accent-color: #78dfa8; }
     .setting output { color: #c5d8ce; font-variant-numeric: tabular-nums; }
+    .focus-heading, .focus-presets { grid-column: 1 / -1; }
+    .focus-heading { display: flex; justify-content: space-between; gap: 12px; padding-top: 5px; color: #9cb1a7; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+    .focus-heading span { color: #61766b; letter-spacing: 0; text-transform: none; }
+    .focus-presets { display: flex; flex-wrap: wrap; gap: 7px; }
+    .focus-presets button { padding: 8px 10px; border: 1px solid #30473c; background: #17261f; color: #cfe2d8; font-size: 11px; }
+    .focus-results { margin-top: 14px; padding: 14px; border: 1px solid #263a31; border-radius: 12px; background: #0b1410; }
+    .focus-results h3 { margin: 0 0 11px; color: #9cb1a7; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+    .focus-metadata { grid-template-columns: repeat(2, 1fr); gap: 8px 14px; font-size: 12px; }
+    .focus-metadata dd { color: #dcebe3; }
+    .metadata-raw { margin-top: 12px; color: #81958b; font-size: 11px; }
+    .metadata-raw summary { cursor: pointer; }
+    .metadata-raw pre { max-height: 240px; overflow: auto; white-space: pre-wrap; color: #a9bdb3; }
     .lab-note { margin: 0; color: #71857b; font-size: 12px; line-height: 1.45; }
     footer { margin-top: 18px; color: #687c72; font-size: 13px; }
     @media (max-width: 760px) { header { display: block; } .badge { display: inline-block; margin-top: 18px; } .grid, .lab-layout { grid-template-columns: 1fr; } .card.wide { grid-column: auto; } }
@@ -1360,14 +1384,27 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
         <div>
           <div class="lab-screen">
             <img id="lab-viewer" alt="Camera lab preview" hidden>
+            <div class="focus-window" id="focus-window" aria-hidden="true"></div>
             <div class="lab-placeholder" id="lab-placeholder">Start live preview to tune the camera, or take a full-resolution test snap. Lab images stay in memory and are never queued or uploaded.</div>
           </div>
           <div class="actions lab-toolbar">
             <button data-action="/api/lab/preview/start" data-result="lab-result">Start live preview</button>
             <button class="secondary" data-action="/api/lab/preview/stop" data-result="lab-result">Stop preview</button>
-            <button class="secondary" data-action="/api/lab/capture" data-result="lab-result">Test snap · no upload</button>
+            <button class="secondary" data-action="/api/lab/capture" data-result="lab-result">Apply + test snap</button>
+            <a class="button secondary" id="lab-full-resolution" href="/api/lab/capture.jpg" target="_blank" rel="noreferrer" hidden>Open full resolution</a>
           </div>
           <p class="lab-status" id="lab-result">Preview is stopped.</p>
+          <section class="focus-results" id="focus-results" hidden>
+            <h3>Last test snap · camera metadata</h3>
+            <dl class="focus-metadata">
+              <dt>AF state</dt><dd id="focus-state">—</dd>
+              <dt>Lens position</dt><dd id="focus-lens-position">—</dd>
+              <dt>Focus score</dt><dd id="focus-score">—</dd>
+              <dt>Exposure</dt><dd id="focus-exposure">—</dd>
+              <dt>Analogue gain</dt><dd id="focus-gain">—</dd>
+            </dl>
+            <details class="metadata-raw"><summary>All capture metadata</summary><pre id="focus-metadata-raw"></pre></details>
+          </section>
         </div>
         <form class="settings" id="lab-settings">
           <div class="setting-grid">
@@ -1383,8 +1420,22 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
             <label class="setting"><span>White balance<select name="awb"><option value="auto">Auto</option><option value="daylight">Daylight</option><option value="cloudy">Cloudy</option><option value="indoor">Indoor</option><option value="tungsten">Tungsten</option><option value="fluorescent">Fluorescent</option><option value="incandescent">Incandescent</option></select></span></label>
             <label class="setting"><span>Metering<select name="metering"><option value="centre">Centre weighted</option><option value="average">Whole frame</option><option value="spot">Spot</option></select></span></label>
             <label class="setting"><span>Exposure profile<select name="exposure"><option value="normal">Normal</option><option value="sport">Short exposure</option></select></span></label>
-            <label class="setting"><span>Focus range<select name="autofocus_range"><option value="normal">Normal</option><option value="full">Full</option><option value="macro">Macro</option></select></span></label>
-            <label class="setting"><span>Focus speed<select name="autofocus_speed"><option value="normal">Normal</option><option value="fast">Fast</option></select></span></label>
+            <div class="focus-heading">Focus calibration <span>The green box is the active AF region</span></div>
+            <label class="setting"><span>Focus strategy<select name="autofocus_mode"><option value="continuous">Continuous · tracks during preview</option><option value="auto">Single AF · repeats on test snap</option><option value="manual">Fixed lens position</option></select></span></label>
+            <label class="setting" data-focus-control="manual"><span>Lens position · dioptres<input name="lens_position" type="number" min="0" max="32" step="0.01"></span></label>
+            <label class="setting" data-focus-control="manual"><span>Approximate distance<output id="focus-distance">—</output></span></label>
+            <label class="setting" data-focus-control="auto"><span>Focus range<select name="autofocus_range"><option value="normal">Normal</option><option value="full">Full</option><option value="macro">Macro</option></select></span></label>
+            <label class="setting" data-focus-control="auto"><span>Focus speed<select name="autofocus_speed"><option value="normal">Normal</option><option value="fast">Fast</option></select></span></label>
+            <label class="setting" data-focus-control="auto"><span>AF window X · 0–1<input name="autofocus_window_x" type="number" min="0" max="1" step="0.01"></span></label>
+            <label class="setting" data-focus-control="auto"><span>AF window Y · 0–1<input name="autofocus_window_y" type="number" min="0" max="1" step="0.01"></span></label>
+            <label class="setting" data-focus-control="auto"><span>AF window width<input name="autofocus_window_width" type="number" min="0.01" max="1" step="0.01"></span></label>
+            <label class="setting" data-focus-control="auto"><span>AF window height<input name="autofocus_window_height" type="number" min="0.01" max="1" step="0.01"></span></label>
+            <div class="focus-presets" aria-label="Focus presets">
+              <button type="button" data-focus-preset="portrait">Portrait AF</button>
+              <button type="button" data-focus-feet="3">Fixed · 3 ft</button>
+              <button type="button" data-focus-feet="4">Fixed · 4 ft</button>
+              <button type="button" data-focus-feet="5">Fixed · 5 ft</button>
+            </div>
             <label class="setting"><span>Shutter · µs (0 = auto)<input name="shutter_us" type="number" min="0" max="1000000" step="1000"></span></label>
             <label class="setting"><span>Gain (0 = auto)<input name="gain" type="number" min="0" max="16" step="0.1"></span></label>
           </div>
@@ -1392,7 +1443,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
             <button type="submit">Apply settings</button>
             <button class="secondary" type="button" id="lab-reset">Reset controls</button>
           </div>
-          <p class="lab-note">Camera orientation is saved on the Pi and applies to previews, button captures, and admin captures after every restart. Apply restarts an active preview. Manual shutter or gain disables that part of automatic exposure; leave both at 0 while establishing a baseline.</p>
+          <p class="lab-note">Start preview or take a test snap to apply every visible control automatically. Test snaps stay in memory and are never uploaded. The AF window uses normalized x, y, width, and height values. Fixed-distance presets convert feet to approximate dioptres; use the reported lens position and full-resolution image to calibrate the actual module. Camera orientation is saved on the Pi and applies to normal captures after restart; other lab values remain temporary.</p>
         </form>
       </div>
     </section>
@@ -1427,9 +1478,11 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       rotation_degrees: 0, hflip: false, vflip: false,
       ev: 0, brightness: 0, contrast: 1, saturation: 1, sharpness: 1,
       denoise: 'auto', awb: 'auto', metering: 'centre', exposure: 'normal',
-      shutter_us: 0, gain: 0, autofocus_range: 'normal', autofocus_speed: 'normal'
+      shutter_us: 0, gain: 0, autofocus_mode: 'continuous',
+      autofocus_range: 'normal', autofocus_speed: 'fast', lens_position: 0.82,
+      autofocus_window_x: 0.2, autofocus_window_y: 0.15, autofocus_window_width: 0.6, autofocus_window_height: 0.7
     };
-    const labNumericFields = new Set(['rotation_degrees', 'ev', 'brightness', 'contrast', 'saturation', 'sharpness', 'shutter_us', 'gain']);
+    const labNumericFields = new Set(['rotation_degrees', 'ev', 'brightness', 'contrast', 'saturation', 'sharpness', 'shutter_us', 'gain', 'lens_position', 'autofocus_window_x', 'autofocus_window_y', 'autofocus_window_width', 'autofocus_window_height']);
     const labBooleanFields = new Set(['hflip', 'vflip']);
     let uptimeBase = 0;
     let uptimeReceivedAt = Date.now();
@@ -1460,6 +1513,10 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       const gallery = byId('gallery');
       gallery.href = status.server_url || '#';
       gallery.hidden = !status.server_url;
+      const fullResolution = byId('lab-full-resolution');
+      fullResolution.hidden = !status.lab_has_capture;
+      fullResolution.href = '/api/lab/capture.jpg?revision=' + status.revision;
+      renderFocusMetadata(status.lab_capture_metadata);
       if (!labSettingsInitialized && status.lab_settings) {
         populateLabSettings(status.lab_settings);
         labSettingsInitialized = true;
@@ -1481,6 +1538,34 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       }
     }
 
+    function metadataValue(metadata, ...keys) {
+      if (!metadata || typeof metadata !== 'object') return null;
+      for (const key of keys) {
+        if (metadata[key] != null) return metadata[key];
+        const match = Object.entries(metadata).find(([name]) => name.toLowerCase() === key.toLowerCase());
+        if (match) return match[1];
+      }
+      return null;
+    }
+
+    function renderFocusMetadata(metadata) {
+      const panel = byId('focus-results');
+      panel.hidden = !metadata;
+      if (!metadata) return;
+      const afState = metadataValue(metadata, 'AfState');
+      const afNames = { 0: 'idle', 1: 'scanning', 2: 'focused', 3: 'failed' };
+      byId('focus-state').textContent = afState == null ? 'not reported' : (afNames[afState] || String(afState));
+      const lens = metadataValue(metadata, 'LensPosition');
+      byId('focus-lens-position').textContent = lens == null ? 'not reported' : Number(lens).toFixed(2) + ' D';
+      const score = metadataValue(metadata, 'FocusFoM');
+      byId('focus-score').textContent = score == null ? 'not reported' : String(score);
+      const exposure = metadataValue(metadata, 'ExposureTime');
+      byId('focus-exposure').textContent = exposure == null ? 'not reported' : Number(exposure).toFixed(0) + ' µs';
+      const gain = metadataValue(metadata, 'AnalogueGain');
+      byId('focus-gain').textContent = gain == null ? 'not reported' : Number(gain).toFixed(2);
+      byId('focus-metadata-raw').textContent = JSON.stringify(metadata, null, 2);
+    }
+
     function populateLabSettings(settings) {
       const form = byId('lab-settings');
       for (const [name, value] of Object.entries(settings)) {
@@ -1493,9 +1578,21 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
     }
 
     function updateLabReadouts() {
+      const form = byId('lab-settings');
       for (const name of ['ev', 'brightness', 'contrast', 'saturation', 'sharpness']) {
-        byId(`${name}-value`).textContent = byId('lab-settings').elements.namedItem(name).value;
+        byId(name + '-value').textContent = form.elements.namedItem(name).value;
       }
+      const manual = form.elements.namedItem('autofocus_mode').value === 'manual';
+      document.querySelectorAll('[data-focus-control="manual"]').forEach(node => node.hidden = !manual);
+      document.querySelectorAll('[data-focus-control="auto"]').forEach(node => node.hidden = manual);
+      const lensPosition = Number(form.elements.namedItem('lens_position').value);
+      byId('focus-distance').textContent = lensPosition > 0 ? (3.28084 / lensPosition).toFixed(2) + ' ft' : 'infinity';
+      const focusWindow = byId('focus-window');
+      focusWindow.hidden = manual;
+      focusWindow.style.left = Number(form.elements.namedItem('autofocus_window_x').value) * 100 + '%';
+      focusWindow.style.top = Number(form.elements.namedItem('autofocus_window_y').value) * 100 + '%';
+      focusWindow.style.width = Number(form.elements.namedItem('autofocus_window_width').value) * 100 + '%';
+      focusWindow.style.height = Number(form.elements.namedItem('autofocus_window_height').value) * 100 + '%';
     }
 
     function collectLabSettings() {
@@ -1546,19 +1643,37 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
         byId('message').textContent = 'The Pi admin service is not responding';
       }
     }
+    async function saveLabSettings() {
+      const response = await fetch('/api/lab/settings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(collectLabSettings())
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'HTTP ' + response.status);
+      labCaptureLoaded = false;
+      return result.message;
+    }
+
     async function action(button) {
       const buttons = [...document.querySelectorAll('button[data-action]')];
       const resultElement = byId(button.dataset.result || 'result');
+      const actionPath = button.dataset.action;
       buttons.forEach(item => item.disabled = true);
       resultElement.textContent = 'Working…';
       try {
-        const response = await fetch(button.dataset.action, { method: 'POST' });
+        if (actionPath === '/api/lab/preview/start' || actionPath === '/api/lab/capture') {
+          resultElement.textContent = 'Applying the visible camera settings…';
+          await saveLabSettings();
+          resultElement.textContent = actionPath === '/api/lab/capture' ? 'Capturing full-resolution test photo…' : 'Starting preview…';
+        }
+        const response = await fetch(actionPath, { method: 'POST' });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.message || `HTTP ${response.status}`);
+        if (!response.ok) throw new Error(result.message || 'HTTP ' + response.status);
         resultElement.textContent = result.message;
-        if (button.dataset.action === '/api/lab/capture') labCaptureLoaded = false;
+        if (actionPath === '/api/lab/capture') labCaptureLoaded = false;
       } catch (error) {
-        resultElement.textContent = `Request failed: ${error.message}`;
+        resultElement.textContent = 'Request failed: ' + error.message;
       } finally {
         buttons.forEach(item => item.disabled = false);
         await refresh();
@@ -1572,23 +1687,38 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       submit.disabled = true;
       byId('lab-result').textContent = 'Applying camera settings…';
       try {
-        const response = await fetch('/api/lab/settings', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(collectLabSettings())
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || `HTTP ${response.status}`);
-        byId('lab-result').textContent = result.message;
-        labCaptureLoaded = false;
+        byId('lab-result').textContent = await saveLabSettings();
       } catch (error) {
-        byId('lab-result').textContent = `Settings failed: ${error.message}`;
+        byId('lab-result').textContent = 'Settings failed: ' + error.message;
       } finally {
         submit.disabled = false;
         await refresh();
       }
     });
-    byId('lab-reset').addEventListener('click', () => populateLabSettings(labDefaults));
+    document.querySelectorAll('[data-focus-feet]').forEach(button => button.addEventListener('click', () => {
+      const form = byId('lab-settings');
+      const feet = Number(button.dataset.focusFeet);
+      form.elements.namedItem('autofocus_mode').value = 'manual';
+      form.elements.namedItem('lens_position').value = (3.28084 / feet).toFixed(2);
+      updateLabReadouts();
+      byId('lab-result').textContent = 'Fixed focus preset loaded for ' + feet + ' ft · start preview or take a test snap to apply it.';
+    }));
+    document.querySelectorAll('[data-focus-preset="portrait"]').forEach(button => button.addEventListener('click', () => {
+      const form = byId('lab-settings');
+      form.elements.namedItem('autofocus_mode').value = 'continuous';
+      form.elements.namedItem('autofocus_range').value = 'normal';
+      form.elements.namedItem('autofocus_speed').value = 'fast';
+      form.elements.namedItem('autofocus_window_x').value = '0.2';
+      form.elements.namedItem('autofocus_window_y').value = '0.15';
+      form.elements.namedItem('autofocus_window_width').value = '0.6';
+      form.elements.namedItem('autofocus_window_height').value = '0.7';
+      updateLabReadouts();
+      byId('lab-result').textContent = 'Portrait autofocus preset loaded · start preview or take a test snap to apply it.';
+    }));
+    byId('lab-reset').addEventListener('click', () => {
+      populateLabSettings(labDefaults);
+      byId('lab-result').textContent = 'Default controls restored · start preview or take a test snap to apply them.';
+    });
     refresh();
     const events = new EventSource('/api/events');
     events.onmessage = event => render(JSON.parse(event.data));
@@ -1747,9 +1877,17 @@ fn default_camera_args() -> Vec<String> {
         "--quality",
         "95",
         "--autofocus-mode",
-        "auto",
+        "continuous",
+        "--autofocus-range",
+        "normal",
         "--autofocus-speed",
         "fast",
+        "--autofocus-window",
+        "0.2,0.15,0.6,0.7",
+        "--metadata-format",
+        "json",
+        "--metadata",
+        "-",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -1916,12 +2054,19 @@ mod tests {
         assert!(ADMIN_PAGE.contains("/api/lab/preview/start"));
         assert!(ADMIN_PAGE.contains("/api/lab/capture"));
         assert!(ADMIN_PAGE.contains("/api/lab/settings"));
+        assert!(ADMIN_PAGE.contains("name=\"autofocus_mode\""));
+        assert!(ADMIN_PAGE.contains("name=\"lens_position\""));
+        assert!(ADMIN_PAGE.contains("name=\"autofocus_window_x\""));
+        assert!(ADMIN_PAGE.contains("name=\"autofocus_window_height\""));
+        assert!(ADMIN_PAGE.contains("data-focus-feet=\"3\""));
+        assert!(ADMIN_PAGE.contains("id=\"focus-metadata-raw\""));
+        assert!(ADMIN_PAGE.contains("id=\"lab-full-resolution\""));
         assert!(ADMIN_PAGE.contains("Ready / processing"));
         assert!(ADMIN_PAGE.contains("Countdown"));
     }
 
     #[test]
-    fn default_capture_focuses_during_the_three_second_countdown() {
+    fn default_capture_tracks_portrait_focus_during_the_three_second_countdown() {
         let args = default_camera_args();
         let timeout = args.iter().position(|arg| arg == "--timeout").unwrap();
         let autofocus = args
@@ -1930,7 +2075,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(args.get(timeout + 1).map(String::as_str), Some("3000"));
-        assert_eq!(args.get(autofocus + 1).map(String::as_str), Some("auto"));
+        assert_eq!(
+            args.get(autofocus + 1).map(String::as_str),
+            Some("continuous")
+        );
         let autofocus_speed = args
             .iter()
             .position(|arg| arg == "--autofocus-speed")
@@ -1939,6 +2087,27 @@ mod tests {
             args.get(autofocus_speed + 1).map(String::as_str),
             Some("fast")
         );
+        let autofocus_range = args
+            .iter()
+            .position(|arg| arg == "--autofocus-range")
+            .unwrap();
+        assert_eq!(
+            args.get(autofocus_range + 1).map(String::as_str),
+            Some("normal")
+        );
+        let autofocus_window = args
+            .iter()
+            .position(|arg| arg == "--autofocus-window")
+            .unwrap();
+        assert_eq!(
+            args.get(autofocus_window + 1).map(String::as_str),
+            Some("0.2,0.15,0.6,0.7")
+        );
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["--metadata-format", "json"])
+        );
+        assert!(args.windows(2).any(|pair| pair == ["--metadata", "-"]));
         assert!(!args.iter().any(|arg| arg == "--autofocus-on-capture"));
         assert!(!args.iter().any(|arg| arg == "--immediate"));
     }

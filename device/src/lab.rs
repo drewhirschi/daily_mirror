@@ -46,6 +46,24 @@ impl CameraOrientation {
         }
         args
     }
+
+    /// Equivalent lossless jpegtran operation for still captures. Sensor-side
+    /// flips change the IMX519 Bayer phase, which degrades autofocus, so
+    /// stills are captured unrotated and transformed after the fact.
+    pub fn jpegtran_args(&self) -> Option<[&'static str; 2]> {
+        let mut hflip = self.hflip;
+        let mut vflip = self.vflip;
+        if self.rotation_degrees == 180 {
+            hflip = !hflip;
+            vflip = !vflip;
+        }
+        match (hflip, vflip) {
+            (false, false) => None,
+            (true, false) => Some(["-flip", "horizontal"]),
+            (false, true) => Some(["-flip", "vertical"]),
+            (true, true) => Some(["-rotate", "180"]),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -218,6 +236,16 @@ impl LabSettings {
             args.push(self.gain.to_string());
         }
         args.extend(self.orientation().camera_args());
+        args
+    }
+
+    /// Args for still captures: everything except sensor-side orientation,
+    /// which is applied losslessly after capture (see
+    /// [`CameraOrientation::jpegtran_args`]).
+    pub fn still_camera_args(&self) -> Vec<String> {
+        let mut args = self.camera_args();
+        let orientation_args = self.orientation().camera_args();
+        args.truncate(args.len() - orientation_args.len());
         args
     }
 
@@ -731,6 +759,39 @@ mod tests {
             orientation.camera_args(),
             ["--rotation", "180", "--hflip"].map(str::to_owned)
         );
+    }
+
+    #[test]
+    fn orientation_maps_to_lossless_jpegtran_operations() {
+        let case = |rotation_degrees, hflip, vflip| {
+            CameraOrientation {
+                rotation_degrees,
+                hflip,
+                vflip,
+            }
+            .jpegtran_args()
+        };
+        assert_eq!(case(0, false, false), None);
+        assert_eq!(case(180, false, false), Some(["-rotate", "180"]));
+        assert_eq!(case(0, true, true), Some(["-rotate", "180"]));
+        assert_eq!(case(0, true, false), Some(["-flip", "horizontal"]));
+        assert_eq!(case(180, true, false), Some(["-flip", "vertical"]));
+        // A 180 rotation combined with both flips cancels out entirely.
+        assert_eq!(case(180, true, true), None);
+    }
+
+    #[test]
+    fn still_camera_args_omit_sensor_orientation() {
+        let settings = LabSettings::default().with_orientation(&CameraOrientation {
+            rotation_degrees: 180,
+            hflip: false,
+            vflip: false,
+        });
+        assert!(settings.camera_args().contains(&"--rotation".to_owned()));
+        let still = settings.still_camera_args();
+        assert!(!still.contains(&"--rotation".to_owned()));
+        assert!(!still.contains(&"--hflip".to_owned()));
+        assert!(!still.contains(&"--vflip".to_owned()));
     }
 
     #[test]

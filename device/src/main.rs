@@ -419,14 +419,16 @@ impl Camera {
         let id = capture_id();
         let temporary = self.queue_dir.join(format!(".{id}.tmp"));
         let final_path = self.queue_dir.join(format!("{id}.jpg"));
-        let orientation_args = self
+        // Orientation is deliberately NOT passed to the camera: sensor-side
+        // flips change the IMX519 Bayer phase and break autofocus. The JPEG
+        // is transformed losslessly after capture instead.
+        let orientation = self
             .orientation
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .camera_args();
+            .clone();
         let child = Command::new(&self.command)
             .args(&self.args)
-            .args(orientation_args)
             .arg("--output")
             .arg(&temporary)
             .spawn()
@@ -437,6 +439,7 @@ impl Camera {
             temporary,
             final_path,
             queue_dir: &self.queue_dir,
+            orientation,
         })
     }
 
@@ -445,12 +448,14 @@ impl Camera {
         temporary: &Path,
         final_path: &Path,
         status: std::process::ExitStatus,
+        orientation: &CameraOrientation,
     ) -> Result<PathBuf> {
         if !status.success() {
             let _ = fs::remove_file(temporary);
             bail!("camera command exited with {status}");
         }
         validate_jpeg_file(temporary)?;
+        apply_orientation(temporary, orientation);
         File::options().write(true).open(temporary)?.sync_all()?;
         fs::rename(temporary, final_path).with_context(|| {
             format!(
@@ -485,7 +490,7 @@ impl Camera {
                 "--quality",
                 "95",
             ])
-            .args(settings.camera_args())
+            .args(settings.still_camera_args())
             .args(settings.focus_args(true))
             .args(["--metadata-format", "json", "--metadata"])
             .arg(&metadata_path)
@@ -503,7 +508,20 @@ impl Camera {
             bail!("lab camera exited with {}: {tail}", output.status);
         }
         validate_jpeg_bytes(&output.stdout)?;
-        Ok((output.stdout, metadata))
+        let mut bytes = output.stdout;
+        let orientation = settings.orientation();
+        if orientation.jpegtran_args().is_some() {
+            let unrotated =
+                std::env::temp_dir().join(format!("daily-mirror-lab-{}.jpg", capture_id()));
+            if fs::write(&unrotated, &bytes).is_ok() {
+                apply_orientation(&unrotated, &orientation);
+                if let Ok(oriented) = fs::read(&unrotated) {
+                    bytes = oriented;
+                }
+                let _ = fs::remove_file(&unrotated);
+            }
+        }
+        Ok((bytes, metadata))
     }
 
     fn queue_existing(&self, source: &Path) -> Result<PathBuf> {
@@ -526,12 +544,55 @@ struct PendingCapture<'a> {
     temporary: PathBuf,
     final_path: PathBuf,
     queue_dir: &'a Path,
+    orientation: CameraOrientation,
 }
 
 impl PendingCapture<'_> {
     fn finish(mut self) -> Result<PathBuf> {
         let status = self.child.wait().context("wait for camera command")?;
-        Camera::finish_capture(self.queue_dir, &self.temporary, &self.final_path, status)
+        Camera::finish_capture(
+            self.queue_dir,
+            &self.temporary,
+            &self.final_path,
+            status,
+            &self.orientation,
+        )
+    }
+}
+
+/// Apply the saved orientation to a captured JPEG losslessly with jpegtran.
+/// Best-effort: an unrotated photo beats a failed capture, so problems are
+/// logged and the original file is kept.
+fn apply_orientation(path: &Path, orientation: &CameraOrientation) {
+    let Some(op) = orientation.jpegtran_args() else {
+        return;
+    };
+    let transformed = path.with_extension("oriented");
+    let result = Command::new("jpegtran")
+        .args(["-copy", "all", "-trim"])
+        .args(op)
+        .arg("-outfile")
+        .arg(&transformed)
+        .arg(path)
+        .output();
+    match result {
+        Ok(output) if output.status.success() && validate_jpeg_file(&transformed).is_ok() => {
+            if let Err(error) = fs::rename(&transformed, path) {
+                eprintln!("keeping unrotated capture: {error}");
+                let _ = fs::remove_file(&transformed);
+            }
+        }
+        Ok(output) => {
+            eprintln!(
+                "keeping unrotated capture: jpegtran exited with {}: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr).trim()
+            );
+            let _ = fs::remove_file(&transformed);
+        }
+        Err(error) => {
+            eprintln!("keeping unrotated capture: jpegtran unavailable: {error}");
+        }
     }
 }
 

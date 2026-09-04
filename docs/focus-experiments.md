@@ -1,4 +1,17 @@
-# Focus & sharpness experiments (2026-09-02)
+# Focus & sharpness experiments (2026-09-02/04)
+
+**2026-09-04 update — root cause found with a person in frame (lights on,
+Lux ≈ 60):** the production AF config had no `--autofocus-window`, so AF
+averaged the whole scene and consistently landed 0.4–0.5 dioptres *behind*
+the subject's face — visibly soft at the ~30–40 cm distance people stand
+from the mirror, where depth of field is millimeters. Adding a centered
+window (`--autofocus-window 0.3,0.3,0.4,0.4`) made AF land dead-on and
+perfectly repeatable (lens position 2.57–2.61 over three runs) and more
+than doubled measured center sharpness (152–157 vs 61–71), beating even the
+best manual lens position from the sweep. Even with room lights on, auto
+exposure still maxed out at 60 ms shutter, so `--exposure sport` (44 ms)
+stays recommended and daylight remains the crisp-motion case. The
+recommended args below include the window.
 
 Empirical results from ~40 captures on the actual Pi (`rpi1.local`, Arducam
 16MP IMX519) using `scripts/focus_sweep.py`. Each capture logged rpicam
@@ -56,11 +69,14 @@ Update `DAILY_MIRROR_CAMERA_ARGS` in the Pi's
 
 ```
 --nopreview --timeout 3000 --autofocus-mode auto --autofocus-on-capture \
+--autofocus-window 0.3,0.3,0.4,0.4 \
 --width 4656 --height 3496 --encoding jpg --quality 95 \
 --sharpness 1.5 --exposure sport --metadata - --metadata-format json
 ```
 
-Changes vs current: `--sharpness 1.5` (visually crisper, artifact-free),
+Changes vs current: `--autofocus-window 0.3,0.3,0.4,0.4` (the root-cause
+fix — see the 2026-09-04 update above), `--sharpness 1.5` (visually
+crisper, artifact-free),
 `--exposure sport` (biases toward short shutter — big deal in daylight,
 mild gain cost at night), and restoring `--metadata -` so every real capture
 logs `LensPosition` / `ExposureTime` / `AnalogueGain` / `AfState` to the

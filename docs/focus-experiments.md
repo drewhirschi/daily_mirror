@@ -1,5 +1,19 @@
 # Focus & sharpness experiments (2026-09-02/04)
 
+**2026-09-04, second update — the real root cause was sensor rotation.**
+Production captures were focusing at infinity (LensPosition ~0.0) while
+identical SSH test invocations focused correctly. The difference: the
+device appends the saved orientation (`--rotation 180`, the camera is
+mounted upside down) to still captures. Flipping the IMX519 readout
+changes the Bayer phase and breaks AF: on the same static scene, AF landed
+at ~1.2 (FocusFoM ~15.5k) with any flip vs ~2.5 (FocusFoM ~29.2k) without,
+and with a subject in production it collapsed to 0. Fix (shipped): stills
+capture unrotated and the JPEG is rotated losslessly afterward with
+`jpegtran -rotate 180` (requires `libjpeg-turbo-progs` on the Pi); the lab
+live preview keeps sensor rotation since it is only used for framing.
+Verified end to end: a production capture via `/api/actions/capture` now
+lands at LensPosition 2.48, matching the measured scene peak.
+
 **2026-09-04 update — root cause found with a person in frame (lights on,
 Lux ≈ 60):** the production AF config had no `--autofocus-window`, so AF
 averaged the whole scene and consistently landed 0.4–0.5 dioptres *behind*

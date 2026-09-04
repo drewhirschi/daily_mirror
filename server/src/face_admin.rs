@@ -186,7 +186,6 @@ pub struct FaceCrop {
 impl ProcessingQueue {
     pub async fn admin_dashboard(&self) -> io::Result<AdminFaceDashboard> {
         let pipeline_version = active_pipeline_version()?;
-        self.reconcile_missing(&pipeline_version).await?;
         let queue = self.status(&pipeline_version).await?;
         self.ensure_schema().await?;
         let connection = self.catalog.connection().await?;

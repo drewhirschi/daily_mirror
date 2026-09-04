@@ -8,7 +8,7 @@ type PhotoGroup = { key: string; label: string; photos: GalleryPhoto[]; headingC
 const DENSITIES: Density[] = ["year", "month", "day"];
 
 export default function Page() {
-  const photos = useGetApiPhotos({ query: { refetchInterval: 60_000, refetchIntervalInBackground: false, staleTime: 30_000 } });
+  const photos = useGetApiPhotos({ query: { staleTime: 30_000 } });
   const [demoMode, setDemoMode] = useState(false);
   const [density, setDensity] = useState<Density>("month");
   const [startDate, setStartDate] = useState("");

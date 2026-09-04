@@ -11,9 +11,7 @@ type AdminView = "processing" | "people" | "flipbooks";
 type AssignmentMap = Record<string, string>;
 
 export default function AdminPage() {
-  const dashboard = useGetApiAdminFaces({
-    query: { refetchInterval: 30_000, refetchIntervalInBackground: false },
-  });
+  const dashboard = useGetApiAdminFaces();
   const people = useGetApiAdminPeople({ query: { staleTime: 10_000 } });
   const createPerson = usePostApiAdminPeople();
   const assignFaces = usePatchApiAdminFaces();

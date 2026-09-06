@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io;
 
 use daily_mirror_vision_contract::Landmark;
@@ -68,6 +68,7 @@ pub struct AdminFace {
     pub person_name: Option<String>,
     pub identity_state: String,
     pub crop_url: String,
+    pub identity_score: Option<f64>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema)]
@@ -164,6 +165,8 @@ pub struct AssignFaceResponse {
 pub struct FaceAssignmentUpdate {
     pub face_id: String,
     pub person_id: Option<String>,
+    #[serde(default)]
+    pub dismiss: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -219,7 +222,7 @@ impl ProcessingQueue {
             photos.push(AdminPhoto {
                 photo_url: format!("/api/photos/{id}"),
                 thumbnail_url: format!("/api/photos/{id}/thumbnail?rev={media_revision}"),
-                faces: self.admin_faces_for_photo(&id, &pipeline_version).await?,
+                faces: Vec::new(),
                 id,
                 captured_at: row.get(1).map_err(io::Error::other)?,
                 status: row.get(3).map_err(io::Error::other)?,
@@ -231,6 +234,17 @@ impl ProcessingQueue {
                 oriented_height: optional_u32(row.get(9).map_err(io::Error::other)?)?,
                 processing_millis: optional_u64(row.get(10).map_err(io::Error::other)?)?,
             });
+        }
+        drop(rows);
+        let photo_ids = photos
+            .iter()
+            .map(|photo| photo.id.as_str())
+            .collect::<Vec<_>>();
+        let mut faces = self
+            .admin_faces_for_photos(&photo_ids, &pipeline_version)
+            .await?;
+        for photo in &mut photos {
+            photo.faces = faces.remove(&photo.id).unwrap_or_default();
         }
         Ok(AdminFaceDashboard {
             pipeline_version,
@@ -269,13 +283,18 @@ impl ProcessingQueue {
         while let Some(row) = rows.next().await.map_err(io::Error::other)? {
             let id: String = row.get(0).map_err(io::Error::other)?;
             people.push(PersonFlipbook {
-                frames: person_frames(&connection, &id, &pipeline_version).await?,
+                frames: Vec::new(),
                 id,
                 display_name: row.get(1).map_err(io::Error::other)?,
                 face_count: nonnegative(row.get(2).map_err(io::Error::other)?)?,
                 day_count: nonnegative(row.get(3).map_err(io::Error::other)?)?,
                 last_seen_at: row.get(4).map_err(io::Error::other)?,
             });
+        }
+        drop(rows);
+        let mut frames = people_frames(&connection, &pipeline_version).await?;
+        for person in &mut people {
+            person.frames = frames.remove(&person.id).unwrap_or_default();
         }
         Ok(PeopleResponse { people })
     }
@@ -449,6 +468,7 @@ impl ProcessingQueue {
             .assign_faces(&[FaceAssignmentUpdate {
                 face_id: face_id.to_owned(),
                 person_id: person_id.map(str::to_owned),
+                dismiss: false,
             }])
             .await?;
         response
@@ -471,6 +491,12 @@ impl ProcessingQueue {
         let mut face_ids = HashSet::new();
         let mut person_ids = HashSet::new();
         for assignment in assignments {
+            if assignment.dismiss && assignment.person_id.is_some() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "a removed detection cannot have a person",
+                ));
+            }
             validate_uuid("face ID", &assignment.face_id)?;
             if !face_ids.insert(assignment.face_id.as_str()) {
                 return Err(io::Error::new(
@@ -511,13 +537,14 @@ impl ProcessingQueue {
             let changed = transaction
                 .execute(
                     "UPDATE faces SET person_id = ?2, identity_state = ?3,
-                         identity_source = CASE WHEN ?2 IS NULL THEN NULL ELSE 'manual' END,
+                         identity_source = CASE WHEN ?4 THEN 'dismissed' WHEN ?2 IS NULL THEN 'manual-rejected' ELSE 'manual' END,
                          identity_score = NULL, updated_at = CURRENT_TIMESTAMP
                      WHERE id = ?1",
                     params![
                         assignment.face_id.clone(),
                         assignment.person_id.clone(),
-                        identity_state
+                        identity_state,
+                        assignment.dismiss
                     ],
                 )
                 .await
@@ -531,6 +558,7 @@ impl ProcessingQueue {
                 identity_state: identity_state.to_owned(),
             });
         }
+        crate::face_matching::propose(&transaction, &active_pipeline_version()?, None).await?;
         transaction.commit().await.map_err(io::Error::other)?;
         Ok(BatchAssignFacesResponse {
             assignments: responses,
@@ -565,11 +593,27 @@ impl ProcessingQueue {
         })
     }
 
+    #[cfg(test)]
     async fn admin_faces_for_photo(
         &self,
         photo_id: &str,
         pipeline_version: &str,
     ) -> io::Result<Vec<AdminFace>> {
+        Ok(self
+            .admin_faces_for_photos(&[photo_id], pipeline_version)
+            .await?
+            .remove(photo_id)
+            .unwrap_or_default())
+    }
+
+    async fn admin_faces_for_photos(
+        &self,
+        photo_ids: &[&str],
+        pipeline_version: &str,
+    ) -> io::Result<HashMap<String, Vec<AdminFace>>> {
+        if photo_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
         let connection = self.catalog.connection().await?;
         let mut rows = connection
             .query(
@@ -577,19 +621,22 @@ impl ProcessingQueue {
                         faces.bounds_x, faces.bounds_y, faces.bounds_width, faces.bounds_height,
                         faces.landmark_model, faces.landmark_schema, faces.landmarks_json,
                         faces.embedding_model, faces.embedding_dimension,
-                        faces.person_id, people.display_name, faces.identity_state
+                        faces.person_id, people.display_name, faces.identity_state, faces.identity_score,
+                        faces.photo_id
                  FROM faces
                  LEFT JOIN people ON people.id = faces.person_id
-                 WHERE faces.photo_id = ?1 AND faces.pipeline_version = ?2
-                 ORDER BY faces.ordinal",
-                params![photo_id, pipeline_version],
+                 WHERE faces.photo_id IN (SELECT value FROM json_each(?1)) AND faces.pipeline_version = ?2
+                   AND COALESCE(faces.identity_source, '') != 'dismissed'
+                 ORDER BY faces.photo_id, faces.ordinal",
+                params![serde_json::to_string(photo_ids).map_err(io::Error::other)?, pipeline_version],
             )
             .await
             .map_err(io::Error::other)?;
-        let mut faces = Vec::new();
+        let mut faces: HashMap<String, Vec<AdminFace>> = HashMap::new();
         while let Some(row) = rows.next().await.map_err(io::Error::other)? {
             let id: String = row.get(0).map_err(io::Error::other)?;
-            faces.push(AdminFace {
+            let photo_id: String = row.get(16).map_err(io::Error::other)?;
+            faces.entry(photo_id).or_default().push(AdminFace {
                 crop_url: format!("/api/admin/faces/{id}/crop"),
                 id,
                 ordinal: u32::try_from(row.get::<i64>(1).map_err(io::Error::other)?)
@@ -610,6 +657,7 @@ impl ProcessingQueue {
                 person_id: row.get(12).map_err(io::Error::other)?,
                 person_name: row.get(13).map_err(io::Error::other)?,
                 identity_state: row.get(14).map_err(io::Error::other)?,
+                identity_score: row.get(15).map_err(io::Error::other)?,
             });
         }
         Ok(faces)
@@ -624,10 +672,12 @@ async fn dashboard_summary(
         .query(
             "SELECT
                 (SELECT COUNT(*) FROM photo_analyses WHERE pipeline_version = ?1),
-                (SELECT COUNT(*) FROM faces WHERE pipeline_version = ?1),
+                (SELECT COUNT(*) FROM faces WHERE pipeline_version = ?1
+                    AND COALESCE(identity_source, '') != 'dismissed'),
                 (SELECT COUNT(*) FROM faces WHERE pipeline_version = ?1
                     AND identity_state = 'confirmed' AND person_id IS NOT NULL),
                 (SELECT COUNT(*) FROM faces WHERE pipeline_version = ?1
+                    AND COALESCE(identity_source, '') != 'dismissed'
                     AND (identity_state != 'confirmed' OR person_id IS NULL))",
             params![pipeline_version],
         )
@@ -646,36 +696,36 @@ async fn dashboard_summary(
     })
 }
 
-async fn person_frames(
+async fn people_frames(
     connection: &libsql::Connection,
-    person_id: &str,
     pipeline_version: &str,
-) -> io::Result<Vec<FlipbookFrame>> {
+) -> io::Result<HashMap<String, Vec<FlipbookFrame>>> {
     let mut rows = connection
         .query(
             "SELECT faces.id, faces.photo_id, photos.captured_at,
-                    faces.detector_confidence
+                    faces.detector_confidence, faces.person_id
              FROM faces
              JOIN photos ON photos.id = faces.photo_id
-             WHERE faces.person_id = ?1 AND faces.pipeline_version = ?2
+             WHERE faces.person_id IS NOT NULL AND faces.pipeline_version = ?1
                AND faces.identity_state = 'confirmed'
              ORDER BY substr(photos.captured_at, 1, 10) DESC,
-                      faces.detector_confidence DESC, photos.captured_at DESC",
-            params![person_id, pipeline_version],
+                      faces.detector_confidence DESC, photos.captured_at DESC, faces.id",
+            params![pipeline_version],
         )
         .await
         .map_err(io::Error::other)?;
     let mut days = HashSet::new();
-    let mut frames = Vec::new();
+    let mut frames: HashMap<String, Vec<FlipbookFrame>> = HashMap::new();
     while let Some(row) = rows.next().await.map_err(io::Error::other)? {
         let captured_at: String = row.get(2).map_err(io::Error::other)?;
         let capture_day = captured_at.get(0..10).unwrap_or(&captured_at).to_owned();
-        if !days.insert(capture_day.clone()) {
+        let person_id: String = row.get(4).map_err(io::Error::other)?;
+        if !days.insert((person_id.clone(), capture_day.clone())) {
             continue;
         }
         let face_id: String = row.get(0).map_err(io::Error::other)?;
         let photo_id: String = row.get(1).map_err(io::Error::other)?;
-        frames.push(FlipbookFrame {
+        frames.entry(person_id).or_default().push(FlipbookFrame {
             crop_url: format!("/api/admin/faces/{face_id}/crop"),
             photo_url: format!("/api/photos/{photo_id}"),
             face_id,
@@ -854,10 +904,12 @@ mod tests {
             FaceAssignmentUpdate {
                 face_id: face_ids[0].clone(),
                 person_id: Some(person.id.clone()),
+                dismiss: false,
             },
             FaceAssignmentUpdate {
                 face_id: uuid::Uuid::new_v4().to_string(),
                 person_id: Some(person.id.clone()),
+                dismiss: false,
             },
         ];
         let error = queue.assign_faces(&invalid_batch).await.unwrap_err();
@@ -877,6 +929,7 @@ mod tests {
             .map(|face_id| FaceAssignmentUpdate {
                 face_id,
                 person_id: Some(person.id.clone()),
+                dismiss: false,
             })
             .collect::<Vec<_>>();
         let response = queue.assign_faces(&assignments).await.unwrap();
@@ -887,6 +940,128 @@ mod tests {
         assert_eq!(people.people[0].day_count, 2);
         assert_eq!(people.people[0].frames.len(), 2);
 
+        let removed_id = assignments[0].face_id.clone();
+        queue
+            .assign_faces(&[FaceAssignmentUpdate {
+                face_id: removed_id.clone(),
+                person_id: None,
+                dismiss: true,
+            }])
+            .await
+            .unwrap();
+        queue.refresh_face_suggestions().await.unwrap();
+        let dashboard = queue.admin_dashboard().await.unwrap();
+        assert_eq!(dashboard.summary.detected_faces, 2);
+        assert_eq!(dashboard.summary.assigned_faces, 2);
+        assert!(
+            dashboard
+                .photos
+                .iter()
+                .flat_map(|p| &p.faces)
+                .all(|f| f.id != removed_id)
+        );
+        assert_eq!(
+            queue.people_with_flipbooks().await.unwrap().people[0].face_count,
+            2
+        );
+        // Retain the original detection so a mistaken removal is recoverable.
+        queue
+            .assign_face(&removed_id, Some(&person.id))
+            .await
+            .unwrap();
+        assert_eq!(
+            queue
+                .admin_dashboard()
+                .await
+                .unwrap()
+                .summary
+                .detected_faces,
+            3
+        );
+
+        let other = queue.create_person("Other person").await.unwrap();
+        queue
+            .assign_face(&removed_id, Some(&other.id))
+            .await
+            .unwrap();
+        let dashboard = queue.admin_dashboard().await.unwrap();
+        let people = queue.people_with_flipbooks().await.unwrap();
+        for owner in people.people {
+            for frame in owner.frames {
+                let photo = dashboard
+                    .photos
+                    .iter()
+                    .find(|photo| photo.id == frame.photo_id)
+                    .unwrap();
+                assert!(photo.faces.iter().any(|face| face.id == frame.face_id
+                    && face.person_id.as_deref() == Some(owner.id.as_str())));
+            }
+        }
+        assert!(dashboard.photos.iter().all(|photo| photo.faces.len() == 1));
+
+        drop(queue);
+        drop(catalog);
+        let _ = tokio::fs::remove_file(path).await;
+    }
+
+    #[tokio::test]
+    async fn processing_a_new_photo_proposes_an_enrolled_person() {
+        let path =
+            std::env::temp_dir().join(format!("face-auto-matching-{}.db", uuid::Uuid::new_v4()));
+        let catalog = PhotoCatalog::local(path.to_string_lossy().into_owned());
+        let queue = ProcessingQueue::new(catalog.clone());
+        let person = queue.create_person("Alex").await.unwrap();
+        for day in 1..=6 {
+            let id = format!("202609{day:02}T080000Z-matching");
+            catalog
+                .register_ready(&id, &format!("photos/{id}.jpg"), 100)
+                .await
+                .unwrap();
+            queue
+                .enqueue_photo(&id, DEFAULT_PIPELINE_VERSION)
+                .await
+                .unwrap();
+            let lease = queue
+                .claim(&ClaimRequest {
+                    worker_id: "matching-test".into(),
+                    pipeline_version: DEFAULT_PIPELINE_VERSION.into(),
+                    limit: 1,
+                })
+                .await
+                .unwrap()
+                .remove(0);
+            queue
+                .complete(&id, DEFAULT_PIPELINE_VERSION, &lease.lease_token, &result())
+                .await
+                .unwrap();
+            let faces = queue
+                .admin_faces_for_photo(&id, DEFAULT_PIPELINE_VERSION)
+                .await
+                .unwrap();
+            if day <= 5 {
+                assert_eq!(faces[0].identity_state, "unknown");
+                queue
+                    .assign_face(&faces[0].id, Some(&person.id))
+                    .await
+                    .unwrap();
+            } else {
+                assert_eq!(faces[0].identity_state, "proposed");
+                assert_eq!(faces[0].person_id.as_deref(), Some(person.id.as_str()));
+                assert!(faces[0].identity_score.unwrap() > 0.99);
+                assert_eq!(
+                    queue.people_with_flipbooks().await.unwrap().people[0].face_count,
+                    5
+                );
+                queue
+                    .assign_face(&faces[0].id, Some(&person.id))
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    queue.people_with_flipbooks().await.unwrap().people[0].face_count,
+                    6
+                );
+            }
+        }
         drop(queue);
         drop(catalog);
         let _ = tokio::fs::remove_file(path).await;

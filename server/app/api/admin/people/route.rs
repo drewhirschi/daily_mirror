@@ -7,10 +7,10 @@ use crate::{
 
 #[nextrs::api]
 pub async fn get(
+    timing: nextrs::Timing,
     Extension(queue): Extension<ProcessingQueue>,
 ) -> Result<Json<PeopleResponse>, StatusCode> {
-    queue
-        .people_with_flipbooks()
+    timing.span("people", queue.people_with_flipbooks())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)

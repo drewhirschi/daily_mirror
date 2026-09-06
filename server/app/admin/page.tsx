@@ -1,20 +1,26 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetApiAdminFaces,
   useGetApiAdminPeople,
   usePatchApiAdminFaces,
   usePostApiAdminPeople,
+  usePostApiAdminFacesSuggest,
+  getGetApiAdminFacesQueryKey,
+  getGetApiAdminPeopleQueryKey,
 } from "@server/client/react-query";
 import type { AdminFace, AdminFaceDashboard, AdminPhoto, PersonFlipbook } from "@server/client/react-query";
 
 type AdminView = "processing" | "people" | "flipbooks";
 type AssignmentMap = Record<string, string>;
+const REMOVE_DETECTION = "__remove_detection__";
 
 export default function AdminPage() {
   const dashboard = useGetApiAdminFaces();
   const people = useGetApiAdminPeople({ query: { staleTime: 10_000 } });
   const createPerson = usePostApiAdminPeople();
   const assignFaces = usePatchApiAdminFaces();
+  const suggestFaces = usePostApiAdminFacesSuggest();
   const [view, setView] = useState<AdminView>("processing");
   const [newPersonName, setNewPersonName] = useState("");
   const [selectedPersonId, setSelectedPersonId] = useState("");
@@ -118,6 +124,9 @@ export default function AdminPage() {
       )}
       {view === "processing" ? (
         <div className="face-edit-toolbar" role="region" aria-label="Processing display and face assignments">
+          <button className="quiet-button" type="button" disabled={suggestFaces.isPending || editCount > 0 || assignFaces.isPending} onClick={() => void refreshSuggestions()}>
+            {suggestFaces.isPending ? "Finding suggestions…" : "Find suggestions"}
+          </button>
           <fieldset className="overlay-toggles">
             <legend>Show</legend>
             <label><input type="checkbox" checked={showBoundingBoxes} onChange={(event) => setShowBoundingBoxes(event.target.checked)} /> Bounding boxes</label>
@@ -154,6 +163,16 @@ export default function AdminPage() {
     }
   }
 
+  async function refreshSuggestions() {
+    try {
+      const result = await suggestFaces.mutateAsync();
+      setMessage(`${result.data.proposed} suggestions from ${result.data.examined} unconfirmed faces. Review each suggestion and save to confirm. Enrollment requires 5 confirmed photos across 3 days.`);
+      void dashboard.refetch();
+    } catch {
+      setMessage("Suggestions could not be refreshed. Please try again.");
+    }
+  }
+
   function switchView(next: AdminView) {
     setView(next);
     const url = new URL(window.location.href);
@@ -168,7 +187,7 @@ export default function AdminPage() {
     const savedPersonId = savedAssignments[face.id] ?? face.person_id ?? "";
     setAssignmentEdits((current) => {
       const next = { ...current };
-      if (personId === savedPersonId) delete next[face.id];
+      if (personId === savedPersonId && face.identity_state !== "proposed") delete next[face.id];
       else next[face.id] = personId;
       return next;
     });
@@ -183,7 +202,8 @@ export default function AdminPage() {
     const submitted = { ...assignmentEdits };
     const assignments = Object.entries(submitted).map(([face_id, personId]) => ({
       face_id,
-      person_id: personId || null,
+      person_id: personId === REMOVE_DETECTION ? null : personId || null,
+      dismiss: personId === REMOVE_DETECTION,
     }));
     if (assignments.length === 0) return;
     setSaveError("");
@@ -323,26 +343,54 @@ function FaceAssignment({ face, people, edits, savedAssignments, onEdit }: {
   savedAssignments: AssignmentMap;
   onEdit: (face: AdminFace, personId: string) => void;
 }) {
+  const confirmFace = usePatchApiAdminFaces();
+  const queryClient = useQueryClient();
+  const [confirmedLocally, setConfirmedLocally] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
+  useEffect(() => setConfirmedLocally(false), [face.person_id, face.identity_state]);
   const hasEdit = Object.prototype.hasOwnProperty.call(edits, face.id);
   const wasJustSaved = Object.prototype.hasOwnProperty.call(savedAssignments, face.id);
   const selectedPersonId = hasEdit ? edits[face.id] : savedAssignments[face.id] ?? face.person_id ?? "";
   const personName = people.find((person) => person.id === selectedPersonId)?.display_name;
+  const confirmed = confirmedLocally || (wasJustSaved
+    ? Boolean(savedAssignments[face.id]) && savedAssignments[face.id] !== REMOVE_DETECTION
+    : face.identity_state === "confirmed");
+  const proposed = face.identity_state === "proposed" && !confirmed && !wasJustSaved && !hasEdit;
+  const removing = selectedPersonId === REMOVE_DETECTION;
   const feedback = hasEdit
-    ? selectedPersonId ? `Not saved · ${personName ?? "person"}` : "Not saved · Unknown"
+    ? removing ? "Will remove this detection when you save. Photo stays intact." : selectedPersonId ? `Not saved · ${personName ?? "person"}` : "Not saved · Unknown"
+    : removing ? "Detection removed"
+    : proposed ? `Suggested: ${personName ?? face.person_name ?? "person"}${face.identity_score == null ? "" : ` · similarity ${face.identity_score.toFixed(2)}`}`
     : selectedPersonId
       ? `${wasJustSaved ? "Saved" : "Confirmed"} as ${personName ?? face.person_name ?? "person"}`
       : wasJustSaved ? "Saved as Unknown" : "Unassigned";
 
   return (
-    <label className="face-assignment" data-state={hasEdit ? "edited" : wasJustSaved ? "saved" : "idle"}>
-      <span className="sr-only">Person for face {face.ordinal + 1}</span>
-      <select value={selectedPersonId} onChange={(event) => onEdit(face, event.target.value)}>
+    <div className="face-assignment" data-state={hasEdit ? "edited" : wasJustSaved ? "saved" : "idle"}>
+      <select disabled={confirmFace.isPending} aria-label={`Person for face ${face.ordinal + 1}`} value={selectedPersonId} onChange={(event) => { setConfirmError(""); onEdit(face, event.target.value); }}>
         <option value="">Unknown</option>
+        {removing ? <option value={REMOVE_DETECTION}>Remove detection</option> : null}
         {people.map((person) => <option key={person.id} value={person.id}>{person.display_name}</option>)}
       </select>
-      <small role="status" aria-live="polite">{feedback}</small>
-    </label>
+      <small role="status" aria-live="polite">{confirmFace.isPending ? "Saving confirmation…" : confirmError || feedback}</small>
+      {proposed ? <button type="button" className="face-action" disabled={confirmFace.isPending} onClick={() => void saveConfirmation()}>{confirmFace.isPending ? "Saving…" : `Confirm ${personName ?? "suggestion"}`}</button> : null}
+      {removing ? <button type="button" className="face-action" disabled={wasJustSaved && !hasEdit} onClick={() => onEdit(face, face.person_id ?? "")}>Undo removal</button>
+        : !confirmed ? <button type="button" className="face-action face-action-muted" disabled={confirmFace.isPending} onClick={() => onEdit(face, REMOVE_DETECTION)}>Remove bad detection</button> : null}
+    </div>
   );
+
+  async function saveConfirmation() {
+    if (confirmFace.isPending || !selectedPersonId || !proposed) return;
+    setConfirmError("");
+    try {
+      await confirmFace.mutateAsync({ data: { assignments: [{ face_id: face.id, person_id: selectedPersonId, dismiss: false }] } });
+      setConfirmedLocally(true);
+      void queryClient.invalidateQueries({ queryKey: getGetApiAdminFacesQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getGetApiAdminPeopleQueryKey() });
+    } catch {
+      setConfirmError("Could not save. Try confirming again.");
+    }
+  }
 }
 
 const MEDIAPIPE_CONTOURS = [

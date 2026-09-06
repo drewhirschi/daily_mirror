@@ -363,6 +363,10 @@ impl ProcessingQueue {
             insert_face(&transaction, photo_id, pipeline_version, ordinal, face).await?;
         }
 
+        crate::face_matching::propose(&transaction, pipeline_version, Some(photo_id))
+            .await
+            .map_err(ProcessingError::Storage)?;
+
         transaction
             .execute(
                 "UPDATE photo_processing

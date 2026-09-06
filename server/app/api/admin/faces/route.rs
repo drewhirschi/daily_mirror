@@ -7,10 +7,10 @@ use crate::{
 
 #[nextrs::api]
 pub async fn get(
+    timing: nextrs::Timing,
     Extension(queue): Extension<ProcessingQueue>,
 ) -> Result<Json<AdminFaceDashboard>, StatusCode> {
-    queue
-        .admin_dashboard()
+    timing.span("dashboard", queue.admin_dashboard())
         .await
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)

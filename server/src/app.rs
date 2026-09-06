@@ -11,6 +11,7 @@ pub mod auth_http;
 pub mod catalog;
 pub mod cron_auth;
 pub mod face_admin;
+pub mod face_matching;
 pub mod passkeys;
 pub mod photos;
 pub mod processing;

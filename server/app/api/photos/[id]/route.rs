@@ -41,11 +41,12 @@ pub async fn get(Extension(store): Extension<PhotoStore>, Path(id): Path<String>
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct RotatePhoto {
     degrees: i16,
 }
 
+#[nextrs::api(responses((status = 204, description = "Photo rotated")))]
 pub async fn patch(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,
@@ -67,6 +68,7 @@ pub async fn patch(
     }
 }
 
+#[nextrs::api(responses((status = 204, description = "Photo deleted")))]
 pub async fn delete(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,

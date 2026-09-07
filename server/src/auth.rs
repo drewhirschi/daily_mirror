@@ -38,7 +38,7 @@ enum AuthLocation {
     Remote { url: String, token: String },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct User {
     pub id: String,
     pub username: String,
@@ -51,7 +51,7 @@ impl User {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct PasskeySummary {
     pub credential_id: String,
     pub label: String,
@@ -591,6 +591,19 @@ pub fn cookie_value(headers: &axum::http::HeaderMap, name: &str) -> Option<Strin
         .split(';')
         .filter_map(|part| part.trim().split_once('='))
         .find_map(|(key, value)| (key == name).then(|| value.to_owned()))
+}
+
+/// Native clients hold the same revocable sessions as browsers in Keychain.
+/// Invalid explicit Authorization must never fall back to a browser cookie.
+pub fn request_session_token(headers: &axum::http::HeaderMap) -> Option<String> {
+    if let Some(value) = headers.get(axum::http::header::AUTHORIZATION) {
+        let (scheme, token) = value.to_str().ok()?.split_once(' ')?;
+        return (scheme.eq_ignore_ascii_case("Bearer")
+            && !token.is_empty()
+            && !token.chars().any(char::is_whitespace))
+        .then(|| token.to_owned());
+    }
+    cookie_value(headers, SESSION_COOKIE)
 }
 
 fn row_to_user(row: Option<libsql::Row>) -> io::Result<Option<User>> {

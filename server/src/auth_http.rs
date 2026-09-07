@@ -1,9 +1,57 @@
 use axum::Json;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::auth::{SessionToken, User, expired_session_cookie, session_cookie};
+use crate::auth::{AuthStore, SessionToken, User, expired_session_cookie, session_cookie};
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct PasswordLogin {
+    pub username: String,
+    pub password: String,
+}
+
+/// Native and web login deliberately share verification and rate limiting.
+pub async fn password_session(
+    store: &AuthStore,
+    headers: &axum::http::HeaderMap,
+    request: &PasswordLogin,
+) -> Result<(User, SessionToken), Response> {
+    let scope = login_scope(&request.username, headers);
+    if let Some(retry_after) = store
+        .login_retry_after(&scope)
+        .await
+        .map_err(|_| internal_error())?
+    {
+        return Err(rate_limited(retry_after));
+    }
+    let user = match store
+        .verify_password(&request.username, &request.password)
+        .await
+    {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            store
+                .record_login_failure(&scope)
+                .await
+                .map_err(|_| internal_error())?;
+            return Err(error(
+                StatusCode::UNAUTHORIZED,
+                "Invalid username or password",
+            ));
+        }
+        Err(_) => return Err(internal_error()),
+    };
+    store
+        .clear_login_failures(&scope)
+        .await
+        .map_err(|_| internal_error())?;
+    let token = store
+        .create_session(&user.id)
+        .await
+        .map_err(|_| internal_error())?;
+    Ok((user, token))
+}
 
 #[derive(Serialize)]
 pub struct LoginResponse {

@@ -1,10 +1,10 @@
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{Method, Request, StatusCode};
+use axum::http::{Method, Request, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Redirect, Response};
 
-use crate::auth::{AuthStore, SESSION_COOKIE, cookie_value};
+use crate::auth::{AuthStore, request_session_token};
 
 pub async fn protect(
     State(store): State<AuthStore>,
@@ -15,13 +15,22 @@ pub async fn protect(
         return next.run(request).await;
     }
 
-    let user = match cookie_value(request.headers(), SESSION_COOKIE) {
+    let user = match request_session_token(request.headers()) {
         Some(token) => store.authenticate_session(&token).await.ok().flatten(),
         None => None,
     };
     if let Some(user) = user {
+        let native_session = request.headers().contains_key(header::AUTHORIZATION);
         request.extensions_mut().insert(user);
-        return next.run(request).await;
+        let mut response = next.run(request).await;
+        // Native clients own their account-scoped media cache. Never retain a
+        // second, URL-only copy in the shared NSURLSession HTTP disk cache.
+        if native_session {
+            response
+                .headers_mut()
+                .insert(header::CACHE_CONTROL, "private, no-store".parse().unwrap());
+        }
+        return response;
     }
 
     if request.method() == Method::GET && !request.uri().path().starts_with("/api/") {

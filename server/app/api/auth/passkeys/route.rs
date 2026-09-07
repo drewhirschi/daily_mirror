@@ -3,11 +3,12 @@ use serde::Serialize;
 
 use crate::auth::{AuthStore, PasskeySummary, User};
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct PasskeyList {
     passkeys: Vec<PasskeySummary>,
 }
 
+#[nextrs::api]
 pub async fn get(
     Extension(store): Extension<AuthStore>,
     Extension(user): Extension<User>,

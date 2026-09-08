@@ -53,6 +53,31 @@ pub async fn password_session(
     Ok((user, token))
 }
 
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct NativeSession {
+    pub user: User,
+    pub token: String,
+    pub expires_in_seconds: u64,
+}
+
+pub fn native_logged_in(user: User, token: SessionToken) -> Response {
+    no_store(
+        Json(NativeSession {
+            user,
+            token: token.token,
+            expires_in_seconds: token.max_age_seconds,
+        })
+        .into_response(),
+    )
+}
+
+pub fn no_store(mut response: Response) -> Response {
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
+
 #[derive(Serialize)]
 pub struct LoginResponse {
     pub user: User,

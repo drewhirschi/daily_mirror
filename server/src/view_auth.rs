@@ -52,7 +52,11 @@ fn bypasses_authentication(method: &Method, path: &str) -> bool {
         || path.starts_with("/dist/")
         || path.starts_with("/api/auth/login/")
         || path.starts_with("/api/processing/")
-        || (method == Method::GET && path == "/api/maintenance/reconcile")
+        || (method == Method::GET
+            && matches!(
+                path,
+                "/api/maintenance/reconcile" | "/api/maintenance/process"
+            ))
         || (method == Method::POST
             && (matches!(path, "/api/uploads" | "/api/photos")
                 || path.starts_with("/api/uploads/")))

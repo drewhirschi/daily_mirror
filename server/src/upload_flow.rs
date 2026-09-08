@@ -1,3 +1,4 @@
+#[cfg(feature = "image-processing")]
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io;
@@ -7,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::catalog::PhotoCatalog;
-use crate::photos::{Photo, PhotoStore};
+use crate::photos::Photo;
+#[cfg(feature = "image-processing")]
+use crate::photos::PhotoStore;
+#[cfg(feature = "image-processing")]
 use crate::processing::ProcessingQueue;
 
 #[derive(Debug)]
@@ -63,6 +67,7 @@ pub struct ReconcileReport {
     pub thumbnail_failures: usize,
 }
 
+#[cfg(feature = "image-processing")]
 pub async fn finalize_upload(
     store: &PhotoStore,
     catalog: &PhotoCatalog,
@@ -111,6 +116,7 @@ pub async fn gallery_photos(catalog: &PhotoCatalog) -> io::Result<Vec<Photo>> {
     catalog.list().await
 }
 
+#[cfg(feature = "image-processing")]
 pub async fn reconcile_all(
     store: &PhotoStore,
     catalog: &PhotoCatalog,
@@ -200,7 +206,7 @@ pub async fn reconcile_all(
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "image-processing"))]
 mod tests {
     use std::io;
     use std::path::PathBuf;

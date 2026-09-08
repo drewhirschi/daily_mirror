@@ -15,6 +15,7 @@ use crate::catalog::PhotoCatalog;
 const MAX_FACES_PER_PHOTO: usize = 100;
 const MAX_LANDMARKS_PER_FACE: usize = 1_000;
 const MAX_EMBEDDING_DIMENSION: usize = 4_096;
+const MAX_HOSTED_ATTEMPTS: i64 = 5;
 
 #[derive(Clone, Debug)]
 pub struct ProcessingQueue {
@@ -125,6 +126,34 @@ impl ProcessingQueue {
         &self,
         request: &ClaimRequest,
     ) -> Result<Vec<ClaimedPhoto>, ProcessingError> {
+        self.claim_selected(request, None, false).await
+    }
+
+    /// Serialize hosted inference across instances using the durable lease.
+    /// Desktop workers retain their existing claim behavior.
+    pub async fn claim_hosted(
+        &self,
+        pipeline: &str,
+        photo_id: Option<&str>,
+    ) -> Result<Option<ClaimedPhoto>, ProcessingError> {
+        if let Some(id) = photo_id {
+            crate::photos::validate_capture_id(id)
+                .map_err(|e| ProcessingError::InvalidInput(e.to_string()))?;
+        }
+        let request = ClaimRequest {
+            worker_id: format!("vercel-{}", Uuid::new_v4()),
+            pipeline_version: pipeline.to_owned(),
+            limit: 1,
+        };
+        Ok(self.claim_selected(&request, photo_id, true).await?.pop())
+    }
+
+    async fn claim_selected(
+        &self,
+        request: &ClaimRequest,
+        photo_id: Option<&str>,
+        hosted: bool,
+    ) -> Result<Vec<ClaimedPhoto>, ProcessingError> {
         validate_identifier("worker ID", &request.worker_id)
             .map_err(|error| ProcessingError::InvalidInput(error.to_string()))?;
         validate_identifier("pipeline version", &request.pipeline_version)
@@ -147,6 +176,17 @@ impl ProcessingQueue {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await
             .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
+        if hosted {
+            transaction.execute(
+                "UPDATE photo_processing SET status = 'failed',
+                    last_error = COALESCE(last_error, 'Hosted worker exhausted its attempts'),
+                    lease_token = NULL, leased_by = NULL, lease_expires_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                 WHERE pipeline_version = ?1 AND attempt_count >= ?2
+                   AND (status = 'pending' OR (status = 'leased' AND lease_expires_at <= CURRENT_TIMESTAMP))",
+                params![request.pipeline_version.clone(), MAX_HOSTED_ATTEMPTS],
+            ).await.map_err(|e| ProcessingError::Storage(io::Error::other(e)))?;
+        }
         let mut rows = transaction
             .query(
                 "SELECT processing.photo_id, photos.byte_size
@@ -154,13 +194,20 @@ impl ProcessingQueue {
                  JOIN photos ON photos.id = processing.photo_id
                  WHERE processing.pipeline_version = ?1
                    AND photos.status = 'ready'
+                   AND (?3 IS NULL OR processing.photo_id = ?3)
+                   AND (?4 = 0 OR NOT EXISTS (
+                     SELECT 1 FROM photo_processing busy
+                     WHERE busy.pipeline_version = ?1 AND busy.status = 'leased'
+                       AND busy.leased_by LIKE 'vercel-%'
+                       AND busy.lease_expires_at > CURRENT_TIMESTAMP
+                   ))
                    AND (
                      (processing.status = 'pending' AND processing.available_at <= CURRENT_TIMESTAMP)
                      OR (processing.status = 'leased' AND processing.lease_expires_at <= CURRENT_TIMESTAMP)
                    )
                  ORDER BY photos.captured_at, photos.id
                  LIMIT ?2",
-                params![request.pipeline_version.clone(), i64::from(request.limit)],
+                params![request.pipeline_version.clone(), i64::from(request.limit), photo_id, i64::from(hosted)],
             )
             .await
             .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
@@ -1010,6 +1057,91 @@ mod tests {
             .unwrap();
         let status = fixture.queue.status("face-v1").await.unwrap();
         assert_eq!((status.pending, status.failed), (1, 1));
+        fixture.cleanup().await;
+    }
+    #[tokio::test]
+    async fn hosted_claims_are_serial_and_recover_expired_leases() {
+        let fixture = Fixture::new("hosted-serial").await;
+        let a = "20260907T120000Z-hosted001";
+        let b = "20260907T120001Z-hosted002";
+        for id in [a, b] {
+            fixture.ready_photo(id).await;
+        }
+        fixture.queue.reconcile_missing("face-v1").await.unwrap();
+        let first = fixture
+            .queue
+            .claim_hosted("face-v1", Some(b))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(first.photo_id, b);
+        assert!(
+            fixture
+                .queue
+                .claim_hosted("face-v1", Some(a))
+                .await
+                .unwrap()
+                .is_none()
+        );
+        fixture.catalog.connection().await.unwrap().execute(
+            "UPDATE photo_processing SET lease_expires_at = datetime(CURRENT_TIMESTAMP, '-1 second') WHERE photo_id = ?1", params![b]
+        ).await.unwrap();
+        let recovered = fixture
+            .queue
+            .claim_hosted("face-v1", Some(b))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_ne!(first.lease_token, recovered.lease_token);
+        assert!(matches!(
+            fixture
+                .queue
+                .complete(b, "face-v1", &first.lease_token, &zero_face_result())
+                .await,
+            Err(ProcessingError::LeaseLost)
+        ));
+        fixture
+            .queue
+            .complete(b, "face-v1", &recovered.lease_token, &zero_face_result())
+            .await
+            .unwrap();
+        assert_eq!(
+            fixture
+                .queue
+                .claim_hosted("face-v1", None)
+                .await
+                .unwrap()
+                .unwrap()
+                .photo_id,
+            a
+        );
+        fixture.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn hosted_crash_loop_is_retained_as_failed_after_five_attempts() {
+        let fixture = Fixture::new("hosted-cap").await;
+        let id = "20260907T120000Z-hosted003";
+        fixture.ready_photo(id).await;
+        fixture.queue.reconcile_missing("face-v1").await.unwrap();
+        fixture
+            .queue
+            .claim_hosted("face-v1", None)
+            .await
+            .unwrap()
+            .unwrap();
+        fixture.catalog.connection().await.unwrap().execute(
+            "UPDATE photo_processing SET attempt_count=5, lease_expires_at=datetime(CURRENT_TIMESTAMP, '-1 second') WHERE photo_id=?1", params![id]
+        ).await.unwrap();
+        assert!(
+            fixture
+                .queue
+                .claim_hosted("face-v1", None)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(fixture.queue.status("face-v1").await.unwrap().failed, 1);
         fixture.cleanup().await;
     }
 }

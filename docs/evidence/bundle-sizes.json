@@ -1,0 +1,325 @@
+{
+  "measurement": "local Linux Vercel artifact file lengths; provider layers unavailable",
+  "source_head": "34bfff936a717aa438c73e944da72a43aa9b6f82",
+  "working_tree_diff_sha256": "0e13857403a4f48b1b5ec6dc6feb2368b2e74aa810f466ff578876c4dcf47af1",
+  "source_file_sha256": {
+    "crates/vision-contract/Cargo.toml": "c512e7313da06a787d2a47484a04489fc6d91534976d90ca24bb7b635a4ec197",
+    "crates/vision-contract/src/lib.rs": "dc0f5b9609d3f5de809d9cdd92fcab03734f76d4b2e1000c5d6b6ea1df898527",
+    "processor/.cargo/config.toml": "191ac9e08e00afdaf2e672e23eef0f5ee0df52b3208c8bf333b98578001cdb88",
+    "processor/Cargo.lock": "66d27715ed426ae4a472e94da7f04ecc08be70b3dedb3fa88444eecd5749b0a9",
+    "processor/Cargo.toml": "8228168f6f77a4331fbefe436b6b865fe7f9f48b5eec753c1fdb79c4d669a8c2",
+    "processor/examples/evaluate_engine.rs": "76f66c7dd2a56229fc0efbd1dc76d993020f94c15a1354d28bf5e6af6b56a703",
+    "processor/examples/evaluate_mediapipe.rs": "0dd47c372c23c58b0c2828d77742147b9805e8ebf0093e73319e095591ce114f",
+    "processor/examples/evaluate_yunet.rs": "9f357e319a6daebeab46953c3e5fbfc55fafa5eaadff9bbf443de1a7e37b7615",
+    "processor/src/lib.rs": "d86ca80aec087e2544a5361396f2e823a82e731a2933b1ccec8924542cab292a",
+    "processor/src/main.rs": "a575bd17f62199621edb34a8400dd4c526cb069192c53a87f0c72149b1b06c8e",
+    "processor/src/mediapipe_engine.rs": "2068762c4c24a0a74da392f9e35a5c063d40527482a7360feec79d16b745fb76",
+    "processor/src/opencv_engine.rs": "496897b74fa6b3a1ee20985e8589315dd466c6117243e594e36374b4a39780a2",
+    "server/.cargo/config.toml": "fa74fad57116a907c63523bee07f576de0a6fc0e96377065bee9de94ea4995c3",
+    "server/.nextrs/dump-openapi.rs": "9669e04dde57afc08de857f4dfd4e78a4adaca6d07d7610f3f19e9e51f97eabf",
+    "server/.nextrs/template/client/orval.config.ts": "e43b46c8b0585f89bb6c84f39baf360333e9133e42fa9eabc27a017cb28c67aa",
+    "server/.nextrs/template/client/src/index.ts": "113dc0d982b674bbce6d9bf51d024c230dc821ba99d5fc745d95ccc22b8e8e70",
+    "server/.nextrs/template/client/src/nextrs-client.ts": "974629b283abd86b5899904d6457efdd4ee2779051f6f3576444d57c967b6f5d",
+    "server/.nextrs/template/client/src/react-query.ts": "da16a8f220dab71c472b6d6cc60c17d061c93d13498fefff9c9dde709087b939",
+    "server/Cargo.lock": "f67769b3815c083c10766941c0d4f2e89fef56883636017bf9bc1fc457460e65",
+    "server/Cargo.toml": "084ec5539b25060fe5561b94d47c94047ef89d4c5d53475f1cff4d3d9db9c6f8",
+    "server/api/index.rs": "d2072b052871e8af94e539b6aca01b1577f65d29b9fa128516b7d2d30d5818cc",
+    "server/app/.well-known/apple-app-site-association/route.rs": "8ed6e679ee7f98b7dce9b7b69d2bd4a9fe66b9949c28a7871ccb1d60114d9943",
+    "server/app/account/page.tsx": "64e60e4d67c581b5db6e6030351b12304960d89b19fdc5a5dcc7e14a6586d811",
+    "server/app/admin/page.tsx": "2cc843fca40819a1b343f8df872afab403d84d17974c04cf00e512793994cf77",
+    "server/app/api/admin/faces/[id]/crop/bundle.toml": "a90ff68f69247a66eb53675f50f4cebe793dd25d4228da332f595f3490e25192",
+    "server/app/api/admin/faces/[id]/crop/route.rs": "c681be7fb6adb1caaed68cb5ecfded0f120d823a857a7ee4d7dba404e0827d31",
+    "server/app/api/admin/faces/[id]/route.rs": "a6a60d567150c9760883698e30a4b11795fa118e1170665d137a7a4767c27d55",
+    "server/app/api/admin/faces/route.rs": "78947d5dbc390810a303c713e44823bc2a7c5c8d98bbaf33386a19886449988b",
+    "server/app/api/admin/faces/suggest/route.rs": "cf6e43c161958b6ea49268bf246c829ffb6f0ab5d3e2148da3963b87b304024a",
+    "server/app/api/admin/households/[id]/route.rs": "2b1bbb23f146298f8f2e7749c032579a8f0fe3962e526657747f08c1ef80cdd0",
+    "server/app/api/admin/households/route.rs": "dfd3c968d7b87a82becb6bfba2a2ac10f7992dea0cd57984cf6068fe1fdf5fdc",
+    "server/app/api/admin/people/route.rs": "8a84aefad0a54cf2f1284ea78fc053fbddcf8c81dea2eab5f88647f14406ceca",
+    "server/app/api/auth/login/native/passkey/finish/route.rs": "8eea031a8daf8432713d196f0467bc1e7beb83b6298c2516f3b1315b1e67c1fb",
+    "server/app/api/auth/login/native/passkey/start/route.rs": "f684d8a498105dd90b96a2a7e3febb11c7809ef908757494ca1b59de7f4a8d2a",
+    "server/app/api/auth/login/native/route.rs": "aa256e0cfd6bc97205c0aa30055bb63745a4e77f7a466efad9c4d18a5519c2fc",
+    "server/app/api/auth/login/passkey/finish/route.rs": "c9888bcfb7f5a9eda7a15d45ccc8824e1e3da95cb1d083b5573888d1e6124e8f",
+    "server/app/api/auth/login/passkey/start/route.rs": "d33d0981bc2117cb1ffee350d8a11771d6288839d7545557bbfaf0148f499c01",
+    "server/app/api/auth/login/password/route.rs": "45e0663ba0a425a80ae9e29e36cc950239da83c18d1f7d9d0993a2ea12f209be",
+    "server/app/api/auth/logout/route.rs": "6c3f09a5cd6c99fed0de2f67771e7ebbddee82278856925dd99793719bbcc5d5",
+    "server/app/api/auth/me/route.rs": "377af9f7c2700799ddb87602f688bef88fb617a39af71eea04b6be49e06642e0",
+    "server/app/api/auth/passkeys/register/finish/route.rs": "e5c0e24cba7114e5cd6200672bada95fd4f234f76baa28cc4e267783840e7fc1",
+    "server/app/api/auth/passkeys/register/start/route.rs": "37a9a01acaef2b1a462c1ad202b7708a55acfa5fd6dbd0782ad4de64f5b6e4b0",
+    "server/app/api/auth/passkeys/route.rs": "c3781cd7dcd59b0720db9e779f567510d4e464235b1d1aad4874a4a7954bb014",
+    "server/app/api/maintenance/process/route.rs": "f9c2826a0936dec97e75ac5c09c510c94f8bc3c5e2f291135cce60f2766f73a0",
+    "server/app/api/maintenance/reconcile/bundle.toml": "a90ff68f69247a66eb53675f50f4cebe793dd25d4228da332f595f3490e25192",
+    "server/app/api/maintenance/reconcile/route.rs": "5054694cce6252d827cd4ac28a02290f7eb800fce121730a360d853fbeeb95ad",
+    "server/app/api/photos/[id]/route.rs": "7decf83711aa08fcdf790b44364b38053968cbcd8441060978fcf3bf29f663d3",
+    "server/app/api/photos/[id]/thumbnail/route.rs": "854ebe0037bac1647ed1c51263231bc39fa488fd90a0dc341821a30a64089593",
+    "server/app/api/photos/bundle.toml": "a90ff68f69247a66eb53675f50f4cebe793dd25d4228da332f595f3490e25192",
+    "server/app/api/photos/route.rs": "aab7c17ee9dca20656bf406ce9fe8870287eb7f8be997e6e9674c36e4b30175c",
+    "server/app/api/processing/claim/route.rs": "e79ff10a1e743b0ae5b88fb6c6506f7079ee7b84ae20e7a520e6b156641938ea",
+    "server/app/api/processing/photos/[id]/complete/route.rs": "9cd576b9f66e344e0d42789ba468e511a23e1dbdb86ff94cbf4a4fef9962cc69",
+    "server/app/api/processing/photos/[id]/fail/route.rs": "782a887dd6ff517613ae0cbb67d93f731a226e9a39b10b4869eb5f6f8c13e182",
+    "server/app/api/processing/photos/[id]/renew/route.rs": "79181f9034377e2486ec4b5eb596161e65ce6a6ec9974cd28923073365567a70",
+    "server/app/api/processing/photos/[id]/route.rs": "c333d59c11189daa58fa8d2989e79576214c7d443202b6230dff98bcfec2c88c",
+    "server/app/api/processing/run/bundle.toml": "ccd389df5218df0b0f9274408b393e69ea1582361e6012f266486bab1e04b69e",
+    "server/app/api/processing/run/route.rs": "6f3904ee014a1d76bd84f5b658337765635942f4f3569c07e906005a6d6537a4",
+    "server/app/api/processing/status/route.rs": "dae5d5ba9f83f46eb9f5f76ebadba20b1c2129e10b2edef2ae3372ea1ddc165a",
+    "server/app/api/uploads/[id]/route.rs": "d14b3668b6a4c3bc041fcd96d3e422cdb27d68faeb95445f99a7c405a32f04c8",
+    "server/app/api/uploads/bundle.toml": "a90ff68f69247a66eb53675f50f4cebe793dd25d4228da332f595f3490e25192",
+    "server/app/api/uploads/route.rs": "f41744a0cfe3b90b98be698428fca05577994ccbdc76c8e3d07c58474b013d15",
+    "server/app/healthz/route.rs": "e98b914d769e53c42597aeb30995fe2abc88710438bb3060a58835e95d85952a",
+    "server/app/layout.tsx": "f96eea268ce644a61a440388538985a0a50c73e8f92db11aa5cb0a285735edb4",
+    "server/app/login/page.tsx": "79cf8813a964278b5968aff3d99c004a3d3b8f728e6455bd62fc4c2fcaef2b67",
+    "server/app/page.tsx": "8e79fde07e8506cfcc3fe7e29511a5162b20392d46fe49d6513167a6a380eaea",
+    "server/build.rs": "a99c837be4276304226b411c1258231f846e0f6f0ef07458017e63ec1068cd86",
+    "server/components/pwa.tsx": "b47b7410d96f9e3b3e2477f51320f63a8f7f9e55e13e42f6a41becfa10a6d4d8",
+    "server/components/webauthn.ts": "8361a9c6321e6d59094d2e124fed8267c345fc48130cc940695a7bb1ca02a0e6",
+    "server/nextrs.toml": "c0bf0b8fc7bc2256c6ea938a833955fab31d495d10c8f46da8fc759e7d56985e",
+    "server/package-lock.json": "fc86c2e82da0a8605f9db0b2184d934c4dbfa28a72b51e88014e4820381a9c82",
+    "server/rust-toolchain.toml": "026fc35218f596471de9f8505f397398a24e2eb42e42b6a0dac87ef8a667ed0a",
+    "server/src/app.rs": "bf01ae7af837c6fa6e69d2ca5311625d3620c5ca6f85c051908c35cb6276c447",
+    "server/src/auth.rs": "9c1a882c7068ac786a1761b67ab65cd48069c1e53d8eafe9e36677076d8f2dfc",
+    "server/src/auth_http.rs": "90673fd4e6aace4b4c284e35dc57954acdaac9e3658b078ea471a607ee1ebe6a",
+    "server/src/background.rs": "ba956dab2c87fa2f29e91c9844fa37619856fc55885aa1b2b44d3079d7f91522",
+    "server/src/bin/backfill_catalog.rs": "439e7c8085937cfef88932db14d8108f1e6e1fa9fe18cb08d9ece7f8188c0a78",
+    "server/src/bin/daily_mirror_auth.rs": "ea3a40e15852d7d065ff178260ccc4c12730c32ea38cc56722be8546068cd77c",
+    "server/src/bin/measure_admin.rs": "9e4062999040013ef436a7ed7ec7ad91c386f76174f2d8d5e9f8290c0297e264",
+    "server/src/bin/repair_photo_sizes.rs": "6e70430ff4061c2d6e96bff2437cbca650bf3536da04548bcb010b39991c2266",
+    "server/src/bin/suggest_faces.rs": "a2cda1437323a850bc980c3d04b825a9ea3a1845ba3798d5488f8d1692602bce",
+    "server/src/catalog.rs": "92b380decf73c37b1fa82ac9181716f58eafcda07e4205441b39552b47c9f18d",
+    "server/src/cron_auth.rs": "5e0606324b164c4342229f91fa7b98ca2b9f34a12ec36688cfb25d4088a63b7e",
+    "server/src/face_admin.rs": "078ac4a8be63bfdff2cc54abb7614064336c75237cfea51970d3a0209700a669",
+    "server/src/face_matching.rs": "2d82eed4c1a5461b67d713a1d7bf6a44c804e00a4df558356caa0f8a2183e417",
+    "server/src/main.rs": "92ae04b35ae51ea50e3a4c988726cbfd78f69808bd37fd6db71feedc36f8464d",
+    "server/src/passkeys.rs": "c9982b646e6482c054c00990b923e2e30c7b03ea34309ea8e6ced4827c6c695e",
+    "server/src/photos.rs": "751986bace755524eecb1a95bc22263eb6d8ad3c1ade0bce5a30bb26b8b1838b",
+    "server/src/processing.rs": "770395823f666632284829673c341068c6328b7a3cb8f6f7062e415cedbe842b",
+    "server/src/processor_auth.rs": "22526207dd9c6a4f47bfd21594516a4949ca4a758acf3f6dc2471f602b2cf152",
+    "server/src/upload_auth.rs": "1f00b5ae1d3a470cd9b1d08f66d30987f85f04775d08b76a494fa2b0b25726a0",
+    "server/src/upload_flow.rs": "f2ebb85a401bf5461f4a0e2ad5e81bab0d156faa76b7f4d76e995ba0b96531bc",
+    "server/src/view_auth.rs": "555fd1fd9ffb67bbb329ae246284fd059d5cd84b5e2254ef3b655a1b7cdfb65f",
+    "server/src/vision.rs": "b8ab090da79362e95988bb58ede7ee560e547ec2af72d07cc52f6aad48a3ae17",
+    "server/tests/native_auth.rs": "1739b56349d876a7b44f736d1ec7896707c11f005fd6c1cd73102c8f9e196660",
+    "server/tests/native_passkeys.rs": "766f4978eb1c52c9d6eb3f63d98dd37d3284b02658bf71c39946e6884986024e",
+    "vendor/vercel_runtime/Cargo.toml": "39892c37cde589374306b06266c92cb5db0e6087b1bbb5084a7505d3320da793",
+    "vendor/vercel_runtime/src/actix/mod.rs": "e694079152d5b762330c1e850cd97a106aad882669f3a3593fb0100de7f60016",
+    "vendor/vercel_runtime/src/awaiter.rs": "00278be3143e9fbfbc0c5914733c6be97105ec941d90c5ff9bf58c11d700fd64",
+    "vendor/vercel_runtime/src/axum/mod.rs": "dc4fe9732dee208557320b8397f5990ffd911c33fa8a01fea73038932ff1c160",
+    "vendor/vercel_runtime/src/ipc/core.rs": "6c0e16bbec2ed2592affccf813cd97cd62c697d17ba8d9d71833bc40e2e7df38",
+    "vendor/vercel_runtime/src/ipc/log.rs": "11cb9418cc859618e7a01d5750742ce1119df64352cdf4c22e5d4f7fc092631f",
+    "vendor/vercel_runtime/src/ipc/metric.rs": "1813ba0435037cbe303c1be04aef0c047ca0bf5ae13ad1ef4f50a80c369bfd8e",
+    "vendor/vercel_runtime/src/ipc/mod.rs": "4f4bd0da9f78477821240366b9d533df664d2f8c67bf0ee56ef55b7f33c8f2d9",
+    "vendor/vercel_runtime/src/ipc_utils.rs": "081ce3bb61bfd7f4198ad71aad1605a6e6f2424b5a866b23597dabb57c417bd7",
+    "vendor/vercel_runtime/src/lib.rs": "c03fca6a7bbcf9fd4c81e59b8e549b1c406d15e79eb14e13dcf111beb013f21b",
+    "vendor/vercel_runtime/src/types.rs": "0b162426d64f202165e4d2633211285785ef9aa7f2e75a18730030f2e91e9d45"
+  },
+  "framework_revision": "9fa4141d145f5afba869a42857e601c08a74e5fc",
+  "toolchain": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "target": "x86_64-unknown-linux-gnu.2.26",
+  "profile": "release (Cargo defaults)",
+  "baseline_executable_bytes": 23173912,
+  "baseline_executable_sha256": "d73c086d8968eb38b5796559d7dbb8a9d87de7c00190a3857a4e13bd89dd54b7",
+  "baseline_package_bytes": null,
+  "baseline_features": [
+    "image-processing",
+    "face-inference"
+  ],
+  "functions": {
+    "default": {
+      "features": [],
+      "bytes": {
+        "executable": 19901048,
+        "native_libraries": 0,
+        "models_assets": 0,
+        "other": 203
+      },
+      "total_bytes": 19901251,
+      "total_mib": 18.9793119430542,
+      "headroom_before_provider_layers_bytes": 230098749,
+      "files": [
+        {
+          "path": ".vc-config.json",
+          "bytes": 203,
+          "category": "other",
+          "sha256": "dbe368b8a54e014a2cc4a1ccf5331635ecb66f17dbc34b21875cd257a304189b"
+        },
+        {
+          "path": "executable",
+          "bytes": 19901048,
+          "category": "executable",
+          "sha256": "0cda2c93e12adceabf54840a4e90de0c70f38fb88f3ad15ff2b241f4b46b5759"
+        }
+      ]
+    },
+    "images": {
+      "features": [
+        "image-processing"
+      ],
+      "bytes": {
+        "executable": 14398584,
+        "native_libraries": 0,
+        "models_assets": 0,
+        "other": 203
+      },
+      "total_bytes": 14398787,
+      "total_mib": 13.7317533493042,
+      "headroom_before_provider_layers_bytes": 235601213,
+      "files": [
+        {
+          "path": ".vc-config.json",
+          "bytes": 203,
+          "category": "other",
+          "sha256": "dbe368b8a54e014a2cc4a1ccf5331635ecb66f17dbc34b21875cd257a304189b"
+        },
+        {
+          "path": "executable",
+          "bytes": 14398584,
+          "category": "executable",
+          "sha256": "c6963409964f9eee98aa5a8fac39a9f36e650983b12e35073e46b002355809f9"
+        }
+      ]
+    },
+    "vision": {
+      "features": [
+        "face-inference"
+      ],
+      "bytes": {
+        "executable": 13951240,
+        "native_libraries": 65598512,
+        "models_assets": 42687538,
+        "other": 203
+      },
+      "total_bytes": 122237493,
+      "total_mib": 116.57475757598877,
+      "headroom_before_provider_layers_bytes": 127762507,
+      "files": [
+        {
+          "path": ".vc-config.json",
+          "bytes": 203,
+          "category": "other",
+          "sha256": "dbe368b8a54e014a2cc4a1ccf5331635ecb66f17dbc34b21875cd257a304189b"
+        },
+        {
+          "path": "executable",
+          "bytes": 13951240,
+          "category": "executable",
+          "sha256": "e7811672bed5a8da04a263e7f87fc7e56b048b9c1857d37b785a7d2a9525a382"
+        },
+        {
+          "path": "resources/vision/face_detection_yunet_2023mar.onnx",
+          "bytes": 232589,
+          "category": "models_assets",
+          "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+        },
+        {
+          "path": "resources/vision/face_landmarker.task",
+          "bytes": 3758596,
+          "category": "models_assets",
+          "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
+        },
+        {
+          "path": "resources/vision/face_recognition_sface_2021dec.onnx",
+          "bytes": 38696353,
+          "category": "models_assets",
+          "sha256": "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79"
+        },
+        {
+          "path": "resources/vision/lib/libEGL.so.1",
+          "bytes": 84680,
+          "category": "native_libraries",
+          "sha256": "45a3ff9a094bce3aca7df8ac0d53fea41a09287b9b2c67c034433cb3883ba485"
+        },
+        {
+          "path": "resources/vision/lib/libGLESv2.so.2",
+          "bytes": 84112,
+          "category": "native_libraries",
+          "sha256": "24edbca5dbd31a3983282d036fad4d11f2746fdb93e33e2d5eff10421a01c6b4"
+        },
+        {
+          "path": "resources/vision/lib/libGLdispatch.so.0",
+          "bytes": 718344,
+          "category": "native_libraries",
+          "sha256": "c410b6277ad81eec73fc3ddfdb27ec2c597c033c0ca5acad4cc48688898f3df6"
+        },
+        {
+          "path": "resources/vision/lib/libgcc_s.so.1",
+          "bytes": 106448,
+          "category": "native_libraries",
+          "sha256": "dfcdde206605bc11b50111bbcc8b262f00fede064103e75613d6180c646ec6f8"
+        },
+        {
+          "path": "resources/vision/lib/libjpeg.so.62",
+          "bytes": 540912,
+          "category": "native_libraries",
+          "sha256": "8b8ce8ba57946ef90a8b5bec1ec17c29aab6482b1f5f46008a373eae5395f7b9"
+        },
+        {
+          "path": "resources/vision/lib/libmediapipe.so",
+          "bytes": 33923384,
+          "category": "native_libraries",
+          "sha256": "76735055251c12bf978fa9fced118e7d40998ca13675f50acaa5acdb4e4f2a24"
+        },
+        {
+          "path": "resources/vision/lib/libopencv_calib3d.so.412",
+          "bytes": 2832144,
+          "category": "native_libraries",
+          "sha256": "fdd965f4665c245e853cc38c8ce96e7ebef63965f3cbc425ee5fc367974a3a72"
+        },
+        {
+          "path": "resources/vision/lib/libopencv_core.so.412",
+          "bytes": 5009712,
+          "category": "native_libraries",
+          "sha256": "aa58428b60e9e7c0cb47883f3e5b5b238999903cfb273fd5c164cfa01a28cdc7"
+        },
+        {
+          "path": "resources/vision/lib/libopencv_dnn.so.412",
+          "bytes": 8491224,
+          "category": "native_libraries",
+          "sha256": "f519afb93ae5390a4091721137ad5abeac53a6b0ed1c94130af736a5b29ce74a"
+        },
+        {
+          "path": "resources/vision/lib/libopencv_features2d.so.412",
+          "bytes": 983120,
+          "category": "native_libraries",
+          "sha256": "4ffd2cc2bc743ecfdf2a793430505ceb039e9cd3d2d771665a45b6982c0be790"
+        },
+        {
+          "path": "resources/vision/lib/libopencv_flann.so.412",
+          "bytes": 691080,
+          "category": "native_libraries",
+          "sha256": "3d66cf6db648a863c2f8120c7c3bf85da3579998012266f44383fcd781c0576a"
+        },
+        {
+          "path": "resources/vision/lib/libopencv_imgcodecs.so.412",
+          "bytes": 802232,
+          "category": "native_libraries",
+          "sha256": "5880a9ee83aeadb2f91d032bc0befba74a3c6e188c9bf2e0d3dec297b5af5496"
+        },
+        {
+          "path": "resources/vision/lib/libopencv_imgproc.so.412",
+          "bytes": 7667176,
+          "category": "native_libraries",
+          "sha256": "9dbed3c2eef61be1dd6f0a46a46067c79a391061ad2146dfedac969962c27c0a"
+        },
+        {
+          "path": "resources/vision/lib/libopencv_objdetect.so.412",
+          "bytes": 1344248,
+          "category": "native_libraries",
+          "sha256": "722cf6654b28f8e82df1b81ad5a0ab9e1f03e43b1cd4f804bce2cb1ae1179ab5"
+        },
+        {
+          "path": "resources/vision/lib/libstdc++.so.6",
+          "bytes": 2202096,
+          "category": "native_libraries",
+          "sha256": "3c7a76c349abe277aa8c9e54e3b43f557f584acbbaad1f2055e9fdd4668d3396"
+        },
+        {
+          "path": "resources/vision/lib/libz.so.1",
+          "bytes": 117600,
+          "category": "native_libraries",
+          "sha256": "6ab9356e77fa852667f7bf7c94d04fcb7051c6f62d47e4f52fb84d8ceac3deaf"
+        }
+      ]
+    }
+  },
+  "combined_function_bytes": 156537531,
+  "default_executable_reduction_bytes": 3272864,
+  "default_executable_reduction_percent": 14.123053544002412
+}

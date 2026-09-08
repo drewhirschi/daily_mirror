@@ -1,0 +1,42 @@
+[
+  {
+    "file": "src/auth_http.rs",
+    "same_as_current_deployment_source": true,
+    "sha256": "90673fd4e6aace4b4c284e35dc57954acdaac9e3658b078ea471a607ee1ebe6a"
+  },
+  {
+    "file": "app/api/auth/login/native/route.rs",
+    "same_as_current_deployment_source": true,
+    "sha256": "aa256e0cfd6bc97205c0aa30055bb63745a4e77f7a466efad9c4d18a5519c2fc"
+  },
+  {
+    "file": "app/api/auth/login/native/passkey/start/route.rs",
+    "same_as_current_deployment_source": true,
+    "sha256": "f684d8a498105dd90b96a2a7e3febb11c7809ef908757494ca1b59de7f4a8d2a"
+  },
+  {
+    "file": "app/api/auth/login/native/passkey/finish/route.rs",
+    "same_as_current_deployment_source": true,
+    "sha256": "8eea031a8daf8432713d196f0467bc1e7beb83b6298c2516f3b1315b1e67c1fb"
+  },
+  {
+    "file": "app/.well-known/apple-app-site-association/route.rs",
+    "same_as_current_deployment_source": true,
+    "sha256": "8ed6e679ee7f98b7dce9b7b69d2bd4a9fe66b9949c28a7871ccb1d60114d9943"
+  },
+  {
+    "existing_production_route": "/.well-known/apple-app-site-association",
+    "status": 200,
+    "body": "{\"webcredentials\":{\"apps\":[\"C9P58ZP4AQ.app.dailymirror.ios\"]}}"
+  },
+  {
+    "existing_production_route": "/api/auth/login/native/passkey/start",
+    "status": 422,
+    "body": "Failed to deserialize the JSON body into the target type: missing field `username` at line 1 column 2"
+  },
+  {
+    "existing_production_route": "/api/auth/login/native/passkey/finish",
+    "status": 422,
+    "body": "Failed to deserialize the JSON body into the target type: missing field `ceremony_id` at line 1 column 2"
+  }
+]

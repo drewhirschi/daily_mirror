@@ -1,0 +1,13 @@
+{
+  "removed_synthetic_capture_ids": [
+    "20260907T230000Z-vercel01",
+    "20260907T230001Z-vercel02",
+    "20260907T230002Z-vercel03"
+  ],
+  "remaining_queue": [
+    [
+      "complete",
+      "59"
+    ]
+  ]
+}

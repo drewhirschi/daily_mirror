@@ -52,12 +52,13 @@ pub async fn patch(
     Extension(catalog): Extension<PhotoCatalog>,
     Extension(processing): Extension<ProcessingQueue>,
     Path(id): Path<String>,
+    wait: nextrs::WaitUntil,
     Json(edit): Json<RotatePhoto>,
 ) -> StatusCode {
     match store.rotate(&id, edit.degrees).await {
         Ok(byte_size) => match catalog.record_rotation(&id, edit.degrees, byte_size).await {
             Ok(()) => match processing.reset_photo(&id).await {
-                Ok(()) => StatusCode::NO_CONTENT,
+                Ok(()) => { crate::background::notify(&wait, Some(id.clone())); StatusCode::NO_CONTENT },
                 Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
             },
             Err(_) => StatusCode::INTERNAL_SERVER_ERROR,

@@ -1,22 +1,8 @@
-use axum::{
-    Extension, Json,
-    http::{HeaderMap, header},
-    response::{IntoResponse, Response},
-};
-use serde::Serialize;
-use utoipa::ToSchema;
-
 use crate::{
-    auth::{AuthStore, User},
-    auth_http::{self, PasswordLogin},
+    auth::AuthStore,
+    auth_http::{self, NativeSession, PasswordLogin},
 };
-
-#[derive(Serialize, ToSchema)]
-pub struct NativeSession {
-    pub user: User,
-    pub token: String,
-    pub expires_in_seconds: u64,
-}
+use axum::{Extension, Json, http::HeaderMap, response::Response};
 
 #[nextrs::api(responses((status = 200, body = NativeSession)))]
 pub async fn post(
@@ -24,17 +10,8 @@ pub async fn post(
     headers: HeaderMap,
     Json(request): Json<PasswordLogin>,
 ) -> Response {
-    let mut response = match auth_http::password_session(&store, &headers, &request).await {
-        Ok((user, token)) => Json(NativeSession {
-            user,
-            token: token.token,
-            expires_in_seconds: token.max_age_seconds,
-        })
-        .into_response(),
-        Err(response) => response,
-    };
-    response
-        .headers_mut()
-        .insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
-    response
+    match auth_http::password_session(&store, &headers, &request).await {
+        Ok((user, token)) => auth_http::native_logged_in(user, token),
+        Err(response) => auth_http::no_store(response),
+    }
 }

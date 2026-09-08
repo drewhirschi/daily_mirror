@@ -42,6 +42,7 @@ pub async fn protect(
 
 fn bypasses_authentication(method: &Method, path: &str) -> bool {
     path == "/healthz"
+        || (method == Method::GET && path == "/.well-known/apple-app-site-association")
         || path == "/login"
         || matches!(
             path,

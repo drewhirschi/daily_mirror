@@ -25,12 +25,18 @@ path = "api/index.rs"
 name = "daily-mirror-auth"
 path = "src/bin/daily_mirror_auth.rs"
 
+[features]
+default = ["image-processing"]
+image-processing = ["dep:image"]
+face-inference = ["dep:daily-mirror-processor"]
+
 [build-dependencies]
-nextrs = { version = "0.6.0", features = ["build", "tsx"] }
+nextrs = { git = "https://github.com/drewhirschi/nextrs.git", rev = "9fa4141d145f5afba869a42857e601c08a74e5fc", features = ["build", "tsx"] }
 
 [dependencies]
-nextrs = { version = "0.6.0", features = ["vercel"] }
+nextrs = { git = "https://github.com/drewhirschi/nextrs.git", rev = "9fa4141d145f5afba869a42857e601c08a74e5fc", features = ["vercel"] }
 daily-mirror-vision-contract = { path = "../crates/vision-contract" }
+daily-mirror-processor = { path = "../processor", optional = true, features = ["hosted"] }
 axum = "0.8"
 argon2 = "0.5.3"
 base64 = "0.22"
@@ -40,7 +46,7 @@ tower = "0.5"
 http = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 rusty-s3 = { version = "0.10.2", default-features = false, features = ["rustcrypto", "xml"] }
-image = { version = "0.25", default-features = false, features = ["jpeg", "webp"] }
+image = { version = "0.25", optional = true, default-features = false, features = ["jpeg", "webp"] }
 libsql = { version = "0.9", default-features = false, features = ["core", "remote", "tls"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 rpassword = "7.4"
@@ -52,6 +58,11 @@ utoipa = "5"
 uuid = { version = "1", features = ["v4"] }
 vercel_runtime = { version = "2", features = ["axum"] }
 webauthn-rs = { version = "0.5.5", default-features = false, features = ["danger-allow-state-serialisation"] }
+
+# Keep each invocation alive until NextRS WaitUntil tasks settle.
+# Provenance and live preview evidence: ../vendor/vercel_runtime/PATCH.md.
+[patch.crates-io]
+vercel_runtime = { path = "../vendor/vercel_runtime" }
 
 [dev-dependencies]
 webauthn-authenticator-rs = { version = "0.5.5", default-features = false, features = ["softpasskey"] }

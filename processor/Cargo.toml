@@ -5,6 +5,9 @@ edition = "2024"
 rust-version = "1.88"
 publish = false
 
+[features]
+hosted = ["opencv/clang-runtime"]
+
 [dependencies]
 anyhow = "1"
 async-trait = "0.1"

@@ -8,6 +8,7 @@ use axum::{Extension, extract::DefaultBodyLimit, middleware};
 
 pub mod auth;
 pub mod auth_http;
+pub mod background;
 pub mod catalog;
 pub mod cron_auth;
 pub mod face_admin;
@@ -19,6 +20,8 @@ pub mod processor_auth;
 pub mod upload_auth;
 pub mod upload_flow;
 pub mod view_auth;
+#[cfg(feature = "face-inference")]
+pub mod vision;
 
 include!(concat!(env!("OUT_DIR"), "/nextrs_routes.rs"));
 
@@ -49,8 +52,25 @@ pub fn app() -> axum::Router {
         .layer(Extension(processing_queue))
         .layer(Extension(passkey_service))
         .layer(Extension(auth_store.clone()))
+        .layer(middleware::from_fn(reject_unmatched_api))
         .layer(middleware::from_fn_with_state(
             auth_store,
             view_auth::protect,
         ))
+}
+
+/// The static-file fallback returns 405 for POST, even when no route exists.
+/// Keep unmatched APIs at 404 while preserving 405 on real API routes. The
+/// outer view-auth layer still runs before this check in every bundle.
+async fn reject_unmatched_api(
+    request: axum::extract::Request,
+    next: middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    if request.uri().path().starts_with("/api/")
+        && request.extensions().get::<axum::extract::MatchedPath>().is_none()
+    {
+        return axum::http::StatusCode::NOT_FOUND.into_response();
+    }
+    next.run(request).await
 }

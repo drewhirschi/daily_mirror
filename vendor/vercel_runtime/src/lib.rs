@@ -1,0 +1,565 @@
+use hyper::server::conn::http1;
+use hyper::service::service_fn as hyper_service_fn;
+use hyper_util::rt::TokioIo;
+use std::convert::Infallible;
+use std::future::Future;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::net::TcpListener;
+use tower::Service;
+
+pub use hyper::Response;
+pub use types::{Error, ResponseBody};
+pub type Request = hyper::Request<hyper::body::Incoming>;
+
+#[cfg(feature = "axum")]
+pub mod axum;
+
+#[cfg(feature = "actix")]
+pub mod actix;
+
+pub mod awaiter;
+#[cfg(unix)]
+mod ipc;
+#[cfg(unix)]
+mod ipc_utils;
+mod types;
+
+use crate::awaiter::Awaiter;
+
+lazy_static::lazy_static! {
+    /// Process-global collector of `waitUntil` background work.
+    /// Shared by every request and drained once at shutdown (see [`run`]).
+    static ref AWAITER: Awaiter = Awaiter::new();
+}
+
+use crate::types::IntoFunctionResponse;
+
+#[cfg(unix)]
+use {
+    crate::ipc::core::{EndMessage, StartMessage},
+    crate::ipc::log::{Level, LogMessage},
+    crate::ipc_utils::{IPC_READY, enqueue_or_send_message, flush_init_log_buffer, send_message},
+    std::env,
+    std::os::unix::net::UnixStream,
+    std::sync::atomic::Ordering,
+    std::sync::{Arc, Mutex},
+};
+
+#[cfg(unix)]
+#[derive(Clone)]
+pub struct LogContext {
+    ipc_stream: Option<Arc<Mutex<UnixStream>>>,
+    invocation_id: Option<String>,
+    request_id: Option<u64>,
+}
+
+#[cfg(unix)]
+impl LogContext {
+    pub fn new(
+        ipc_stream: Option<Arc<Mutex<UnixStream>>>,
+        invocation_id: Option<String>,
+        request_id: Option<u64>,
+    ) -> Self {
+        Self {
+            ipc_stream,
+            invocation_id,
+            request_id,
+        }
+    }
+
+    pub fn info(&self, msg: &str) {
+        self.log(Level::Info, msg);
+    }
+
+    pub fn error(&self, msg: &str) {
+        self.log(Level::Error, msg);
+    }
+
+    pub fn warn(&self, msg: &str) {
+        self.log(Level::Warn, msg);
+    }
+
+    pub fn debug(&self, msg: &str) {
+        self.log(Level::Debug, msg);
+    }
+
+    fn log(&self, level: Level, msg: &str) {
+        if let (Some(inv_id), Some(req_id)) = (&self.invocation_id, &self.request_id) {
+            let log = LogMessage::with_level(inv_id.clone(), *req_id, msg, level);
+            if let Err(_e) = enqueue_or_send_message(&self.ipc_stream, log) {
+                // Failed to send or queue log message
+            }
+        } else {
+            // Fall back to regular println when no request context
+            println!("{:?}: {}", level, msg);
+        }
+    }
+}
+
+// Non-Unix version without IPC support (simple logging to stdout)
+#[cfg(not(unix))]
+#[derive(Clone)]
+pub struct LogContext {
+    _placeholder: (),
+}
+
+#[cfg(not(unix))]
+impl LogContext {
+    pub fn new() -> Self {
+        Self { _placeholder: () }
+    }
+
+    pub fn info(&self, msg: &str) {
+        println!("INFO: {}", msg);
+    }
+
+    pub fn error(&self, msg: &str) {
+        eprintln!("ERROR: {}", msg);
+    }
+
+    pub fn warn(&self, msg: &str) {
+        println!("WARN: {}", msg);
+    }
+
+    pub fn debug(&self, msg: &str) {
+        println!("DEBUG: {}", msg);
+    }
+}
+
+#[cfg(not(unix))]
+impl Default for LogContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub log_context: LogContext,
+    /// Per-request background-work set. The request's `end` IPC message is
+    /// withheld until every future registered here settles, so the platform
+    /// keeps the invocation active (and the instance unsuspended) while
+    /// `waitUntil` work runs. Without this, Fluid suspends the instance as
+    /// soon as the response completes and background futures only advance
+    /// while later requests happen to wake the process.
+    awaiter: Awaiter,
+}
+
+impl AppState {
+    pub fn new(log_context: LogContext) -> Self {
+        Self {
+            log_context,
+            awaiter: Awaiter::new(),
+        }
+    }
+
+    /// Register a background future to keep running after the response has been
+    /// sent. The future is spawned immediately; the request's `end` IPC message
+    /// (which lets the platform consider the invocation finished) is delayed
+    /// until all futures registered during the request settle, bounded by the
+    /// function's `maxDuration`.
+    ///
+    /// This future runs regardless of whether the handler succeeded or errored.
+    /// A panic in the future is isolated from the rest of the runtime.
+    pub fn wait_until<F>(&self, future: F)
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        self.awaiter.wait_until(future);
+    }
+
+    /// Handle to this request's background-work set, used by [`run`] to drain
+    /// it before emitting the per-request `end` IPC message.
+    pub(crate) fn awaiter(&self) -> Awaiter {
+        self.awaiter.clone()
+    }
+}
+
+/// Trait that abstracts over handler function signatures that return types implementing IntoFunctionResponse
+pub trait Handler {
+    type Output: IntoFunctionResponse;
+    type Future: Future<Output = Self::Output> + Send + 'static;
+    fn call(&self, req: Request, state: AppState) -> Self::Future;
+}
+
+/// Implementation for handlers that return IntoFunctionResponse types
+impl<F, Fut, R> Handler for F
+where
+    F: Fn(Request, AppState) -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = R> + Send + 'static,
+    R: IntoFunctionResponse,
+{
+    type Output = R;
+    type Future = Fut;
+
+    fn call(&self, req: Request, state: AppState) -> Self::Future {
+        self(req, state)
+    }
+}
+
+/// Wrapper for stateless handlers that return IntoFunctionResponse types
+#[derive(Clone)]
+pub struct StatelessHandler<F> {
+    f: F,
+}
+
+impl<F, Fut, R> Handler for StatelessHandler<F>
+where
+    F: Fn(Request) -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = R> + Send + 'static,
+    R: IntoFunctionResponse,
+{
+    type Output = R;
+    type Future = Fut;
+
+    fn call(&self, req: Request, _state: AppState) -> Self::Future {
+        (self.f)(req)
+    }
+}
+
+/// Service function creation trait for different handler signatures
+pub trait IntoServiceFn<Args> {
+    type Handler: Handler;
+    fn into_service_fn(self) -> ServiceFn<Self::Handler>;
+}
+
+/// Implementation for handlers that take Request and AppState
+impl<F, Fut, R> IntoServiceFn<(Request, AppState)> for F
+where
+    F: Fn(Request, AppState) -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = R> + Send + 'static,
+    R: IntoFunctionResponse,
+{
+    type Handler = F;
+
+    fn into_service_fn(self) -> ServiceFn<Self::Handler> {
+        ServiceFn { f: self }
+    }
+}
+
+/// Implementation for handlers that only take Request (stateless)
+impl<F, Fut, R> IntoServiceFn<(Request,)> for F
+where
+    F: Fn(Request) -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = R> + Send + 'static,
+    R: IntoFunctionResponse,
+{
+    type Handler = StatelessHandler<F>;
+
+    fn into_service_fn(self) -> ServiceFn<Self::Handler> {
+        ServiceFn {
+            f: StatelessHandler { f: self },
+        }
+    }
+}
+
+/// Creates a Tower service from a handler function
+pub fn service_fn<F, Args>(handler: F) -> ServiceFn<F::Handler>
+where
+    F: IntoServiceFn<Args>,
+{
+    handler.into_service_fn()
+}
+
+/// A Tower service wrapper around a handler function
+#[derive(Clone)]
+pub struct ServiceFn<H> {
+    f: H,
+}
+
+impl<H> Service<(AppState, Request)> for ServiceFn<H>
+where
+    H: Handler + Clone + Send + 'static,
+    H::Future: Send + 'static,
+    H::Output: Send + 'static,
+{
+    type Response = Response<ResponseBody>;
+    type Error = Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, (state, req): (AppState, Request)) -> Self::Future {
+        let f = self.f.clone();
+        Box::pin(async move {
+            let result = f.call(req, state).await;
+            result.into_response()
+        })
+    }
+}
+
+/// Run a Tower service with Vercel's runtime
+pub async fn run<S>(service: S) -> Result<(), Error>
+where
+    S: tower::Service<
+            (AppState, hyper::Request<hyper::body::Incoming>),
+            Response = Response<ResponseBody>,
+            Error = Error,
+        > + Send
+        + Clone
+        + 'static,
+    S::Future: Send + 'static,
+{
+    // IPC stream setup
+    #[cfg(unix)]
+    let ipc_stream = match env::var("VERCEL_IPC_PATH") {
+        Ok(ipc_path) => match UnixStream::connect(ipc_path) {
+            Ok(stream) => Some(Arc::new(Mutex::new(stream))),
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
+    let port: u16 = env::var("VERCEL_DEV_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(3000);
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let listener = TcpListener::bind(addr).await?;
+
+    // Send start message via IPC
+    #[cfg(unix)]
+    {
+        if let Some(ref ipc_stream_ref) = ipc_stream {
+            let start_message = StartMessage::new(0, port);
+            if let Err(_e) = send_message(ipc_stream_ref, start_message) {
+                // Failed to send start message to IPC
+            } else {
+                IPC_READY.store(true, Ordering::Relaxed);
+                flush_init_log_buffer(&ipc_stream);
+            }
+        } else {
+            println!("Dev server listening: {}", port);
+            flush_init_log_buffer(&ipc_stream);
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        println!("Dev server listening: {}", port);
+    }
+
+    // Shutdown signal future. On Unix the host terminates the process with
+    // SIGTERM; on other platforms fall back to Ctrl-C. When it fires we stop
+    // accepting new connections and drain any pending `waitUntil` work.
+    let shutdown = async {
+        #[cfg(unix)]
+        {
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(mut sigterm) => {
+                    sigterm.recv().await;
+                }
+                Err(_) => {
+                    let _ = tokio::signal::ctrl_c().await;
+                }
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = tokio::signal::ctrl_c().await;
+        }
+    };
+    tokio::pin!(shutdown);
+
+    loop {
+        let (stream, _) = tokio::select! {
+            accepted = listener.accept() => accepted?,
+            _ = &mut shutdown => {
+                // Drain background `waitUntil` work, then exit. The per-request
+                // `end` IPC message has already been sent for each completed
+                // request, so this only affects background tasks. This mirrors
+                // the Node.js runtime's `onExit` behavior.
+                //
+                // In `vc dev` (signalled by `VERCEL_DEV=1`) we bound the drain by
+                // `WAIT_UNTIL_TIMEOUT` so a hung task cannot keep the dev process
+                // alive. In production there is no artificial cap: background work
+                // runs until it resolves or the function itself times out, which
+                // matches the Node.js bridge.
+                if std::env::var("VERCEL_DEV").as_deref() == Ok("1") {
+                    if tokio::time::timeout(
+                        std::time::Duration::from_secs(crate::awaiter::WAIT_UNTIL_TIMEOUT),
+                        AWAITER.awaiting(),
+                    )
+                    .await
+                    .is_err()
+                    {
+                        eprintln!(
+                            "A waitUntil() task is still running after {}s and was abandoned at shutdown.",
+                            crate::awaiter::WAIT_UNTIL_TIMEOUT
+                        );
+                    }
+                } else {
+                    AWAITER.awaiting().await;
+                }
+                return Ok(());
+            }
+        };
+        let io = TokioIo::new(stream);
+        #[cfg(unix)]
+        let ipc_stream_clone = ipc_stream.clone();
+        let service_clone = service.clone();
+
+        tokio::task::spawn(async move {
+            if let Err(_e) = http1::Builder::new()
+                .keep_alive(true)
+                .half_close(true)
+                .serve_connection(
+                    io,
+                    hyper_service_fn(move |req| {
+                        let mut service_clone = service_clone.clone();
+
+                        // Extract information for IPC before calling handler (Unix only)
+                        #[cfg(unix)]
+                        let (app_state, invocation_id, request_id) = {
+                            let ipc_stream_clone = ipc_stream_clone.clone();
+                            let invocation_id = req
+                                .headers()
+                                .get("x-vercel-internal-invocation-id")
+                                .and_then(|v| v.to_str().ok())
+                                .map(|s| s.to_owned());
+                            let request_id = req
+                                .headers()
+                                .get("x-vercel-internal-request-id")
+                                .and_then(|v| v.to_str().ok())
+                                .and_then(|s| s.parse::<u64>().ok());
+                            let app_state = AppState::new(LogContext::new(
+                                ipc_stream_clone,
+                                invocation_id.clone(),
+                                request_id,
+                            ));
+                            (app_state, invocation_id, request_id)
+                        };
+
+                        #[cfg(not(unix))]
+                        let app_state = AppState::new(LogContext::new());
+
+                        async move {
+                            #[cfg(unix)]
+                            let ipc_stream_for_end = app_state.log_context.ipc_stream.clone();
+                            #[cfg(unix)]
+                            let request_awaiter = app_state.awaiter();
+
+                            if req.uri().path() == "/_vercel/ping" {
+                                let response = hyper::Response::builder()
+                                    .status(200)
+                                    .body(ResponseBody::from("OK"))
+                                    .unwrap();
+                                return Ok::<_, Infallible>(response);
+                            }
+
+                            let response = match tower::ServiceExt::ready(&mut service_clone).await
+                            {
+                                Ok(ready_service) => {
+                                    match tower::Service::call(ready_service, (app_state, req))
+                                        .await
+                                    {
+                                        Ok(resp) => resp,
+                                        Err(_e) => {
+                                            // Service error
+                                            hyper::Response::builder()
+                                                .status(500)
+                                                .header("connection", "close")
+                                                .body(ResponseBody::from("Internal Server Error"))
+                                                .unwrap()
+                                        }
+                                    }
+                                }
+                                Err(_e) => {
+                                    // Service not ready
+                                    hyper::Response::builder()
+                                        .status(500)
+                                        .header("connection", "close")
+                                        .body(ResponseBody::from("Service Not Ready"))
+                                        .unwrap()
+                                }
+                            };
+
+                            // Send end message via IPC once this request's
+                            // `waitUntil` work settles. The response is
+                            // returned to hyper immediately below, so client
+                            // latency is unaffected; only the platform's
+                            // "invocation finished" signal is delayed, which
+                            // keeps the instance from suspending while
+                            // background futures run (mirroring the Node.js
+                            // runtime's extended-lifecycle behavior). With no
+                            // registered work the drain resolves immediately
+                            // and the end message is sent right away. The
+                            // drain task is registered in the global AWAITER
+                            // so the SIGTERM drain also waits for in-flight
+                            // end messages.
+                            #[cfg(unix)]
+                            if let (Some(ipc_stream), Some(inv_id), Some(req_id)) =
+                                (ipc_stream_for_end, invocation_id, request_id)
+                            {
+                                AWAITER.wait_until(async move {
+                                    request_awaiter.awaiting().await;
+                                    let end_message = EndMessage::new(inv_id, req_id, None);
+                                    if let Err(_e) = send_message(&ipc_stream, end_message) {
+                                        // Failed to send end message
+                                    }
+                                });
+                            }
+
+                            Ok::<_, Infallible>(response)
+                        }
+                    }),
+                )
+                // Enable HTTP/1.1 upgrades so WebSocket handshakes complete.
+                // hyper injects `hyper::upgrade::OnUpgrade` into the request
+                // extensions and drives the upgraded connection after the 101,
+                // which framework extractors (e.g. axum's `WebSocketUpgrade`)
+                // rely on. Without registered background work, the request's
+                // `end` IPC message is sent at accept time for a 101 response.
+                .with_upgrades()
+                .await
+            {
+                // Error serving connection
+            }
+        });
+    }
+}
+
+#[cfg(all(test, unix))]
+mod lifecycle_tests {
+    use super::{AppState, LogContext};
+    use std::time::Duration;
+    use tokio::sync::oneshot;
+    use tokio::time::timeout;
+
+    fn request() -> AppState {
+        AppState::new(LogContext::new(None, None, None))
+    }
+
+    #[tokio::test]
+    async fn one_request_does_not_drain_another_requests_work() {
+        let first = request();
+        let second = request();
+        let (release, blocked) = oneshot::channel();
+        first.wait_until(async move { let _ = blocked.await; });
+        timeout(Duration::from_secs(1), second.awaiter().awaiting())
+            .await.expect("an idle request must not await a busy request");
+        let first_drain = first.awaiter();
+        let drain = first_drain.awaiting();
+        tokio::pin!(drain);
+        assert!(timeout(Duration::from_millis(20), &mut drain).await.is_err());
+        release.send(()).unwrap();
+        timeout(Duration::from_secs(1), drain).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn drain_includes_nested_work_and_survives_panics() {
+        let state = request();
+        let child_state = state.clone();
+        let (complete, completed) = oneshot::channel();
+        state.wait_until(async move {
+            child_state.wait_until(async move { complete.send(()).unwrap(); });
+            panic!("intentional background failure");
+        });
+        timeout(Duration::from_secs(1), state.awaiter().awaiting()).await.unwrap();
+        completed.await.unwrap();
+    }
+}

@@ -1,0 +1,7 @@
+FROM debian:bullseye-slim
+COPY ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN printf 'deb https://deb.debian.org/debian bullseye main\n' > /etc/apt/sources.list && apt-get -o Acquire::Check-Valid-Until=false update && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-downgrades --no-install-recommends libc6=2.31-13+deb11u11 perl-base=5.32.1-4+deb11u3 build-essential cmake pkg-config clang libclang-dev ca-certificates curl git python3 libjpeg-dev zlib1g-dev libegl1 libgles2 patchelf && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://github.com/opencv/opencv/archive/refs/tags/4.12.0.tar.gz | tar xz -C /opt
+RUN cmake -S /opt/opencv-4.12.0 -B /opt/ocv-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/opencv -DBUILD_LIST=core,imgproc,imgcodecs,dnn,objdetect -DBUILD_SHARED_LIBS=ON -DOPENCV_GENERATE_PKGCONFIG=ON -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_opencv_apps=OFF -DBUILD_JAVA=OFF -DBUILD_opencv_python2=OFF -DBUILD_opencv_python3=OFF -DWITH_IPP=OFF -DWITH_OPENCL=OFF -DWITH_TBB=OFF -DWITH_LAPACK=OFF -DWITH_FFMPEG=OFF -DWITH_GSTREAMER=OFF -DWITH_GTK=OFF -DWITH_QT=OFF -DWITH_V4L=OFF -DWITH_1394=OFF -DWITH_OPENGL=OFF -DWITH_JPEG=ON -DWITH_PNG=OFF -DWITH_TIFF=OFF -DWITH_WEBP=OFF -DWITH_OPENJPEG=OFF -DWITH_OPENEXR=OFF && cmake --build /opt/ocv-build -j 8 && cmake --install /opt/ocv-build && rm -rf /opt/ocv-build /opt/opencv-4.12.0
+ENV PKG_CONFIG_PATH=/opt/opencv/lib/pkgconfig
+ENV LD_LIBRARY_PATH=/opt/opencv/lib

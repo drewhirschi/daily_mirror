@@ -8,7 +8,7 @@ use crate::{
     upload_flow::{ReconcileReport, reconcile_all},
 };
 
-#[nextrs::api]
+#[nextrs::cron(schedule = "0 9 * * *")]
 pub async fn get(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,

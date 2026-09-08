@@ -1,0 +1,25 @@
+{
+  "real_face": [
+    [
+      "478",
+      "128",
+      "proposed",
+      "centroid-v1",
+      0.7499875829364981,
+      "1"
+    ]
+  ],
+  "finalize_response_seconds": 1.1396723829998336,
+  "automatic_upload": [
+    [
+      "complete",
+      "1"
+    ]
+  ],
+  "queue": [
+    [
+      "complete",
+      "61"
+    ]
+  ]
+}

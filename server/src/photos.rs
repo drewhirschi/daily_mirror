@@ -284,6 +284,7 @@ impl PhotoStore {
         }
     }
 
+    #[cfg(feature = "image-processing")]
     pub async fn ensure_thumbnail(&self, id: &str) -> io::Result<bool> {
         validate_capture_id(id)?;
         if self.thumbnail_size(id).await?.is_some_and(|size| size > 0) {
@@ -293,6 +294,7 @@ impl PhotoStore {
         Ok(true)
     }
 
+    #[cfg(feature = "image-processing")]
     pub async fn regenerate_thumbnail(&self, id: &str) -> io::Result<()> {
         let jpeg = self
             .original_bytes(id)
@@ -316,7 +318,7 @@ impl PhotoStore {
         }
     }
 
-    pub(crate) async fn original_bytes(&self, id: &str) -> io::Result<Option<Vec<u8>>> {
+    pub async fn original_bytes(&self, id: &str) -> io::Result<Option<Vec<u8>>> {
         validate_capture_id(id)?;
         match self.backend.as_ref() {
             Backend::Local(store) => match tokio::fs::read(store.path_for(id)).await {
@@ -328,6 +330,7 @@ impl PhotoStore {
         }
     }
 
+    #[cfg(feature = "image-processing")]
     async fn thumbnail_size(&self, id: &str) -> io::Result<Option<u64>> {
         match self.backend.as_ref() {
             Backend::Local(store) => {
@@ -345,6 +348,7 @@ impl PhotoStore {
         }
     }
 
+    #[cfg(feature = "image-processing")]
     async fn write_thumbnail(&self, id: &str, webp: Vec<u8>) -> io::Result<()> {
         match self.backend.as_ref() {
             Backend::Local(store) => {
@@ -386,6 +390,7 @@ impl PhotoStore {
         }
     }
 
+    #[cfg(feature = "image-processing")]
     pub async fn rotate(&self, id: &str, degrees: i16) -> io::Result<u64> {
         validate_capture_id(id)?;
         if !matches!(degrees, -90 | 90 | 180) {
@@ -514,6 +519,7 @@ impl R2Store {
         ))
     }
 
+    #[cfg(feature = "image-processing")]
     async fn put_object(&self, key: &str, content_type: &str, bytes: Vec<u8>) -> io::Result<()> {
         let mut action = self.bucket.put_object(Some(&self.credentials), key);
         action.headers_mut().insert("content-type", content_type);
@@ -620,12 +626,14 @@ fn photo(id: &str) -> Photo {
     }
 }
 
+#[cfg(feature = "image-processing")]
 fn thumbnail_webp(jpeg: &[u8]) -> io::Result<Vec<u8>> {
     let image = image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg)
         .map_err(io::Error::other)?;
     thumbnail_webp_from_image(&image)
 }
 
+#[cfg(feature = "image-processing")]
 fn thumbnail_webp_from_image(image: &image::DynamicImage) -> io::Result<Vec<u8>> {
     let resized = image
         .resize(
@@ -695,7 +703,7 @@ fn invalid_config(message: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message.into())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "image-processing"))]
 mod tests {
     use image::{GenericImageView as _, Rgb, RgbImage};
     use std::sync::Arc;

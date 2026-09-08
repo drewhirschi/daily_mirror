@@ -102,3 +102,13 @@ Rollback: redeploy the previous native-auth production deployment
 Set `DAILY_MIRROR_HOSTED_PROCESSING=0` on a newly deployed build to disable hosted
 processing. Existing leases expire; disabling does not cancel an invocation already
 running. Keep the shared cron secret consistent when redeploying older source.
+
+## PR preparation
+
+Rebased onto `60d3872` after native authentication merged in PRs #6 and #7.
+The PR preserves main's expanded session tests and removes duplicate native-auth
+changes from its diff. Application behavior matches the verified deployment;
+subsequent changes are formatting and test coverage. The artifact inventories
+above describe the deployed build, before that history/formatting cleanup.
+The recovery endpoint was invoked again while preparing the PR: HTTP 200,
+59 complete and no pending, leased, or failed jobs.

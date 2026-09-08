@@ -1064,19 +1064,57 @@ mod tests {
         let fixture = Fixture::new("hosted-serial").await;
         let a = "20260907T120000Z-hosted001";
         let b = "20260907T120001Z-hosted002";
-        for id in [a, b] { fixture.ready_photo(id).await; }
+        for id in [a, b] {
+            fixture.ready_photo(id).await;
+        }
         fixture.queue.reconcile_missing("face-v1").await.unwrap();
-        let first = fixture.queue.claim_hosted("face-v1", Some(b)).await.unwrap().unwrap();
+        let first = fixture
+            .queue
+            .claim_hosted("face-v1", Some(b))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(first.photo_id, b);
-        assert!(fixture.queue.claim_hosted("face-v1", Some(a)).await.unwrap().is_none());
+        assert!(
+            fixture
+                .queue
+                .claim_hosted("face-v1", Some(a))
+                .await
+                .unwrap()
+                .is_none()
+        );
         fixture.catalog.connection().await.unwrap().execute(
             "UPDATE photo_processing SET lease_expires_at = datetime(CURRENT_TIMESTAMP, '-1 second') WHERE photo_id = ?1", params![b]
         ).await.unwrap();
-        let recovered = fixture.queue.claim_hosted("face-v1", Some(b)).await.unwrap().unwrap();
+        let recovered = fixture
+            .queue
+            .claim_hosted("face-v1", Some(b))
+            .await
+            .unwrap()
+            .unwrap();
         assert_ne!(first.lease_token, recovered.lease_token);
-        assert!(matches!(fixture.queue.complete(b,"face-v1",&first.lease_token,&zero_face_result()).await, Err(ProcessingError::LeaseLost)));
-        fixture.queue.complete(b,"face-v1",&recovered.lease_token,&zero_face_result()).await.unwrap();
-        assert_eq!(fixture.queue.claim_hosted("face-v1", None).await.unwrap().unwrap().photo_id, a);
+        assert!(matches!(
+            fixture
+                .queue
+                .complete(b, "face-v1", &first.lease_token, &zero_face_result())
+                .await,
+            Err(ProcessingError::LeaseLost)
+        ));
+        fixture
+            .queue
+            .complete(b, "face-v1", &recovered.lease_token, &zero_face_result())
+            .await
+            .unwrap();
+        assert_eq!(
+            fixture
+                .queue
+                .claim_hosted("face-v1", None)
+                .await
+                .unwrap()
+                .unwrap()
+                .photo_id,
+            a
+        );
         fixture.cleanup().await;
     }
 
@@ -1086,13 +1124,24 @@ mod tests {
         let id = "20260907T120000Z-hosted003";
         fixture.ready_photo(id).await;
         fixture.queue.reconcile_missing("face-v1").await.unwrap();
-        fixture.queue.claim_hosted("face-v1", None).await.unwrap().unwrap();
+        fixture
+            .queue
+            .claim_hosted("face-v1", None)
+            .await
+            .unwrap()
+            .unwrap();
         fixture.catalog.connection().await.unwrap().execute(
             "UPDATE photo_processing SET attempt_count=5, lease_expires_at=datetime(CURRENT_TIMESTAMP, '-1 second') WHERE photo_id=?1", params![id]
         ).await.unwrap();
-        assert!(fixture.queue.claim_hosted("face-v1", None).await.unwrap().is_none());
+        assert!(
+            fixture
+                .queue
+                .claim_hosted("face-v1", None)
+                .await
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(fixture.queue.status("face-v1").await.unwrap().failed, 1);
         fixture.cleanup().await;
     }
-
 }

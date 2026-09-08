@@ -68,7 +68,10 @@ async fn reject_unmatched_api(
 ) -> axum::response::Response {
     use axum::response::IntoResponse;
     if request.uri().path().starts_with("/api/")
-        && request.extensions().get::<axum::extract::MatchedPath>().is_none()
+        && request
+            .extensions()
+            .get::<axum::extract::MatchedPath>()
+            .is_none()
     {
         return axum::http::StatusCode::NOT_FOUND.into_response();
     }

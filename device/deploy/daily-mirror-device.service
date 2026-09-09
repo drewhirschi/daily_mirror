@@ -1,0 +1,18 @@
+[Unit]
+Description=Daily Mirror camera, button, LEDs, uploader, and admin page
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=drew
+Group=drew
+WorkingDirectory=/home/drew/daily-mirror-device
+ExecStart=/home/drew/daily-mirror-device/bin/daily-mirror-device run
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

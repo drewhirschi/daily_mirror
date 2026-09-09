@@ -112,3 +112,94 @@ image for 100% inspection. It does not touch the durable queue, local photo
 storage, or gallery upload endpoint. Starting preview again or pressing the
 physical button safely releases/reclaims the camera; a physical capture always
 stops lab preview before running the normal workflow.
+
+## rpi2: common-anode RGB indicator
+
+The four-leg LED identified on rpi2 has leg 3 as common positive (3.3 V),
+leg 2 green (P17 through its own resistor), leg 1 blue (P27 through its own
+resistor), and leg 4 red (P22 through its own resistor). Button: SDA/P2 to GND.
+Set `DAILY_MIRROR_LED_MODE=rgb-common-anode`. Keep the legacy pin environment
+names: `YELLOW_LED_PIN=27` now identifies the physical blue output.
+
+RGB mode starts all channels HIGH/off and inverts green PWM. Countdown yellow
+combines red and green; ready/processing/success remain green. A queued upload
+shows steady red instead of combining ready green and error red into yellow.
+The admin's green/yellow/red lamps represent logical status colors; `/api/status`
+also reports `led_mode`. Blue and white are reserved for later behavior.
+The default `discrete` mode preserves rpi1's active-high three-LED hardware.
+
+Select `DAILY_MIRROR_CAMERA_PROFILE=ov5647` for Camera v1 or `imx219` for
+Camera v2. Omit `DAILY_MIRROR_CAMERA_ARGS` to use the profile defaults.
+
+A matching systemd unit is in `deploy/daily-mirror-device.service`. It expects
+`/home/drew/daily-mirror-device/bin/daily-mirror-device` and a mode-0600 `.env` in
+`/home/drew/daily-mirror-device`. Enable the unit after installing both.
+Use `DAILY_MIRROR_ADMIN_BIND=0.0.0.0:8081` for the new Pi.
+
+## Camera profiles and local development
+
+Two independent settings control hardware behavior and photo destination:
+
+```text
+DAILY_MIRROR_CAMERA_PROFILE=ov5647
+DAILY_MIRROR_CAPTURE_MODE=local
+DAILY_MIRROR_LOCAL_DIR=./data/local
+```
+
+| Profile | Camera | Full-resolution still | Focus |
+| --- | --- | --- | --- |
+| `imx519` | Arducam IMX519 | 4656 × 3496 | Autofocus, manual lens control |
+| `ov5647` | Pi Camera v1 / Rev 1.3 | 2592 × 1944 | Fixed focus |
+| `imx219` | Pi Camera v2 | 3280 × 2464 | Fixed focus |
+
+`camera_profile.rs` holds the sensor-specific resolution, focus capabilities,
+and preview-mode choices. The shared rpicam backend owns file capture, JPEG
+validation, camera locking and orientation. Both normal capture and the lab
+(still and preview) use the same profile; the UI disables unsupported focus
+controls. Add future rpicam-compatible sensors here rather than scattering
+sensor checks through the application. A USB/OpenCV camera would require a
+separate capture backend, not merely another sensor profile.
+
+Profiles are selected explicitly; they do not install kernel drivers or identify
+a disconnected sensor. The default stays `imx519` for existing installations.
+`DAILY_MIRROR_CAMERA_ARGS` remains an advanced override for normal capture only;
+it replaces profile-generated arguments, so remove stale overrides when changing
+sensors. Preview and lab stills continue to use the selected profile.
+
+`local` mode saves button and admin captures in `data/local`, never queues or
+uploads them, disables upload retries, and ignores server credentials even if
+present. The admin page shows the latest 24 local photos, with full-resolution
+links. This page is accessible on the LAN. Files remain until manually removed;
+monitor free disk space during development. `capture-once --no-upload` also uses
+this separate local directory, even when configured for upload mode.
+
+`upload` mode retains the existing durable queue/retry behavior in `data/pending`.
+Switching to upload mode does not sweep local photos into that queue. The two
+directories must be distinct. The code defaults to `upload` for compatibility;
+the example environment explicitly selects `local` for new development setups.
+The standalone `upload` command refuses to run in local mode.
+
+On rpi2, uploads are disabled and production credentials have been removed.
+The camera is now confirmed as OV5647. Automatic detection missed it; explicitly
+loading `ov5647` detected the sensor and produced a valid 2592 × 1944 local JPEG.
+Boot configuration now sets `camera_auto_detect=0` and `dtoverlay=ov5647`.
+Runtime detection and capture are verified; boot persistence is configured but
+has not yet been tested by rebooting. The admin `camera_available` API field
+remains an executable check, not a sensor probe.
+
+### Inspect local test photos
+
+In local capture mode, click a photo in **Local test photos** to open the
+in-page viewer. Use the newer/older buttons or left/right arrow keys to move
+through the listed photos; Escape or Close returns to the grid. **100%** shows
+native image detail with scrolling, and **Fit** returns to the whole frame.
+The Metadata button hides or shows the overlay without leaving the image.
+
+The overlay reads embedded JPEG EXIF: exposure, ISO, reported focus distance,
+camera/software, timestamp, and other supported fields, plus file size and
+displayed dimensions. Missing fields are explicitly unavailable; current lab
+settings are never attributed to old captures. EXIF timestamps have no assumed
+timezone, and reported focus distance is not a measurement of subject distance.
+This does not change capture processing or rewrite the originals.
+
+Parser checks: `node device/tests/local_photo_viewer.test.cjs` from the repository root.

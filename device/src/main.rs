@@ -28,7 +28,15 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 use uuid::Uuid;
 
+mod camera_profile;
+mod capture_mode;
 mod lab;
+use camera_profile::CameraProfile;
+use capture_mode::CaptureMode;
+mod led;
+mod local_photos;
+
+use led::LedMode;
 
 use lab::{CameraLab, CameraOrientation, LabSettings, load_orientation};
 
@@ -55,7 +63,7 @@ enum DeviceCommand {
     Upload { path: PathBuf },
     /// Retry every JPEG already in the durable queue.
     Retry,
-    /// Run continuously with the physical button and three status LEDs.
+    /// Run continuously with the physical button and configured status LEDs.
     Run,
 }
 
@@ -72,24 +80,46 @@ struct Config {
     green_led_pin: u8,
     yellow_led_pin: u8,
     red_led_pin: u8,
+    led_mode: LedMode,
+    camera_profile: CameraProfile,
+    capture_mode: CaptureMode,
+    local_dir: PathBuf,
 }
 
 impl Config {
     fn from_env() -> Result<Self> {
+        let camera_profile = CameraProfile::parse(
+            &std::env::var("DAILY_MIRROR_CAMERA_PROFILE").unwrap_or_else(|_| "imx519".into()),
+        )?;
+        let capture_mode = CaptureMode::parse(
+            &std::env::var("DAILY_MIRROR_CAPTURE_MODE").unwrap_or_else(|_| "upload".into()),
+        )?;
         let camera_command = std::env::var("DAILY_MIRROR_CAMERA_COMMAND")
             .unwrap_or_else(|_| detect_camera_command());
         let camera_args = std::env::var("DAILY_MIRROR_CAMERA_ARGS")
             .ok()
             .map(|value| shlex::split(&value).ok_or_else(|| anyhow!("invalid camera arguments")))
             .transpose()?
-            .unwrap_or_else(default_camera_args);
+            .unwrap_or_else(|| camera_profile.capture_args());
 
+        let queue_dir = std::env::var_os("DAILY_MIRROR_QUEUE_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("data/pending"));
+        let local_dir = std::env::var_os("DAILY_MIRROR_LOCAL_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("data/local"));
+        fs::create_dir_all(&queue_dir)?;
+        fs::create_dir_all(&local_dir)?;
+        if fs::canonicalize(&queue_dir)? == fs::canonicalize(&local_dir)? {
+            bail!("Local photo directory must be separate from the upload queue");
+        }
         Ok(Self {
+            camera_profile,
+            capture_mode,
+            local_dir,
             server_url: std::env::var("DAILY_MIRROR_SERVER_URL").ok(),
             upload_token: std::env::var("DAILY_MIRROR_UPLOAD_TOKEN").ok(),
-            queue_dir: std::env::var_os("DAILY_MIRROR_QUEUE_DIR")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("data/pending")),
+            queue_dir,
             camera_command,
             camera_args,
             camera_settings_path: std::env::var_os("DAILY_MIRROR_CAMERA_SETTINGS_PATH")
@@ -101,6 +131,9 @@ impl Config {
             green_led_pin: env_pin("DAILY_MIRROR_GREEN_LED_PIN", 17)?,
             yellow_led_pin: env_pin("DAILY_MIRROR_YELLOW_LED_PIN", 27)?,
             red_led_pin: env_pin("DAILY_MIRROR_RED_LED_PIN", 22)?,
+            led_mode: LedMode::parse(
+                &std::env::var("DAILY_MIRROR_LED_MODE").unwrap_or_else(|_| "discrete".to_owned()),
+            )?,
         })
     }
 
@@ -116,14 +149,17 @@ impl Config {
 fn main() -> Result<()> {
     dotenvy::dotenv().ok();
     let cli = Cli::parse();
-    let config = Config::from_env()?;
+    let mut config = Config::from_env()?;
+    if matches!(cli.command, DeviceCommand::CaptureOnce { no_upload: true }) {
+        config.capture_mode = CaptureMode::Local;
+    }
     let device = Device::new(config)?;
 
     match cli.command {
         DeviceCommand::CaptureOnce { no_upload } => {
             let capture = device.camera.capture()?;
             println!("captured {}", capture.display());
-            if !no_upload {
+            if !no_upload && device.config.capture_mode == CaptureMode::Upload {
                 match device.uploader.upload(&capture) {
                     Ok(()) => println!("uploaded {}", capture.display()),
                     Err(error) => {
@@ -133,6 +169,9 @@ fn main() -> Result<()> {
             }
         }
         DeviceCommand::Upload { path } => {
+            if device.config.capture_mode == CaptureMode::Local {
+                bail!("Uploads are disabled in local mode");
+            }
             let queued = device.camera.queue_existing(&path)?;
             device.uploader.upload(&queued)?;
             println!("uploaded {}", path.display());
@@ -185,6 +224,7 @@ impl Device {
             Arc::clone(&self.camera.camera_lock),
             Arc::clone(&self.camera.orientation),
             self.camera.orientation_path.clone(),
+            self.config.camera_profile,
         );
         let led_test_active = Arc::new(AtomicBool::new(false));
         self.start_admin_server(Arc::clone(&leds), Arc::clone(&led_test_active), lab.clone())?;
@@ -259,7 +299,7 @@ impl Device {
         set_runtime_status(
             &self.runtime_status,
             "countdown",
-            "Get ready — autofocus starting",
+            "Get ready — camera starting",
         );
         let pending = match self.camera.start_capture() {
             Ok(pending) => pending,
@@ -303,7 +343,7 @@ impl Device {
         set_runtime_status(
             &self.runtime_status,
             "processing",
-            "Uploading the new photo",
+            self.config.capture_mode.processing_message(),
         );
         let mut pulse = leds
             .lock()
@@ -318,7 +358,7 @@ impl Device {
                 set_runtime_status(
                     &self.runtime_status,
                     "success",
-                    "Photo uploaded successfully",
+                    self.config.capture_mode.success_message(),
                 );
                 leds.lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -384,6 +424,7 @@ impl Device {
 
 #[derive(Clone)]
 struct Camera {
+    profile: CameraProfile,
     command: String,
     args: Vec<String>,
     queue_dir: PathBuf,
@@ -398,9 +439,14 @@ impl Camera {
             .with_context(|| format!("create queue directory {}", config.queue_dir.display()))?;
         let orientation = load_orientation(&config.camera_settings_path)?;
         Ok(Self {
+            profile: config.camera_profile,
             command: config.camera_command.clone(),
             args: config.camera_args.clone(),
-            queue_dir: config.queue_dir.clone(),
+            queue_dir: if config.capture_mode == CaptureMode::Local {
+                config.local_dir.clone()
+            } else {
+                config.queue_dir.clone()
+            },
             camera_lock: Arc::new(Mutex::new(())),
             orientation: Arc::new(RwLock::new(orientation)),
             orientation_path: config.camera_settings_path.clone(),
@@ -477,21 +523,9 @@ impl Camera {
         let metadata_path =
             std::env::temp_dir().join(format!("daily-mirror-lab-{}.json", capture_id()));
         let output = Command::new(&self.command)
-            .args([
-                "--nopreview",
-                "--timeout",
-                "3000",
-                "--width",
-                "4656",
-                "--height",
-                "3496",
-                "--encoding",
-                "jpg",
-                "--quality",
-                "95",
-            ])
+            .args(self.profile.still_args())
             .args(settings.still_camera_args())
-            .args(settings.focus_args(true))
+            .args(self.profile.focus_args(settings, true))
             .args(["--metadata-format", "json", "--metadata"])
             .arg(&metadata_path)
             .args(["--output", "-"])
@@ -598,6 +632,7 @@ fn apply_orientation(path: &Path, orientation: &CameraOrientation) {
 
 #[derive(Clone)]
 struct Uploader {
+    mode: CaptureMode,
     client: Client,
     upload_url: Option<String>,
     upload_token: Option<String>,
@@ -622,17 +657,29 @@ struct UploadGrant {
 impl Uploader {
     fn new(config: &Config) -> Result<Self> {
         Ok(Self {
+            mode: config.capture_mode,
             client: Client::builder()
                 .connect_timeout(Duration::from_secs(10))
                 .timeout(Duration::from_secs(90))
                 .build()?,
-            upload_url: config.upload_url().ok(),
-            upload_token: config.upload_token.clone(),
+            upload_url: if config.capture_mode == CaptureMode::Local {
+                None
+            } else {
+                config.upload_url().ok()
+            },
+            upload_token: if config.capture_mode == CaptureMode::Local {
+                None
+            } else {
+                config.upload_token.clone()
+            },
             queue_dir: config.queue_dir.clone(),
         })
     }
 
     fn upload(&self, path: &Path) -> Result<()> {
+        if self.mode == CaptureMode::Local {
+            return Ok(());
+        }
         let grant_url = self
             .upload_url
             .as_deref()
@@ -734,6 +781,9 @@ impl Uploader {
     }
 
     fn retry_all(&self) -> Result<usize> {
+        if self.mode == CaptureMode::Local {
+            return Ok(0);
+        }
         let mut queued = fs::read_dir(&self.queue_dir)?
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
             .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("jpg"))
@@ -749,6 +799,9 @@ impl Uploader {
     }
 
     fn pending_count(&self) -> Result<usize> {
+        if self.mode == CaptureMode::Local {
+            return Ok(0);
+        }
         Ok(fs::read_dir(&self.queue_dir)?
             .filter_map(Result::ok)
             .filter(|entry| {
@@ -809,11 +862,15 @@ struct AdminStatus {
     pending_photos: usize,
     camera_command: String,
     camera_available: bool,
+    camera_profile: &'static str,
+    camera_autofocus: bool,
+    capture_mode: &'static str,
     server_url: Option<String>,
     button_pin: u8,
     green_led_pin: u8,
     yellow_led_pin: u8,
     red_led_pin: u8,
+    led_mode: &'static str,
     green_on: bool,
     yellow_on: bool,
     red_on: bool,
@@ -845,6 +902,8 @@ struct HealthResponse {
     phase: String,
     camera_available: bool,
     upload_configured: bool,
+    capture_mode: &'static str,
+    camera_profile: &'static str,
     pending_photos: usize,
     revision: u64,
     cpu_temperature_celsius: Option<f64>,
@@ -872,11 +931,19 @@ impl AdminState {
             pending_photos: self.uploader.pending_count().unwrap_or_default(),
             camera_available: Path::new(&self.camera.command).exists(),
             camera_command: self.camera.command.clone(),
-            server_url: self.config.server_url.clone(),
+            server_url: if self.config.capture_mode == CaptureMode::Local {
+                None
+            } else {
+                self.config.server_url.clone()
+            },
+            camera_profile: self.config.camera_profile.name(),
+            camera_autofocus: self.config.camera_profile.autofocus(),
+            capture_mode: self.config.capture_mode.name(),
             button_pin: self.config.button_pin,
             green_led_pin: self.config.green_led_pin,
             yellow_led_pin: self.config.yellow_led_pin,
             red_led_pin: self.config.red_led_pin,
+            led_mode: self.config.led_mode.name(),
             green_on: runtime.green_on,
             yellow_on: runtime.yellow_on,
             red_on: runtime.red_on,
@@ -906,7 +973,7 @@ impl AdminState {
         set_runtime_status(
             &self.runtime_status,
             "countdown",
-            "Get ready — autofocus starting",
+            "Get ready — camera starting",
         );
         let pending = self.camera.start_capture()?;
         self.leds
@@ -928,7 +995,7 @@ impl AdminState {
             set_runtime_status(
                 &self.runtime_status,
                 "processing",
-                "Uploading the new photo",
+                self.config.capture_mode.processing_message(),
             );
             let mut pulse = self
                 .leds
@@ -939,7 +1006,10 @@ impl AdminState {
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .while_processing(&mut pulse, || self.uploader.upload(&capture))?;
-            Ok(format!("Captured and uploaded {capture_id}"))
+            Ok(format!(
+                "{}: {capture_id}",
+                self.config.capture_mode.success_message()
+            ))
         })();
 
         match &result {
@@ -1046,6 +1116,9 @@ impl AdminState {
     }
 
     fn retry_uploads(&self) -> Result<String> {
+        if self.config.capture_mode == CaptureMode::Local {
+            return Ok("Uploads disabled — local photos are not queued".into());
+        }
         let _operation = self
             .operation_lock
             .lock()
@@ -1135,6 +1208,12 @@ fn admin_router(state: AdminState) -> Router {
         .route("/", get(admin_page))
         .route("/healthz", get(admin_health))
         .route("/api/status", get(admin_status))
+        .route(
+            "/local-photo-viewer.js",
+            get(admin_local_photo_viewer_script),
+        )
+        .route("/api/local/photos", get(admin_local_photos))
+        .route("/api/local/photos/{name}", get(admin_local_photo))
         .route("/api/events", get(admin_events))
         .route("/api/actions/capture", post(admin_capture))
         .route("/api/actions/retry", post(admin_retry))
@@ -1156,11 +1235,51 @@ async fn admin_status(State(state): State<AdminState>) -> Json<AdminStatus> {
     Json(state.snapshot())
 }
 
+async fn admin_local_photo_viewer_script() -> impl IntoResponse {
+    (
+        [
+            ("content-type", "text/javascript; charset=utf-8"),
+            ("cache-control", "no-cache"),
+        ],
+        include_str!("local_photo_viewer.js"),
+    )
+}
+
+async fn admin_local_photos(State(state): State<AdminState>) -> Response {
+    if state.config.capture_mode != CaptureMode::Local {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    match local_photos::list(&state.config.local_dir) {
+        Ok(names) => Json(names).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+async fn admin_local_photo(
+    AxumPath(name): AxumPath<String>,
+    State(state): State<AdminState>,
+) -> Response {
+    if state.config.capture_mode != CaptureMode::Local {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    match local_photos::resolve(&state.config.local_dir, &name).and_then(|p| Ok(fs::read(p)?)) {
+        Ok(bytes) => (
+            [
+                ("content-type", "image/jpeg"),
+                ("cache-control", "no-store"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
 async fn admin_health(State(state): State<AdminState>) -> (StatusCode, Json<HealthResponse>) {
     let snapshot = state.snapshot();
     let upload_configured = snapshot.server_url.is_some();
     let healthy = snapshot.camera_available
-        && upload_configured
+        && (upload_configured || snapshot.capture_mode == "local")
         && !matches!(snapshot.phase.as_str(), "starting" | "error");
     let status = if healthy {
         StatusCode::OK
@@ -1175,6 +1294,8 @@ async fn admin_health(State(state): State<AdminState>) -> (StatusCode, Json<Heal
             phase: snapshot.phase,
             camera_available: snapshot.camera_available,
             upload_configured,
+            capture_mode: snapshot.capture_mode,
+            camera_profile: snapshot.camera_profile,
             pending_photos: snapshot.pending_photos,
             revision: snapshot.revision,
             cpu_temperature_celsius: snapshot.cpu_temperature_celsius,
@@ -1415,6 +1536,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
         <dl>
           <dt>Uptime</dt><dd id="uptime">—</dd>
           <dt>Camera</dt><dd id="camera">—</dd>
+          <dt>Capture mode</dt><dd id="capture-mode">—</dd>
           <dt>Queued photos</dt><dd id="pending">—</dd>
           <dt>GPIO</dt><dd id="gpio">—</dd>
         </dl>
@@ -1436,9 +1558,14 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
           <button class="secondary" data-action="/api/actions/retry">Retry uploads</button>
           <a class="button secondary" id="gallery" target="_blank" rel="noreferrer">Open gallery</a>
         </div>
-        <p class="result" id="result">Controls operate the same durable queue as the physical button.</p>
+        <p class="result" id="result">Capture uses the same mode as the physical button.</p>
       </section>
     </div>
+    <section class="card" id="local-photos" hidden>
+      <h2>Local test photos</h2>
+      <p>Saved on this Pi only. These photos are never added to the upload queue.</p>
+      <div id="local-photo-list">No local photos yet.</div>
+    </section>
     <section class="card lab">
       <h2>Camera lab · local only</h2>
       <div class="lab-layout">
@@ -1521,6 +1648,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
     </section>
     <footer>LAN-only prototype · live status over a persistent event stream</footer>
   </main>
+  <script src="/local-photo-viewer.js"></script>
   <script>
     const byId = id => document.getElementById(id);
     const duration = seconds => seconds < 60 ? `${seconds}s` : seconds < 3600 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${Math.floor(seconds / 3600)}h ${Math.floor(seconds % 3600 / 60)}m`;
@@ -1552,6 +1680,36 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
     let labFrameLoading = false;
     let labObjectUrl = null;
     let labCaptureLoaded = false;
+    let localPhotosLoading = false;
+    let localPhotosKey = null;
+    async function refreshLocalPhotos() {
+      if (localPhotosLoading) return;
+      localPhotosLoading = true;
+      try {
+        const response = await fetch('/api/local/photos');
+        if (!response.ok) throw new Error('Could not load local photos');
+        const names = await response.json();
+        const key = JSON.stringify(names);
+        if (key === localPhotosKey) return;
+        localPhotosKey = key;
+        window.localPhotoViewer.setPhotos(names);
+        const container = byId('local-photo-list');
+        container.replaceChildren();
+        if (!names.length) container.textContent = 'No local photos yet.';
+        for (const name of names) {
+          const button = document.createElement('button');
+          button.type = 'button'; button.className = 'local-photo-tile';
+          button.setAttribute('aria-label', `View ${name}`);
+          button.onclick = () => window.localPhotoViewer.open(name, button);
+          const image = document.createElement('img');
+          image.src = `/api/local/photos/${encodeURIComponent(name)}`;
+          image.alt = ''; image.loading = 'lazy';
+          const label = document.createElement('span'); label.textContent = name;
+          button.append(image, label); container.appendChild(button);
+        }
+      } catch (error) { byId('local-photo-list').textContent = error.message; localPhotosKey = null; }
+      finally { localPhotosLoading = false; }
+    }
     function render(status) {
       lastStatus = status;
       uptimeBase = status.uptime_seconds;
@@ -1560,9 +1718,16 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       byId('phase').textContent = status.phase;
       byId('message').textContent = status.message;
       byId('uptime').textContent = duration(status.uptime_seconds);
-      byId('camera').textContent = status.camera_available ? 'IMX519 online' : 'unavailable';
+      byId('camera').textContent = `${status.camera_profile} · ${status.camera_available ? 'capture tool installed' : 'capture tool missing'}`;
+      const local = status.capture_mode === 'local';
+      byId('capture-mode').textContent = local ? 'Local only — no uploads' : 'Upload to server';
+      byId('local-photos').hidden = !local;
+      document.querySelector('[data-action="/api/actions/retry"]').hidden = local;
+      document.querySelector('[data-action="/api/actions/capture"]').textContent = local ? 'Capture locally' : 'Capture now';
+      document.querySelectorAll('[name^="autofocus_"], [name="lens_position"], [data-focus-feet]').forEach(el => { el.disabled = !status.camera_autofocus; });
+      if (local) refreshLocalPhotos();
       byId('pending').textContent = status.pending_photos;
-      byId('gpio').textContent = `button ${status.button_pin} · LEDs ${status.green_led_pin}/${status.yellow_led_pin}/${status.red_led_pin}`;
+      byId('gpio').textContent = `button P${status.button_pin} · ${status.led_mode} · outputs P${status.green_led_pin}/P${status.yellow_led_pin}/P${status.red_led_pin}`;
       byId('temperature').textContent = status.cpu_temperature_celsius == null ? '—' : `${status.cpu_temperature_celsius.toFixed(1)} °C`;
       byId('load').textContent = status.load_average_one_minute == null ? '—' : status.load_average_one_minute.toFixed(2);
       byId('memory').textContent = `${bytes(status.memory_used_bytes)} / ${bytes(status.memory_total_bytes)}`;
@@ -1643,13 +1808,15 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       for (const name of ['ev', 'brightness', 'contrast', 'saturation', 'sharpness']) {
         byId(name + '-value').textContent = form.elements.namedItem(name).value;
       }
+      const fixedFocus = lastStatus?.camera_autofocus === false;
       const manual = form.elements.namedItem('autofocus_mode').value === 'manual';
-      document.querySelectorAll('[data-focus-control="manual"]').forEach(node => node.hidden = !manual);
-      document.querySelectorAll('[data-focus-control="auto"]').forEach(node => node.hidden = manual);
+      document.querySelectorAll('[data-focus-control="manual"]').forEach(node => node.hidden = fixedFocus || !manual);
+      document.querySelectorAll('[data-focus-control="auto"]').forEach(node => node.hidden = fixedFocus || manual);
       const lensPosition = Number(form.elements.namedItem('lens_position').value);
       byId('focus-distance').textContent = lensPosition > 0 ? (3.28084 / lensPosition).toFixed(2) + ' ft' : 'infinity';
+      if (fixedFocus) byId('focus-distance').textContent = 'Fixed-focus camera';
       const focusWindow = byId('focus-window');
-      focusWindow.hidden = manual;
+      focusWindow.hidden = fixedFocus || manual;
       focusWindow.style.left = Number(form.elements.namedItem('autofocus_window_x').value) * 100 + '%';
       focusWindow.style.top = Number(form.elements.namedItem('autofocus_window_y').value) * 100 + '%';
       focusWindow.style.width = Number(form.elements.namedItem('autofocus_window_width').value) * 100 + '%';
@@ -1692,7 +1859,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
 
     async function refreshLabFrame() {
       if (!lastStatus?.lab_preview_running) return;
-      await loadLabImage(`/api/lab/frame.jpg?t=${Date.now()}`, 'Live IMX519 camera preview');
+      await loadLabImage(`/api/lab/frame.jpg?t=${Date.now()}`, 'Live camera preview');
     }
     async function refresh() {
       try {
@@ -1797,6 +1964,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
 </html>"#;
 
 struct LedPanel {
+    mode: LedMode,
     green: OutputPin,
     yellow: OutputPin,
     red: OutputPin,
@@ -1813,10 +1981,20 @@ impl LedPanel {
         config: &Config,
         runtime_status: watch::Sender<RuntimeStatus>,
     ) -> Result<Self> {
+        let off_high = config.led_mode == LedMode::RgbCommonAnode;
+        let output = |pin| -> Result<OutputPin> {
+            let pin = gpio.get(pin)?;
+            Ok(if off_high {
+                pin.into_output_high()
+            } else {
+                pin.into_output_low()
+            })
+        };
         let mut panel = Self {
-            green: gpio.get(config.green_led_pin)?.into_output_low(),
-            yellow: gpio.get(config.yellow_led_pin)?.into_output_low(),
-            red: gpio.get(config.red_led_pin)?.into_output_low(),
+            mode: config.led_mode,
+            green: output(config.green_led_pin)?,
+            yellow: output(config.yellow_led_pin)?,
+            red: output(config.red_led_pin)?,
             runtime_status,
         };
         panel.set(false, false, false);
@@ -1825,26 +2003,27 @@ impl LedPanel {
 
     fn set(&mut self, green_on: bool, yellow_on: bool, red_on: bool) {
         let _ = self.green.clear_pwm();
-        if green_on {
-            self.green.set_high();
-        } else {
-            self.green.set_low();
-        }
-        if yellow_on {
-            self.yellow.set_high();
-        } else {
-            self.yellow.set_low();
-        }
-        if red_on {
-            self.red.set_high();
-        } else {
-            self.red.set_low();
+        let levels = self.mode.levels(green_on, yellow_on, red_on);
+        for (pin, high) in [&mut self.green, &mut self.yellow, &mut self.red]
+            .into_iter()
+            .zip(levels)
+        {
+            if high {
+                pin.set_high();
+            } else {
+                pin.set_low();
+            }
         }
         set_led_status(&self.runtime_status, green_on, yellow_on, red_on);
     }
 
     fn ready(&mut self, has_queued_photos: bool) {
-        self.set(true, false, has_queued_photos);
+        // An RGB LED cannot show separate green and red: that would look like countdown yellow.
+        self.set(
+            !has_queued_photos || self.mode == LedMode::Discrete,
+            false,
+            has_queued_photos,
+        );
     }
 
     fn countdown(&mut self) {
@@ -1871,9 +2050,13 @@ impl LedPanel {
     }
 
     fn processing_tick(&mut self, pulse: &mut ProcessingPulse) {
-        let duty_cycle = processing_duty_cycle(pulse.step);
+        let duty_cycle = self.mode.high_duty_cycle(processing_duty_cycle(pulse.step));
         if self.green.set_pwm_frequency(100.0, duty_cycle).is_err() {
-            self.green.set_high();
+            if self.mode == LedMode::RgbCommonAnode {
+                self.green.set_low();
+            } else {
+                self.green.set_high();
+            }
         }
         pulse.step = pulse.step.wrapping_add(1);
     }
@@ -1928,31 +2111,9 @@ fn processing_duty_cycle(step: u32) -> f64 {
     0.12 + 0.58 * ((phase - std::f64::consts::FRAC_PI_2).sin() + 1.0) / 2.0
 }
 
+#[cfg(test)]
 fn default_camera_args() -> Vec<String> {
-    [
-        "--nopreview",
-        "--timeout",
-        "3000",
-        "--encoding",
-        "jpg",
-        "--quality",
-        "95",
-        "--autofocus-mode",
-        "continuous",
-        "--autofocus-range",
-        "normal",
-        "--autofocus-speed",
-        "fast",
-        "--autofocus-window",
-        "0.2,0.15,0.6,0.7",
-        "--metadata-format",
-        "json",
-        "--metadata",
-        "-",
-    ]
-    .into_iter()
-    .map(str::to_owned)
-    .collect()
+    CameraProfile::Imx519.capture_args()
 }
 
 fn capture_id() -> String {
@@ -2084,6 +2245,32 @@ mod tests {
         ADMIN_PAGE, capture_id, default_camera_args, processing_duty_cycle, validate_jpeg_file,
     };
     use std::io::Write;
+
+    #[test]
+    fn local_dispatch_retains_files_and_never_sends_or_retries_uploads() {
+        let root = std::env::temp_dir().join(format!("local-dispatch-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let photo = root.join("test.jpg");
+        std::fs::write(&photo, b"retained photo").unwrap();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let uploader = super::Uploader {
+            mode: super::CaptureMode::Local,
+            client: reqwest::blocking::Client::new(),
+            upload_url: Some(format!(
+                "http://{}/api/uploads",
+                listener.local_addr().unwrap()
+            )),
+            upload_token: Some("must-not-leave-device".into()),
+            queue_dir: root.clone(),
+        };
+        uploader.upload(&photo).unwrap();
+        assert_eq!(uploader.retry_all().unwrap(), 0);
+        assert_eq!(uploader.pending_count().unwrap(), 0);
+        assert!(listener.accept().is_err());
+        assert_eq!(std::fs::read(&photo).unwrap(), b"retained photo");
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn capture_ids_are_safe_and_sortable() {

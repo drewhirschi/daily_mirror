@@ -1,3 +1,4 @@
+use crate::camera_profile::CameraProfile;
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -13,7 +14,6 @@ use serde::{Deserialize, Serialize};
 const PREVIEW_WIDTH: &str = "960";
 const PREVIEW_HEIGHT: &str = "720";
 const PREVIEW_FRAMERATE: &str = "8";
-const PREVIEW_SENSOR_MODE: &str = "2328:1748:10:P";
 const PREVIEW_QUALITY: &str = "90";
 const MAX_PREVIEW_JPEG_BYTES: usize = 4 * 1024 * 1024;
 
@@ -318,6 +318,7 @@ fn save_orientation(path: &Path, orientation: &CameraOrientation) -> Result<()> 
 
 #[derive(Clone)]
 pub struct CameraLab {
+    profile: CameraProfile,
     camera_lock: Arc<Mutex<()>>,
     orientation: Arc<RwLock<CameraOrientation>>,
     orientation_path: PathBuf,
@@ -341,12 +342,14 @@ impl CameraLab {
         camera_lock: Arc<Mutex<()>>,
         orientation: Arc<RwLock<CameraOrientation>>,
         orientation_path: PathBuf,
+        profile: CameraProfile,
     ) -> Self {
         let initial_orientation = orientation
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone();
         Self {
+            profile,
             camera_lock,
             orientation,
             orientation_path,
@@ -425,10 +428,17 @@ impl CameraLab {
         let preview = Arc::clone(&self.preview);
         let command = self.preview_command.clone();
         let settings = self.settings();
+        let profile = self.profile;
         let spawn_result = thread::Builder::new()
             .name("daily-mirror-preview".to_owned())
             .spawn(move || {
-                let result = run_preview(command, camera_lock, Arc::clone(&preview), settings);
+                let result = run_preview(
+                    command,
+                    camera_lock,
+                    Arc::clone(&preview),
+                    settings,
+                    profile,
+                );
                 if let Err(error) = result {
                     *preview
                         .last_error
@@ -529,6 +539,7 @@ fn run_preview(
     camera_lock: Arc<Mutex<()>>,
     preview: Arc<PreviewState>,
     settings: LabSettings,
+    profile: CameraProfile,
 ) -> Result<()> {
     let _camera = camera_lock
         .lock()
@@ -544,8 +555,6 @@ fn run_preview(
             "0",
             "--codec",
             "mjpeg",
-            "--mode",
-            PREVIEW_SENSOR_MODE,
             "--width",
             PREVIEW_WIDTH,
             "--height",
@@ -558,8 +567,9 @@ fn run_preview(
             "--output",
             "-",
         ])
+        .args(profile.preview_args())
         .args(settings.camera_args())
-        .args(settings.focus_args(false))
+        .args(profile.focus_args(&settings, false))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())

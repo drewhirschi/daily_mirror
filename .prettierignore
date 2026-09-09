@@ -1,0 +1,7 @@
+node_modules/
+mobile/dist/
+mobile/ios/
+mobile/android/
+mobile/.expo/
+packages/api/src/schema.d.ts
+server/

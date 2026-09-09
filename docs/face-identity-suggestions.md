@@ -8,9 +8,10 @@ using the updated examples.
 A suggested face shows the person's name and cosine similarity. This score
 is not a calibrated probability. Click **Confirm [name]** to save immediately.
 You can also choose a different person in the dropdown, then use **Save changes**
-in the toolbar. Only after saving does
-the face become confirmed, appear in that person's flipbook, and contribute to
-future matching. Discard cancels staged edits.
+in the toolbar. Suggested faces already appear in that person's flipbook.
+Only after saving does the face become confirmed and contribute to future
+matching. Discard cancels staged edits. Flipbooks choose one frame per day,
+preferring confirmed matches over suggestions when both are available.
 
 Choosing Unknown and saving explicitly rejects automatic assignment for that
 face. Future suggestion refreshes preserve that decision. Assigning a person

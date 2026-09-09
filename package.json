@@ -1,0 +1,21 @@
+{
+  "name": "daily-mirror",
+  "private": true,
+  "workspaces": [
+    "mobile",
+    "packages/*"
+  ],
+  "scripts": {
+    "mobile": "npm run start --workspace @daily-mirror/mobile",
+    "ios": "npm run ios --workspace @daily-mirror/mobile",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "node --import tsx --test packages/api/test/*.test.ts mobile/test/*.test.ts",
+    "api:generate": "npm --prefix server run client:generate && npm run generate --workspace @daily-mirror/api",
+    "mobile:export": "npm run export:ios --workspace @daily-mirror/mobile"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.2"
+  }
+}

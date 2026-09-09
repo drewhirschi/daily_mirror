@@ -22,7 +22,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            server/package-lock.json
+            package-lock.json
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.96.0
@@ -41,6 +43,8 @@ jobs:
         run: node .nextrs/ensure-client.mjs
       - name: Install web dependencies
         working-directory: server
+        run: npm ci
+      - name: Install mobile workspace dependencies
         run: npm ci
       - name: Run all checks
         run: just check

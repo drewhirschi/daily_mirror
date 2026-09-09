@@ -25,6 +25,7 @@ doctor:
 # Install the locked web dependencies, including the project-local Vercel CLI.
 install:
     cd server && node .nextrs/ensure-client.mjs && npm ci
+    npm ci
 
 # Configure this clone to run the full quality suite before every Git push.
 install-hooks:
@@ -42,12 +43,30 @@ auth-create-user username:
 # Regenerate the typed web client after changing a Rust API route.
 client:
     cd server && npm run client:generate
+    npm run generate --workspace @daily-mirror/api
+
+# Start Metro for the native Expo development client.
+mobile:
+    npm run mobile
+
+# Build the iOS development client on this Mac.
+mobile-ios:
+    npm run ios
+
+# Validate the shared client, native app, and iOS bundle without a Mac.
+mobile-check:
+    npm run typecheck
+    npm test
+    npm run mobile:export
 
 # Format, compile, type-check, and test both Rust applications.
 check:
     cd device && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
     cd processor && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
     cd server && npm run client:generate && cargo fmt --check && cargo clippy --all-targets -- -D warnings -A clippy::match-single-binding && npm run typecheck && cargo test
+    npm run generate --workspace @daily-mirror/api
+    git diff --exit-code -- packages/api/src/schema.d.ts
+    just mobile-check
     git diff --check
 
 # Show one environment's pending, leased, complete, and failed processing counts.

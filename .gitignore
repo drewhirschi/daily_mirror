@@ -1,4 +1,9 @@
 venv/
+node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/ios/
+mobile/android/
 # data/**/*.png
 snapr/target/
 .wrangler/

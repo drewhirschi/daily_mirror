@@ -8,6 +8,10 @@ identity recognition, comparison, notes, alignment, or time-lapse generation.
 
 ## Repository layout
 
+- `mobile/` — native Expo iOS gallery and account app, with a persistent,
+  bounded thumbnail cache. See [`docs/mobile.md`](docs/mobile.md).
+- `packages/api/` — portable TypeScript API client with types generated from
+  the Rust server's OpenAPI contract.
 - `device/` — new Rust Raspberry Pi client: camera command, GPIO button and
   three LEDs, durable upload queue, and retries.
 - `server/` — new NextRS/Axum API, local filesystem storage, React gallery,
@@ -89,3 +93,8 @@ type-check the gallery, and test all Rust applications. Run
 `just install-hooks` once per clone to make the same suite a mandatory local
 pre-push hook. GitHub Actions runs it again for every push and pull request,
 and production deployment refuses to start until it passes.
+
+The root npm workspace manages mobile and shared TypeScript packages; the
+NextRS server keeps its existing generated-client workspace. Run `npm ci` at
+the repository root to install mobile dependencies, then `npm run mobile` for
+Metro or `npm run ios` on a Mac to build and open the simulator.

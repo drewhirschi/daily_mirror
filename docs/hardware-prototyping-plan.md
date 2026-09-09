@@ -1,5 +1,11 @@
 # Daily Mirror hardware prototyping plan
 
+> Current next-version direction (2026-09-05): Raspberry Pi 4 Model B,
+> a camera mount, and one probably-white LED. Follow
+> [the next enclosure plan](next-enclosure-plan.md) for the immediate build.
+> The RGB ring and illuminated-button requirements below are earlier proposals,
+> not requirements for this version.
+
 ## Goal
 
 Turn the working Raspberry Pi, IMX519 camera, pushbutton, and loose LED wiring

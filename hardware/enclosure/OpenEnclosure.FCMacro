@@ -1,0 +1,17 @@
+# Run using Macro > Macros in FreeCAD; opens the generated model with clean visibility.
+import json
+from pathlib import Path
+import FreeCAD as App
+import FreeCADGui as Gui
+root = Path('/home/drew/work/daily_mirror/hardware/enclosure/output')
+existing = App.getDocument('DailyMirrorEnclosure') if 'DailyMirrorEnclosure' in App.listDocuments() else None
+doc = existing or App.openDocument(str(root / 'DailyMirrorEnclosure.FCStd'))
+scene = {s['name']: s for s in json.loads((root / 'scene.json').read_text())}
+for obj in doc.Objects:
+    if obj.ViewObject:
+        obj.ViewObject.Visibility = obj.Name in scene
+        if obj.Name in scene:
+            obj.ViewObject.ShapeColor = tuple(scene[obj.Name]['color'])
+            obj.ViewObject.Transparency = 65 if scene[obj.Name]['reference'] else 0
+Gui.activeDocument().activeView().viewAxonometric()
+Gui.activeDocument().activeView().fitAll()

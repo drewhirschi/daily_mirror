@@ -106,3 +106,47 @@ just pi-health       # live Pi version and status
 just pi-status       # systemd status
 just pi-logs         # latest service logs
 ```
+
+## Second Pi (rpi2)
+
+Provisioned 2026-09-08 at `drew@rpi2.local`, admin URL
+`http://rpi2.local:8081`, using the same service layout and production upload
+credentials as rpi1. Its `.env` selects `rgb-common-anode`, button GPIO2,
+green GPIO17, blue GPIO27 (legacy `YELLOW_LED_PIN` setting), and red GPIO22.
+Normal camera arguments omit IMX519 autofocus options. Camera identification
+and capture validation are pending: `rpicam-still --list-cameras` reported
+`No cameras available!` during provisioning. The user reports an older Pi
+camera, possibly Camera Rev 1.3; this is not yet confirmed. No camera overlay
+changes were made. Health's `camera_available` currently checks the executable,
+not sensor detection; do not treat that field as a passed capture test.
+
+Target this Pi explicitly for future deployments (the defaults remain rpi1):
+
+```sh
+DAILY_MIRROR_PI_HOST=drew@rpi2.local \
+DAILY_MIRROR_PI_ADMIN_URL=http://rpi2.local:8081 just pi-deploy
+```
+
+The unit is enabled at boot. GPIO initialization and the yellow/restore admin
+commands were exercised successfully; visible LED colors and the physical
+button still need user confirmation. No test photo/upload has been verified.
+
+### rpi2 development mode (supersedes initial upload setup)
+
+rpi2 now uses `DAILY_MIRROR_CAPTURE_MODE=local` and a provisional
+`DAILY_MIRROR_CAMERA_PROFILE=ov5647`. Its production URL and upload token have
+been removed. Normal captures are stored in `/home/drew/daily-mirror-device/data/local`
+and can be viewed on its admin page. They never enter the upload retry queue.
+Sensor detection remains unresolved; confirm the camera revision and ribbon
+connection before treating the profile as hardware-verified.
+
+### Camera detection resolved
+
+The runtime `ov5647` overlay successfully detected the sensor on rpi2 and a
+normal admin Capture action saved a valid 2592 × 1944 JPEG locally. No upload
+was attempted. The OV5647 profile is now confirmed, superseding the provisional
+identification above. `/boot/firmware/config.txt` was updated to
+`camera_auto_detect=0` plus `dtoverlay=ov5647` in an `[all]` section. Original
+configuration backup: `/boot/firmware/config.txt.before-daily-mirror-camera-20260909T023654Z`.
+The working runtime overlay was retained. No reboot was needed for the test;
+a future reboot is still needed to verify persistence end to end.

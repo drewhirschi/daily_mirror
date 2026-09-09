@@ -92,6 +92,11 @@ pub struct PeopleResponse {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PersonPhotosResponse {
+    pub photo_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct PersonFlipbook {
     pub id: String,
     pub display_name: String,
@@ -271,7 +276,7 @@ impl ProcessingQueue {
                  FROM people
                  LEFT JOIN faces ON faces.person_id = people.id
                                 AND faces.pipeline_version = ?1
-                                AND faces.identity_state = 'confirmed'
+                                AND faces.identity_state IN ('confirmed', 'proposed')
                  LEFT JOIN photos ON photos.id = faces.photo_id
                  GROUP BY people.id, people.display_name
                  ORDER BY people.display_name COLLATE NOCASE",
@@ -297,6 +302,27 @@ impl ProcessingQueue {
             person.frames = frames.remove(&person.id).unwrap_or_default();
         }
         Ok(PeopleResponse { people })
+    }
+
+    pub async fn person_photos(&self, person_id: &str) -> io::Result<PersonPhotosResponse> {
+        self.ensure_schema().await?;
+        let connection = self.catalog.connection().await?;
+        let mut rows = connection
+            .query(
+                "SELECT DISTINCT photos.id, photos.captured_at FROM photos
+             JOIN faces ON faces.photo_id = photos.id
+             WHERE photos.status = 'ready' AND faces.pipeline_version = ?1
+               AND faces.person_id = ?2 AND faces.identity_state IN ('confirmed', 'proposed')
+             ORDER BY photos.captured_at DESC, photos.id DESC",
+                params![active_pipeline_version()?, person_id],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let mut photo_ids = Vec::new();
+        while let Some(row) = rows.next().await.map_err(io::Error::other)? {
+            photo_ids.push(row.get(0).map_err(io::Error::other)?);
+        }
+        Ok(PersonPhotosResponse { photo_ids })
     }
 
     pub async fn create_person(&self, display_name: &str) -> io::Result<CreatePersonResponse> {
@@ -700,6 +726,8 @@ async fn people_frames(
     connection: &libsql::Connection,
     pipeline_version: &str,
 ) -> io::Result<HashMap<String, Vec<FlipbookFrame>>> {
+    // Suggested identities are useful for playback without becoming training
+    // examples. Profile enrollment remains manual-confirmed-only in face_matching.
     let mut rows = connection
         .query(
             "SELECT faces.id, faces.photo_id, photos.captured_at,
@@ -707,8 +735,9 @@ async fn people_frames(
              FROM faces
              JOIN photos ON photos.id = faces.photo_id
              WHERE faces.person_id IS NOT NULL AND faces.pipeline_version = ?1
-               AND faces.identity_state = 'confirmed'
+               AND faces.identity_state IN ('confirmed', 'proposed')
              ORDER BY substr(photos.captured_at, 1, 10) DESC,
+                      (faces.identity_state = 'confirmed') DESC,
                       faces.detector_confidence DESC, photos.captured_at DESC, faces.id",
             params![pipeline_version],
         )
@@ -940,6 +969,40 @@ mod tests {
         assert_eq!(people.people[0].day_count, 2);
         assert_eq!(people.people[0].frames.len(), 2);
 
+        // A suggested match fills a new day, but must not displace a manually
+        // confirmed match on the same day even with higher detector confidence.
+        let connection = catalog.connection().await.unwrap();
+        connection
+            .execute(
+                "UPDATE faces SET identity_state = 'proposed',
+                    identity_source = 'centroid-v1', detector_confidence = 0.99
+                 WHERE photo_id IN (?1, ?2)",
+                libsql::params![ids[1], ids[2]],
+            )
+            .await
+            .unwrap();
+        let people = queue.people_with_flipbooks().await.unwrap();
+        let book = &people.people[0];
+        assert_eq!(book.face_count, 3);
+        assert_eq!(book.day_count, 2);
+        assert_eq!(book.frames.len(), 2);
+        assert_eq!(book.frames[0].photo_id, ids[2]);
+        assert_eq!(book.frames[1].photo_id, ids[0]);
+        // Filtering keeps every matching photo, including multiple on one day.
+        assert_eq!(
+            queue.person_photos(&person.id).await.unwrap().photo_ids,
+            vec![ids[2], ids[1], ids[0]],
+        );
+        assert!(
+            queue
+                .person_photos("other-person")
+                .await
+                .unwrap()
+                .photo_ids
+                .is_empty()
+        );
+        queue.assign_faces(&assignments).await.unwrap();
+
         let removed_id = assignments[0].face_id.clone();
         queue
             .assign_faces(&[FaceAssignmentUpdate {
@@ -1048,6 +1111,33 @@ mod tests {
                 assert_eq!(faces[0].identity_state, "proposed");
                 assert_eq!(faces[0].person_id.as_deref(), Some(person.id.as_str()));
                 assert!(faces[0].identity_score.unwrap() > 0.99);
+                let people = queue.people_with_flipbooks().await.unwrap();
+                let book = &people.people[0];
+                assert_eq!(book.face_count, 6);
+                assert_eq!(book.day_count, 6);
+                assert_eq!(book.frames.len(), 6);
+                assert_eq!(book.frames[0].photo_id, id);
+                assert_eq!(book.last_seen_at.as_deref(), Some("2026-09-06T08:00:00Z"));
+                // Reading the flipbook must not confirm the suggestion or teach
+                // the profile. It remains in the dashboard's review queue.
+                let dashboard = queue.admin_dashboard().await.unwrap();
+                assert_eq!(dashboard.summary.assigned_faces, 5);
+                assert_eq!(dashboard.summary.unknown_faces, 1);
+                let suggestion = queue
+                    .admin_faces_for_photo(&id, DEFAULT_PIPELINE_VERSION)
+                    .await
+                    .unwrap();
+                assert_eq!(suggestion[0].identity_state, "proposed");
+
+                queue.assign_face(&faces[0].id, None).await.unwrap();
+                assert!(
+                    !queue
+                        .person_photos(&person.id)
+                        .await
+                        .unwrap()
+                        .photo_ids
+                        .contains(&id)
+                );
                 assert_eq!(
                     queue.people_with_flipbooks().await.unwrap().people[0].face_count,
                     5

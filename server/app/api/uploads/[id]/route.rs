@@ -13,6 +13,7 @@ pub async fn post(
     Extension(catalog): Extension<PhotoCatalog>,
     Extension(processing): Extension<ProcessingQueue>,
     Path(id): Path<String>,
+    wait: nextrs::WaitUntil,
     headers: HeaderMap,
 ) -> StatusCode {
     if let Err(status) = upload_auth::authorize(&headers) {
@@ -20,6 +21,6 @@ pub async fn post(
     }
     finalize_upload(&store, &catalog, &processing, &id)
         .await
-        .map(|()| StatusCode::NO_CONTENT)
+        .map(|()| { crate::background::notify(&wait, Some(id.clone())); StatusCode::NO_CONTENT })
         .unwrap_or_else(|error| error.status_code())
 }

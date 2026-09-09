@@ -137,10 +137,66 @@ async fn native_and_web_share_sessions_rate_limits_and_logout_revocation() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    assert!(response.headers().contains_key(header::SET_COOKIE));
+    let cookie = response.headers()[header::SET_COOKIE]
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_owned();
     let web: serde_json::Value =
         serde_json::from_slice(&to_bytes(response.into_body(), 8192).await.unwrap()).unwrap();
     assert!(web.get("token").is_none());
+
+    let browser_request = |method: &str, path: &str| {
+        Request::builder()
+            .method(method)
+            .uri(path)
+            .header(header::COOKIE, &cookie)
+            .body(Body::empty())
+            .unwrap()
+    };
+    assert_eq!(
+        app.clone()
+            .oneshot(browser_request("GET", "/api/auth/me"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    let mut mixed_credentials = browser_request("GET", "/api/auth/me");
+    mixed_credentials.headers_mut().insert(
+        header::AUTHORIZATION,
+        "Bearer invalid-session".parse().unwrap(),
+    );
+    assert_eq!(
+        app.clone()
+            .oneshot(mixed_credentials)
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let logout = app
+        .clone()
+        .oneshot(browser_request("POST", "/api/auth/logout"))
+        .await
+        .unwrap();
+    assert_eq!(logout.status(), StatusCode::NO_CONTENT);
+    assert!(
+        logout.headers()[header::SET_COOKIE]
+            .to_str()
+            .unwrap()
+            .contains("Max-Age=0")
+    );
+    assert_eq!(
+        app.clone()
+            .oneshot(browser_request("GET", "/api/auth/me"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
 
     for attempt in 0..8 {
         let path = if attempt % 2 == 0 {

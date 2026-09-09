@@ -1,0 +1,56 @@
+[
+  {
+    "wallTime": 517,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+      "id": "bbee602a-09c4-4b5c-8f6b-10b1dacd6bea"
+    },
+    "scriptName": "daily-mirror-cron",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+      {
+        "message": [
+          "*/5 * * * * /api/maintenance/process -> 401"
+        ],
+        "level": "log",
+        "timestamp": 1788842462871
+      }
+    ],
+    "eventTimestamp": 1788842462347,
+    "event": {
+      "cron": "*/5 * * * *",
+      "scheduledTime": 1788842459000
+    }
+  },
+  {
+    "wallTime": 3483,
+    "cpuTime": 0,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+      "id": "f8f8359c-334c-48ce-84f2-d3883ed50bbe"
+    },
+    "scriptName": "daily-mirror-cron",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [
+      {
+        "message": [
+          "*/5 * * * * /api/maintenance/process -> 200"
+        ],
+        "level": "log",
+        "timestamp": 1788842764640
+      }
+    ],
+    "eventTimestamp": 1788842761149,
+    "event": {
+      "cron": "*/5 * * * *",
+      "scheduledTime": 1788842759000
+    }
+  }
+]

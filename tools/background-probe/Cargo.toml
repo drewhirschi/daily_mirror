@@ -1,0 +1,17 @@
+[package]
+name = "daily-mirror-background-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = "0.8"
+nextrs = { git = "https://github.com/drewhirschi/nextrs.git", rev = "9fa4141d145f5afba869a42857e601c08a74e5fc", default-features = false, features = ["vercel"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tower = "0.5"
+vercel_runtime = { version = "=2.4.0", features = ["axum"] }
+
+[patch.crates-io]
+vercel_runtime = { path = "../../vendor/vercel_runtime" }

@@ -1,6 +1,10 @@
 use axum::{Extension, Json, http::HeaderMap, response::Response};
 
-use crate::{auth::AuthStore, auth_http::{self, PasswordLogin}, passkeys::PasskeyService};
+use crate::{
+    auth::AuthStore,
+    auth_http::{self, PasswordLogin},
+    passkeys::PasskeyService,
+};
 
 pub async fn post(
     Extension(store): Extension<AuthStore>,

@@ -1,0 +1,19 @@
+{
+  "kind": "local-packaged-vercel-adapters-with-native-inference",
+  "passed": 12,
+  "upload_response_seconds": 0.08753824199993687,
+  "checks": [
+    "native models and libraries are exclusive to vision",
+    "worker rejects invalid credentials",
+    "recovery cron rejects invalid credentials",
+    "images excludes worker route",
+    "default excludes worker route",
+    "upload starts actual hosted inference",
+    "real YuNet MediaPipe SFace pipeline completes without manual dispatch",
+    "blank JPEG produces correct dimensions and zero faces",
+    "duplicate notification is harmless",
+    "upload survives failed notification",
+    "NextRS recovery route waits for actual processing",
+    "recovery cron processes a job whose upload notification failed"
+  ]
+}

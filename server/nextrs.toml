@@ -1,0 +1,14 @@
+[app]
+name = "daily-mirror"
+url = "https://daily-mirror-pearl.vercel.app"
+
+[vercel]
+git_deploys = false
+regions = ["pdx1"]
+
+[bundles.images]
+features = ["image-processing"]
+
+[bundles.vision]
+features = ["face-inference"]
+assets = ["resources/vision"]

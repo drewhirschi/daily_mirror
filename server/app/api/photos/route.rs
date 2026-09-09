@@ -37,6 +37,7 @@ pub async fn post(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,
     Extension(processing): Extension<ProcessingQueue>,
+    wait: nextrs::WaitUntil,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<(StatusCode, Json<UploadResponse>), StatusCode> {
@@ -64,6 +65,7 @@ pub async fn post(
     processing.enqueue_active_photo(&saved.id).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    crate::background::notify(&wait, Some(saved.id.clone()));
     Ok((
         StatusCode::CREATED,
         Json(UploadResponse {

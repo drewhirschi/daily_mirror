@@ -19,6 +19,9 @@ const config: ExpoConfig = {
         "Connect to your Daily Mirror development server on your local network.",
     },
   },
+  android: {
+    package: "app.dailymirror.android",
+  },
   plugins: [
     "expo-image",
     "expo-secure-store",

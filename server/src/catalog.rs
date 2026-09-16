@@ -1,10 +1,14 @@
 use std::io;
 use std::sync::Arc;
+use std::time::Duration;
 
 use libsql::{Builder, Database, params};
 use tokio::sync::OnceCell;
 
 use crate::photos::Photo;
+
+/// How long a local-file writer waits for another process's write lock.
+const LOCAL_BUSY_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug)]
 pub struct PhotoCatalog {
@@ -88,6 +92,15 @@ impl PhotoCatalog {
                     }
                 };
                 let connection = database.connect().map_err(io::Error::other)?;
+                if matches!(&self.inner.location, CatalogLocation::Local(_)) {
+                    connection
+                        .busy_timeout(LOCAL_BUSY_TIMEOUT)
+                        .map_err(io::Error::other)?;
+                    connection
+                        .execute_batch("PRAGMA journal_mode = WAL;")
+                        .await
+                        .map_err(io::Error::other)?;
+                }
                 connection
                     .execute_batch(
                         "CREATE TABLE IF NOT EXISTS photos (
@@ -129,11 +142,20 @@ impl PhotoCatalog {
     }
 
     pub(crate) async fn connection(&self) -> io::Result<libsql::Connection> {
-        self.database().await?.connect().map_err(io::Error::other)
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        if matches!(self.inner.location, CatalogLocation::Local(_)) {
+            // A local file is shared by every process of a split deployment (and by
+            // concurrent hosted workers in the packaged tests), so a writer must wait
+            // for the current writer instead of failing the request with SQLITE_BUSY.
+            connection
+                .busy_timeout(LOCAL_BUSY_TIMEOUT)
+                .map_err(io::Error::other)?;
+        }
+        Ok(connection)
     }
 
     pub async fn reserve(&self, id: &str, storage_key: &str, byte_size: u64) -> io::Result<()> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         connection.execute(
             "INSERT INTO photos (id, storage_key, captured_at, byte_size, status)
              VALUES (?1, ?2, ?3, ?4, 'pending')
@@ -152,7 +174,7 @@ impl PhotoCatalog {
         byte_size: u64,
         person_id: &str,
     ) -> io::Result<()> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         connection
             .execute(
                 "INSERT INTO photos (id, storage_key, captured_at, byte_size, status,
@@ -175,7 +197,7 @@ impl PhotoCatalog {
     }
 
     pub async fn mark_ready(&self, id: &str) -> io::Result<()> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         let changed = connection
             .execute(
                 "UPDATE photos SET status = 'ready', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
@@ -194,7 +216,7 @@ impl PhotoCatalog {
     }
 
     pub async fn expected_size(&self, id: &str) -> io::Result<Option<u64>> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         let mut rows = connection
             .query("SELECT byte_size FROM photos WHERE id = ?1", params![id])
             .await
@@ -207,7 +229,7 @@ impl PhotoCatalog {
     }
 
     pub async fn pending(&self) -> io::Result<Vec<PendingPhoto>> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         let mut rows = connection
             .query(
                 "SELECT id, byte_size FROM photos WHERE status = 'pending' ORDER BY captured_at",
@@ -228,7 +250,7 @@ impl PhotoCatalog {
     }
 
     pub async fn list(&self) -> io::Result<Vec<Photo>> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         let mut rows = connection
             .query(
                 "SELECT id, thumbnail_status, media_revision, flipbook_excluded FROM photos WHERE status = 'ready' ORDER BY captured_at DESC, id DESC",
@@ -257,13 +279,13 @@ impl PhotoCatalog {
     }
 
     pub async fn ready_is_empty(&self) -> io::Result<bool> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         let count = ready_photo_count(&connection).await?;
         Ok(count == 0)
     }
 
     pub async fn import(&self, photos: &[(Photo, String)]) -> io::Result<()> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         for (photo, storage_key) in photos {
             connection
                 .execute(
@@ -296,7 +318,7 @@ impl PhotoCatalog {
     }
 
     pub async fn thumbnails_pending(&self) -> io::Result<Vec<String>> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         let mut rows = connection
             .query(
                 "SELECT id FROM photos WHERE status = 'ready' AND thumbnail_status != 'ready' ORDER BY captured_at",
@@ -312,7 +334,7 @@ impl PhotoCatalog {
     }
 
     pub async fn mark_thumbnail_ready(&self, id: &str) -> io::Result<()> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         connection
             .execute(
                 "UPDATE photos SET thumbnail_status = 'ready', updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
@@ -324,7 +346,7 @@ impl PhotoCatalog {
     }
 
     pub async fn record_rotation(&self, id: &str, degrees: i16, byte_size: u64) -> io::Result<()> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         let byte_size = i64::try_from(byte_size)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "photo is too large"))?;
         let changed = connection.execute(
@@ -343,7 +365,7 @@ impl PhotoCatalog {
 
     /// Returns `false` when no ready photo exists for `id`.
     pub async fn set_flipbook_excluded(&self, id: &str, excluded: bool) -> io::Result<bool> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         let changed = connection
             .execute(
                 "UPDATE photos SET flipbook_excluded = ?2, updated_at = CURRENT_TIMESTAMP
@@ -356,7 +378,7 @@ impl PhotoCatalog {
     }
 
     pub async fn repair_ready_size(&self, id: &str, byte_size: u64) -> io::Result<()> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         let byte_size = i64::try_from(byte_size)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "photo is too large"))?;
         let changed = connection
@@ -377,7 +399,7 @@ impl PhotoCatalog {
     }
 
     pub async fn delete(&self, id: &str) -> io::Result<()> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
         connection
             .execute("DELETE FROM photos WHERE id = ?1", params![id])
             .await

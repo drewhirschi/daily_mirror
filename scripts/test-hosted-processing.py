@@ -34,6 +34,8 @@ def main():
                    DAILY_MIRROR_DATABASE_URL=str(db), DAILY_MIRROR_UPLOAD_TOKEN=TOKEN,
                    DAILY_MIRROR_PROCESSOR_TOKEN=TOKEN, CRON_SECRET=TOKEN,
                    DAILY_MIRROR_PROCESSING_PIPELINE='face-v5', DAILY_MIRROR_HOSTED_PROCESSING='1',
+                   # The claim gate lives in the vision bundle; images/default dispatch to it.
+                   DAILY_MIRROR_HOSTED_CONCURRENCY='3',
                    DAILY_MIRROR_WORKER_URL=origins['vision'] + '/api/processing/run',
                    MEDIAPIPE_LIB='resources/vision/lib/libmediapipe.so', NEXTRS_PUBLIC_DIR=str(ROOT/'server/public'))
         logs = {}
@@ -49,11 +51,20 @@ def main():
                     row = c.execute('SELECT status FROM photo_processing WHERE photo_id=?', (photo,)).fetchone()
                     return row[0] if row else None
             except sqlite3.OperationalError: return None
-        def completed(photo):
-            for _ in range(200):
+        def completed(photo, tries=200):
+            for _ in range(tries):
                 if status(photo) == 'complete': return
                 time.sleep(0.1)
             raise AssertionError(f'{photo} did not complete: {status(photo)}')
+        def live_hosted_leases():
+            """Rows holding an unexpired vercel lease right now, as the claim gate counts them."""
+            if not db.exists(): return 0
+            try:
+                with sqlite3.connect(db) as c:
+                    return c.execute("SELECT count(*) FROM photo_processing WHERE status='leased'"
+                                     " AND leased_by LIKE 'vercel-%'"
+                                     " AND lease_expires_at > CURRENT_TIMESTAMP").fetchone()[0]
+            except sqlite3.OperationalError: return 0
         try:
             for name, origin in origins.items():
                 bundle = 'images' if name == 'broken-dispatch' else name
@@ -102,8 +113,29 @@ def main():
             call('default','GET','/api/maintenance/process',200,'NextRS recovery route waits for actual processing',headers=auth)
             completed(second)
             checks.append('recovery cron processes a job whose upload notification failed')
+            # Three back-to-back uploads each notify with their own photo id, so three
+            # independent worker invocations claim in parallel while the limit is 3.
+            batch = ['20260907T1202%02dZ-parallel%d' % (index, index) for index in range(3)]
+            for capture in batch:
+                call('images','POST','/api/photos',201,f'parallel upload {capture} accepted',data=jpeg,
+                     headers={**auth,'x-capture-id':capture,'Content-Type':'image/jpeg'})
+            peak_leases = 0
+            for _ in range(300):
+                peak_leases = max(peak_leases, live_hosted_leases())
+                if peak_leases >= 2: break
+                time.sleep(0.05)
+            assert peak_leases >= 2, f'never observed overlapping hosted leases (peak {peak_leases})'
+            checks.append(f'concurrency 3 holds {peak_leases} hosted leases at the same instant')
+            for capture in batch:
+                completed(capture, tries=600)
+            with sqlite3.connect(db) as c:
+                attempts = [c.execute('SELECT attempt_count FROM photo_processing WHERE photo_id=?',
+                                      (capture,)).fetchone()[0] for capture in batch]
+            assert attempts == [1,1,1], attempts
+            checks.append('all three parallel photos complete on their first attempt')
             print(json.dumps({'kind':'local-packaged-vercel-adapters-with-native-inference','passed':len(checks),
-                              'upload_response_seconds':response_seconds,'checks':checks},indent=2))
+                              'upload_response_seconds':response_seconds,'peak_hosted_leases':peak_leases,
+                              'checks':checks},indent=2))
         except BaseException:
             for name, log in logs.items():
                 log.flush()

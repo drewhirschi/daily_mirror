@@ -24,6 +24,20 @@ export function useColors() {
   };
 }
 
+/** The shared text field appearance used by the sign-in and onboarding forms. */
+export function useInputStyle() {
+  const c = useColors();
+  return {
+    backgroundColor: c.card,
+    color: c.text,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 17,
+  } as const;
+}
+
 export function IconButton({
   icon,
   label,

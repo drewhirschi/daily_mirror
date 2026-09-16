@@ -1,5 +1,12 @@
 import { useCallback, useState } from "react";
-import { Alert, Linking, ScrollView, Text, View } from "react-native";
+import {
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
@@ -11,9 +18,12 @@ import { Button, styles, useColors } from "../ui";
 export function Account({
   session,
   onClearCache,
+  onOpenHousehold,
 }: {
   session: ActiveSession;
   onClearCache(): Promise<void>;
+  /** App owns the household screen so it survives tab switching. */
+  onOpenHousehold(): void;
 }) {
   const c = useColors();
   const { signOut } = useSession();
@@ -86,6 +96,24 @@ export function Account({
             {session.api.origin}
           </Text>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenHousehold}
+          style={({ pressed }) => [
+            styles.card,
+            styles.row,
+            { backgroundColor: c.card, gap: 14, opacity: pressed ? 0.6 : 1 },
+          ]}
+        >
+          <Ionicons name="people-outline" color={c.accent} size={24} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.subtitle, { color: c.text }]}>Household</Text>
+            <Text style={{ color: c.secondary, marginTop: 4, lineHeight: 22 }}>
+              Add the people who live here and take enrollment photos.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" color={c.secondary} size={20} />
+        </Pressable>
         <View style={[styles.card, { backgroundColor: c.card }]}>
           <Text style={[styles.subtitle, { color: c.text }]}>
             On this iPhone

@@ -5,14 +5,14 @@ pickers, image decoding, and iOS scroll/zoom gestures. It has no WebView.
 
 ## Repository boundaries
 
-| Directory | Responsibility | Deployment |
-| --- | --- | --- |
-| `mobile/` | Expo / React Native iOS client | Xcode, internal distribution, TestFlight |
-| `server/` | Rust API and existing React website | Existing Vercel / Docker workflow |
-| `device/` | Pi camera, button, LEDs, durable upload queue | Existing Pi deployment |
-| `processor/` | Face-processing worker | Existing worker deployment |
-| `packages/api/` | Portable fetch client and generated Rust API types | Bundled with clients |
-| `crates/vision-contract/` | Server / worker Rust wire contract | Bundled with Rust apps |
+| Directory                 | Responsibility                                     | Deployment                               |
+| ------------------------- | -------------------------------------------------- | ---------------------------------------- |
+| `mobile/`                 | Expo / React Native iOS client                     | Xcode, internal distribution, TestFlight |
+| `server/`                 | Rust API and existing React website                | Existing Vercel / Docker workflow        |
+| `device/`                 | Pi camera, button, LEDs, durable upload queue      | Existing Pi deployment                   |
+| `processor/`              | Face-processing worker                             | Existing worker deployment               |
+| `packages/api/`           | Portable fetch client and generated Rust API types | Bundled with clients                     |
+| `crates/vision-contract/` | Server / worker Rust wire contract                 | Bundled with Rust apps                   |
 
 The root npm workspace contains `mobile/` and `packages/*`. The NextRS server
 retains its own npm workspace and lockfile: its generated `@server/client`
@@ -169,6 +169,62 @@ sign-in. Admin/face-review tools remain on the web.
 The photo viewer keeps swipe navigation and swipe-down dismissal. Its ellipsis
 menu contains named rotation actions and deletion; deleting still requires a
 separate confirmation.
+
+## Signup, household, and guided face enrollment
+
+See `docs/mobile-onboarding-plan.md` for the shared server/client contract.
+
+Sign in has a "Create an account" link opening a sign-up sheet: username,
+display name, and a password of at least twelve characters, with the remaining
+character count shown live. Signup is gated server-side by
+`DAILY_MIRROR_ALLOW_SIGNUP=1`; a 403 reads "This server does not allow
+sign-ups" and a 409 reads "That username is taken". On success the returned
+`NativeSession` is stored exactly like a password login, and the new account
+lands directly on the household screen with a one-time welcome hint.
+
+Household is reached from the Account tab's Household row and is presented as a
+full-screen modal owned by `App`, so it survives tab switching. It lists every
+member with a "You" badge for `self_person_id` and an enrollment badge reading
+Enrolled, "n of 5", or "Not set up". "Add person" expands an inline text field
+(not `Alert.prompt`, which is iOS-only), and after the person is created the
+screen offers "Add photos of <name> now?" straight away.
+
+Guided capture shows a front-facing `CameraView` with a switch button and five
+slots along the bottom in capture order: lower left, upper left, centre, upper
+right, lower right. An ellipse outline drawn with a `View` border springs to
+each target position and pulses gently, with a caption such as "Turn slightly
+and look toward the lower left". The shutter calls
+`takePictureAsync({ quality: 0.85, skipProcessing: false })`, starts that
+slot's upload immediately, and advances to the next pose, so uploads overlap
+with capture. Slots show uploading, processing, enrolled, or retake, and
+tapping a finished slot clears it for a retake. Denied camera access explains
+why and offers `Linking.openSettings()`. When all five are enrolled the screen
+reads "Ready. New mirror photos of <name> will be tagged automatically." with a
+button back to the household.
+
+All non-UI logic lives in `mobile/src/enrollment.ts`: capture ids in the Pi's
+`YYYYMMDDTHHMMSSZ-<8 hex>` form (so gallery date parsing works for every
+source), the five pose definitions with outline positions as fractions of the
+preview, and an `EnrollmentUploader` that performs grant, signed PUT, and
+finalize per slot, retries once on a network failure while reusing the same
+capture id, and polls `enrollmentStatus` every two seconds while any slot is
+unresolved. The signed PUT bypasses the JSON `request()` helper and uses fetch
+directly with the grant's headers and an `expo-file-system` `File` as the body;
+the session token is attached only when the upload target is the Daily Mirror
+origin, never third-party blob storage. `mobile/test/enrollment.test.ts` covers
+the chain, the retry, the status merge, the capture-id format, and that polling
+stops once everything is enrolled.
+
+Camera permission and Android configuration: `expo-camera` is added with its
+config plugin supplying `cameraPermission`, matched by
+`NSCameraUsageDescription` in `ios.infoPlist`. Microphone, Android
+`RECORD_AUDIO`, and barcode scanning are all disabled, because enrollment takes
+stills only. `app.config.ts` now has an `android` block with package
+`app.dailymirror.android`, the `CAMERA` permission, and an adaptive icon.
+
+**A native rebuild is required.** `expo-camera` adds native code, so the
+existing dev client and any previously distributed build cannot load these
+screens; rebuild with `expo run:ios` / `expo run:android` or a new EAS build.
 
 ## Verification before distributing
 

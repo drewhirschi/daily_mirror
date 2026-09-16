@@ -26,6 +26,25 @@ export const maxImageBytes = (key: string) =>
     ? MAX_PHOTO_BYTES
     : MAX_THUMBNAIL_BYTES;
 
+/**
+ * Serialize manifest writes and swallow their failures.
+ *
+ * `CacheStorage.save` is synchronous but writing the manifest is not: the
+ * temporary file is renamed over `index.json` with an asynchronous `move`.
+ * Two overlapping saves would therefore fight over the same temporary file,
+ * and — because nothing awaited the rename — a rejection escaped as an
+ * unhandled promise rejection, which shows up as a full-screen error in the
+ * app. The manifest is a disposable index: a dropped write costs at most one
+ * re-download, so failures are ignored and the next save recovers.
+ */
+export function createManifestWriter(write: (json: string) => Promise<void>) {
+  let pending = Promise.resolve();
+  return (json: string) => {
+    pending = pending.then(() => write(json)).catch(() => undefined);
+    return pending;
+  };
+}
+
 /** Persistent LRU, de-duplicated requests, and bounded network concurrency. */
 export class DiskCache {
   private entries = new Map<string, CacheEntry>();

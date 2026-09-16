@@ -4,6 +4,7 @@ import { fetch } from "expo/fetch";
 import { ApiError, type MirrorApi, type Photo } from "@daily-mirror/api";
 import {
   DiskCache,
+  createManifestWriter,
   maxImageBytes,
   type CacheEntry,
   type CacheStorage,
@@ -21,6 +22,12 @@ export async function createImageCache(api: MirrorApi, userId: string) {
   directory.create({ intermediates: true, idempotent: true });
   const manifest = new File(directory, "index.json");
   const prefix = `${directory.uri.replace(/\/$/, "")}/`;
+  const writeManifest = createManifestWriter(async (json) => {
+    const temporary = new File(directory, "index.tmp");
+    temporary.write(json);
+    // `move` rejects on an existing destination unless told to overwrite.
+    await temporary.move(manifest, { overwrite: true });
+  });
   const storage: CacheStorage = {
     load() {
       try {
@@ -41,10 +48,7 @@ export async function createImageCache(api: MirrorApi, userId: string) {
       }
     },
     save(entries) {
-      const temporary = new File(directory, "index.tmp");
-      temporary.write(JSON.stringify(entries));
-      if (manifest.exists) manifest.delete();
-      temporary.move(manifest);
+      writeManifest(JSON.stringify(entries));
     },
     exists: (entry) => new File(entry.uri).exists,
     remove(entry) {

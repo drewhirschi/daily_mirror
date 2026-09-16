@@ -2,9 +2,56 @@ use std::io;
 
 use axum::http::{HeaderMap, StatusCode, header};
 
+use crate::devices::DeviceRegistry;
 use crate::photos::PhotoStore;
 
-pub fn authorize(headers: &HeaderMap) -> Result<(), StatusCode> {
+/// Who is uploading. Per-device tokens are the pairing-era credential; the
+/// shared token is the Pi rig's legacy path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UploadPrincipal {
+    /// A device that redeemed a claim token. The photo row records its ID, and
+    /// through it the household.
+    Device(String),
+    /// The deployment-wide `DAILY_MIRROR_UPLOAD_TOKEN`.
+    ///
+    /// TODO(pairing): remove once the last Pi rig is re-provisioned with a
+    /// per-device token. `docs/device-pairing-plan.md` retires the shared
+    /// token; it survives only so the current rig keeps uploading.
+    SharedToken,
+}
+
+impl UploadPrincipal {
+    pub fn device_id(&self) -> Option<&str> {
+        match self {
+            Self::Device(device_id) => Some(device_id),
+            Self::SharedToken => None,
+        }
+    }
+}
+
+/// Accept either a per-device bearer token or the shared upload token.
+///
+/// A device token wins when both could match, and authenticating one records
+/// the device as seen.
+pub async fn authorize(
+    registry: &DeviceRegistry,
+    headers: &HeaderMap,
+) -> Result<UploadPrincipal, StatusCode> {
+    let supplied = bearer(headers);
+    if let Some(token) = supplied
+        && let Some(device_id) = registry
+            .authenticate_device(token)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    {
+        return Ok(UploadPrincipal::Device(device_id));
+    }
+    authorize_shared(headers).map(|()| UploadPrincipal::SharedToken)
+}
+
+/// The pre-pairing check, unchanged: no configured token means an open
+/// deployment, which `validate_configuration` forbids for remote storage.
+pub fn authorize_shared(headers: &HeaderMap) -> Result<(), StatusCode> {
     let Ok(expected) = std::env::var("DAILY_MIRROR_UPLOAD_TOKEN") else {
         return Ok(());
     };
@@ -12,15 +59,18 @@ pub fn authorize(headers: &HeaderMap) -> Result<(), StatusCode> {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    let supplied = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "));
-    if supplied == Some(expected.as_str()) {
+    if bearer(headers) == Some(expected.as_str()) {
         Ok(())
     } else {
         Err(StatusCode::UNAUTHORIZED)
     }
+}
+
+fn bearer(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
 }
 
 pub fn validate_configuration(store: &PhotoStore) -> io::Result<()> {
@@ -41,7 +91,7 @@ pub fn validate_configuration(store: &PhotoStore) -> io::Result<()> {
 mod tests {
     use axum::http::{HeaderMap, HeaderValue, header};
 
-    use super::authorize;
+    use super::authorize_shared;
 
     #[test]
     fn bearer_token_is_required_when_configured() {
@@ -51,12 +101,12 @@ mod tests {
         unsafe { std::env::set_var("DAILY_MIRROR_UPLOAD_TOKEN", "test-upload-token") };
 
         let mut headers = HeaderMap::new();
-        assert!(authorize(&headers).is_err());
+        assert!(authorize_shared(&headers).is_err());
         headers.insert(
             header::AUTHORIZATION,
             HeaderValue::from_static("Bearer test-upload-token"),
         );
-        assert!(authorize(&headers).is_ok());
+        assert!(authorize_shared(&headers).is_ok());
 
         match previous {
             Some(value) => unsafe { std::env::set_var("DAILY_MIRROR_UPLOAD_TOKEN", value) },

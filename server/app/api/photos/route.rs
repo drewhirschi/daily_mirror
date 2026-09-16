@@ -37,11 +37,12 @@ pub async fn post(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,
     Extension(processing): Extension<ProcessingQueue>,
+    Extension(registry): Extension<crate::devices::DeviceRegistry>,
     wait: nextrs::WaitUntil,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<(StatusCode, Json<UploadResponse>), StatusCode> {
-    upload_auth::authorize(&headers)?;
+    let principal = upload_auth::authorize(&registry, &headers).await?;
     let id = required_header(&headers, "x-capture-id")?;
     let storage_key = store.storage_key(id).map_err(|_| StatusCode::BAD_REQUEST)?;
     let saved = store
@@ -58,7 +59,7 @@ pub async fn post(
         .ensure_thumbnail(&saved.id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    catalog.register_ready(&saved.id, &storage_key, body.len() as u64).await
+    catalog.register_ready_for_device(&saved.id, &storage_key, body.len() as u64, principal.device_id()).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     catalog.mark_thumbnail_ready(&saved.id).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

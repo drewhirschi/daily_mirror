@@ -830,6 +830,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "daily-mirror-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "utoipa",
+]
+
+[[package]]
 name = "daily-mirror-processor"
 version = "0.1.0"
 dependencies = [
@@ -4324,6 +4332,7 @@ dependencies = [
  "argon2",
  "axum",
  "base64 0.22.1",
+ "daily-mirror-core",
  "daily-mirror-processor",
  "daily-mirror-vision-contract",
  "dotenvy",

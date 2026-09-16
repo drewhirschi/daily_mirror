@@ -115,6 +115,10 @@ impl PhotoCatalog {
                 )
                 .await?;
                 ensure_column(&connection, "media_revision", "INTEGER NOT NULL DEFAULT 0").await?;
+                // Which paired device uploaded this photo, and through the
+                // devices table which household owns it. NULL for photos that
+                // predate pairing or arrived on the shared upload token.
+                ensure_column(&connection, "device_id", "TEXT").await?;
                 Ok(database)
             })
             .await
@@ -125,14 +129,52 @@ impl PhotoCatalog {
     }
 
     pub async fn reserve(&self, id: &str, storage_key: &str, byte_size: u64) -> io::Result<()> {
+        self.reserve_for_device(id, storage_key, byte_size, None)
+            .await
+    }
+
+    /// Reserve an upload slot, recording the device that captured it when the
+    /// uploader authenticated with a per-device token.
+    pub async fn reserve_for_device(
+        &self,
+        id: &str,
+        storage_key: &str,
+        byte_size: u64,
+        device_id: Option<&str>,
+    ) -> io::Result<()> {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
-        connection.execute(
-            "INSERT INTO photos (id, storage_key, captured_at, byte_size, status)
-             VALUES (?1, ?2, ?3, ?4, 'pending')
-             ON CONFLICT(id) DO UPDATE SET byte_size = excluded.byte_size, updated_at = CURRENT_TIMESTAMP",
-            params![id, storage_key, id_to_timestamp(id), byte_size as i64],
-        ).await.map_err(io::Error::other)?;
+        connection
+            .execute(
+                "INSERT INTO photos (id, storage_key, captured_at, byte_size, status, device_id)
+             VALUES (?1, ?2, ?3, ?4, 'pending', ?5)
+             ON CONFLICT(id) DO UPDATE SET
+                byte_size = excluded.byte_size,
+                device_id = COALESCE(excluded.device_id, photos.device_id),
+                updated_at = CURRENT_TIMESTAMP",
+                params![
+                    id,
+                    storage_key,
+                    id_to_timestamp(id),
+                    byte_size as i64,
+                    device_id.map(str::to_owned)
+                ],
+            )
+            .await
+            .map_err(io::Error::other)?;
         Ok(())
+    }
+
+    /// The device that uploaded a photo, when one is recorded.
+    pub async fn device_for_photo(&self, id: &str) -> io::Result<Option<String>> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let mut rows = connection
+            .query("SELECT device_id FROM photos WHERE id = ?1", params![id])
+            .await
+            .map_err(io::Error::other)?;
+        let Some(row) = rows.next().await.map_err(io::Error::other)? else {
+            return Ok(None);
+        };
+        row.get::<Option<String>>(0).map_err(io::Error::other)
     }
 
     pub async fn mark_ready(&self, id: &str) -> io::Result<()> {
@@ -250,7 +292,19 @@ impl PhotoCatalog {
         storage_key: &str,
         byte_size: u64,
     ) -> io::Result<()> {
-        self.reserve(id, storage_key, byte_size).await?;
+        self.register_ready_for_device(id, storage_key, byte_size, None)
+            .await
+    }
+
+    pub async fn register_ready_for_device(
+        &self,
+        id: &str,
+        storage_key: &str,
+        byte_size: u64,
+        device_id: Option<&str>,
+    ) -> io::Result<()> {
+        self.reserve_for_device(id, storage_key, byte_size, device_id)
+            .await?;
         self.mark_ready(id).await
     }
 

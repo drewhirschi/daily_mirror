@@ -57,8 +57,9 @@ fn bypasses_authentication(method: &Method, path: &str) -> bool {
                 path,
                 "/api/maintenance/reconcile" | "/api/maintenance/process"
             ))
+        // The claim token is the credential here; the device has no session.
         || (method == Method::POST
-            && (matches!(path, "/api/uploads" | "/api/photos")
+            && (matches!(path, "/api/uploads" | "/api/photos" | "/api/devices/claim")
                 || path.starts_with("/api/uploads/")))
 }
 
@@ -96,6 +97,12 @@ mod tests {
             "/api/maintenance/reconcile"
         ));
         assert!(bypasses_authentication(&Method::POST, "/api/uploads"));
+        assert!(bypasses_authentication(&Method::POST, "/api/devices/claim"));
+        assert!(!bypasses_authentication(&Method::GET, "/api/devices"));
+        assert!(!bypasses_authentication(
+            &Method::POST,
+            "/api/devices/claim-tokens"
+        ));
         assert!(bypasses_authentication(
             &Method::POST,
             "/api/processing/claim"

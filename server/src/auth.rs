@@ -636,13 +636,13 @@ fn argon2<'a>() -> Argon2<'a> {
     Argon2::new(Algorithm::Argon2id, Version::V0x13, Params::default())
 }
 
-fn random_token() -> String {
+pub(crate) fn random_token() -> String {
     let mut bytes = [0_u8; 32];
     OsRng.fill_bytes(&mut bytes);
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
-fn secret_hash(secret: &str) -> String {
+pub(crate) fn secret_hash(secret: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(secret.as_bytes()))
 }
 

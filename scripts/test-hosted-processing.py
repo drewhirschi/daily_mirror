@@ -3,10 +3,12 @@
 import io
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import socket
 import sqlite3
 import subprocess
+import threading
 import tempfile
 import time
 from PIL import Image
@@ -113,18 +115,33 @@ def main():
             call('default','GET','/api/maintenance/process',200,'NextRS recovery route waits for actual processing',headers=auth)
             completed(second)
             checks.append('recovery cron processes a job whose upload notification failed')
-            # Three back-to-back uploads each notify with their own photo id, so three
+            # Three simultaneous uploads each notify with their own photo id, so three
             # independent worker invocations claim in parallel while the limit is 3.
+            # Local inference finishes in about ten milliseconds, far quicker than hosted
+            # inference, so the leases only overlap when the uploads are dispatched
+            # together and the lease table is sampled continuously rather than polled.
             batch = ['20260907T1202%02dZ-parallel%d' % (index, index) for index in range(3)]
-            for capture in batch:
-                call('images','POST','/api/photos',201,f'parallel upload {capture} accepted',data=jpeg,
-                     headers={**auth,'x-capture-id':capture,'Content-Type':'image/jpeg'})
-            peak_leases = 0
-            for _ in range(300):
-                peak_leases = max(peak_leases, live_hosted_leases())
-                if peak_leases >= 2: break
-                time.sleep(0.05)
-            assert peak_leases >= 2, f'never observed overlapping hosted leases (peak {peak_leases})'
+            sampling = threading.Event(); sampling.set()
+            observed = []
+            def sample_leases():
+                while sampling.is_set():
+                    observed.append(live_hosted_leases())
+            sampler = threading.Thread(target=sample_leases, daemon=True); sampler.start()
+            try:
+                with ThreadPoolExecutor(max_workers=len(batch)) as pool:
+                    uploads = [pool.submit(call,'images','POST','/api/photos',201,
+                                           f'parallel upload {capture} accepted',data=jpeg,
+                                           headers={**auth,'x-capture-id':capture,'Content-Type':'image/jpeg'})
+                               for capture in batch]
+                    for upload in uploads: upload.result()
+                for _ in range(300):
+                    if max(observed, default=0) >= 2: break
+                    time.sleep(0.05)
+            finally:
+                sampling.clear(); sampler.join(timeout=10)
+            peak_leases = max(observed, default=0)
+            assert peak_leases >= 2, (f'never observed overlapping hosted leases'
+                                      f' (peak {peak_leases} over {len(observed)} samples)')
             checks.append(f'concurrency 3 holds {peak_leases} hosted leases at the same instant')
             for capture in batch:
                 completed(capture, tries=600)
@@ -134,7 +151,7 @@ def main():
             assert attempts == [1,1,1], attempts
             checks.append('all three parallel photos complete on their first attempt')
             print(json.dumps({'kind':'local-packaged-vercel-adapters-with-native-inference','passed':len(checks),
-                              'upload_response_seconds':response_seconds,'peak_hosted_leases':peak_leases,
+                              'upload_response_seconds':response_seconds,'peak_hosted_leases':peak_leases,'lease_samples':len(observed),
                               'checks':checks},indent=2))
         except BaseException:
             for name, log in logs.items():

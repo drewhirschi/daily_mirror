@@ -61,6 +61,7 @@ mobile-check:
 
 # Format, compile, type-check, and test both Rust applications.
 check:
+    cd crates/mirror-core && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
     cd device && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
     cd processor && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
     cd server && npm run client:generate && cargo fmt --check && cargo clippy --all-targets -- -D warnings -A clippy::match-single-binding && npm run typecheck && cargo test

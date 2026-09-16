@@ -16,9 +16,9 @@ use crate::catalog::PhotoCatalog;
 use crate::face_admin::{MAX_HOUSEHOLD_MEMBERS, validate_person_name};
 use crate::photos::PhotoStore;
 use crate::processing::{ProcessingQueue, active_pipeline_version};
-use crate::upload_flow::{
-    FinalizeError, UploadGrant, UploadRequest, finalize_upload, upload_grant,
-};
+#[cfg(feature = "image-processing")]
+use crate::upload_flow::{FinalizeError, finalize_upload};
+use crate::upload_flow::{UploadGrant, UploadRequest, upload_grant};
 
 /// Five directions of guided capture enrol one person.
 pub const REQUIRED_ENROLLMENT_PHOTOS: u32 = 5;
@@ -83,6 +83,7 @@ pub enum OnboardingError {
     HouseholdFull,
     PersonNotInHousehold,
     Invalid(String),
+    #[cfg(feature = "image-processing")]
     Finalize(FinalizeError),
     Storage(io::Error),
 }
@@ -94,6 +95,7 @@ impl OnboardingError {
             Self::UsernameTaken | Self::NoHousehold | Self::HouseholdFull => StatusCode::CONFLICT,
             Self::PersonNotInHousehold => StatusCode::NOT_FOUND,
             Self::Invalid(_) => StatusCode::BAD_REQUEST,
+            #[cfg(feature = "image-processing")]
             Self::Finalize(error) => error.status_code(),
             Self::Storage(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -110,6 +112,7 @@ impl OnboardingError {
             Self::HouseholdFull => "This household is already full".to_owned(),
             Self::PersonNotInHousehold => "That person is not in your household".to_owned(),
             Self::Invalid(message) => message.clone(),
+            #[cfg(feature = "image-processing")]
             Self::Finalize(error) => error.to_string(),
             Self::Storage(_) => "Onboarding service unavailable".to_owned(),
         }
@@ -411,6 +414,7 @@ pub async fn create_enrollment_upload(
     ))
 }
 
+#[cfg(feature = "image-processing")]
 pub async fn finalize_enrollment_upload(
     store: &PhotoStore,
     catalog: &PhotoCatalog,

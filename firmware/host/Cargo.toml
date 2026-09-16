@@ -1,0 +1,21 @@
+[package]
+name = "daily-mirror-firmware-host"
+description = "Linux adapters for the Daily Mirror device runtime: stdin button, terminal ring, fixture camera, directory store, and a real HTTP network."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = "1"
+chrono = "0.4"
+clap = { version = "4", features = ["derive", "env"] }
+daily-mirror-core = { path = "../../crates/mirror-core" }
+reqwest = { version = "0.12", default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls-tls",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }

@@ -1,0 +1,9 @@
+# Credentials and the device token live in NVS; the photo queue lives on the SD
+# card, so the flash layout only needs room for two OTA slots.
+# Name,   Type, SubType,  Offset,  Size
+nvs,      data, nvs,      ,        64K
+otadata,  data, ota,      ,        8K
+phy_init, data, phy,      ,        4K
+ota_0,    app,  ota_0,    ,        3M
+ota_1,    app,  ota_1,    ,        3M
+storage,  data, fat,      ,        1M

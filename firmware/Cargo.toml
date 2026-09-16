@@ -1,0 +1,18 @@
+# The firmware workspace. Two targets run the same `daily-mirror-core`
+# runtime: `host` on Linux for development and CI, `esp32p4` on the board.
+#
+# `esp32p4` is listed here for discoverability but kept out of the dependency
+# graph with `exclude`, because resolving `esp-idf-svc` requires the ESP-IDF
+# toolchain and would make `cd firmware/host && cargo test` fail on a machine
+# that only has a normal Rust install. Build it from its own directory with
+# the espup toolchain; see `esp32p4/README.md`.
+[workspace]
+resolver = "3"
+members = ["host"]
+exclude = ["esp32p4"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false

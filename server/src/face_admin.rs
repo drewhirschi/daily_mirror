@@ -86,6 +86,26 @@ pub struct AdminLandmark {
     pub z: f32,
 }
 
+/// Faces detected in one photograph, for drawing labels over the image.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PhotoFacesResponse {
+    pub photo_id: String,
+    /// False until the face pipeline has analyzed the current media revision.
+    pub analyzed: bool,
+    pub faces: Vec<PhotoFace>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct PhotoFace {
+    pub id: String,
+    /// Fractions of the oriented image, 0..1.
+    pub bounds: AdminBounds,
+    pub person_id: Option<String>,
+    pub person_name: Option<String>,
+    /// `confirmed`, `proposed`, or `unknown`.
+    pub identity_state: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct PeopleResponse {
     pub people: Vec<PersonFlipbook>,
@@ -313,6 +333,7 @@ impl ProcessingQueue {
              JOIN faces ON faces.photo_id = photos.id
              WHERE photos.status = 'ready' AND faces.pipeline_version = ?1
                AND faces.person_id = ?2 AND faces.identity_state IN ('confirmed', 'proposed')
+               AND COALESCE(photos.flipbook_excluded, 0) = 0
              ORDER BY photos.captured_at DESC, photos.id DESC",
                 params![active_pipeline_version()?, person_id],
             )
@@ -323,6 +344,40 @@ impl ProcessingQueue {
             photo_ids.push(row.get(0).map_err(io::Error::other)?);
         }
         Ok(PersonPhotosResponse { photo_ids })
+    }
+
+    pub async fn photo_faces(&self, photo_id: &str) -> io::Result<PhotoFacesResponse> {
+        let pipeline_version = active_pipeline_version()?;
+        self.ensure_schema().await?;
+        let connection = self.catalog.connection().await?;
+        let mut rows = connection
+            .query(
+                "SELECT 1 FROM photo_analyses WHERE photo_id = ?1 AND pipeline_version = ?2",
+                params![photo_id, pipeline_version.clone()],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let analyzed = rows.next().await.map_err(io::Error::other)?.is_some();
+        drop(rows);
+        let faces = self
+            .admin_faces_for_photos(&[photo_id], &pipeline_version)
+            .await?
+            .remove(photo_id)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|face| PhotoFace {
+                id: face.id,
+                bounds: face.bounds,
+                person_id: face.person_id,
+                person_name: face.person_name,
+                identity_state: face.identity_state,
+            })
+            .collect();
+        Ok(PhotoFacesResponse {
+            photo_id: photo_id.to_owned(),
+            analyzed,
+            faces,
+        })
     }
 
     pub async fn create_person(&self, display_name: &str) -> io::Result<CreatePersonResponse> {
@@ -736,6 +791,7 @@ async fn people_frames(
              JOIN photos ON photos.id = faces.photo_id
              WHERE faces.person_id IS NOT NULL AND faces.pipeline_version = ?1
                AND faces.identity_state IN ('confirmed', 'proposed')
+               AND COALESCE(photos.flipbook_excluded, 0) = 0
              ORDER BY substr(photos.captured_at, 1, 10) DESC,
                       (faces.identity_state = 'confirmed') DESC,
                       faces.detector_confidence DESC, photos.captured_at DESC, faces.id",
@@ -1000,6 +1056,48 @@ mod tests {
                 .unwrap()
                 .photo_ids
                 .is_empty()
+        );
+        // Viewers label faces from the per-photo endpoint.
+        let labeled = queue.photo_faces(ids[0]).await.unwrap();
+        assert!(labeled.analyzed);
+        assert_eq!(labeled.faces.len(), 1);
+        assert_eq!(labeled.faces[0].person_name.as_deref(), Some("Drew"));
+        assert_eq!(labeled.faces[0].identity_state, "confirmed");
+        assert!(
+            !queue
+                .photo_faces("20260901T000000Z-never")
+                .await
+                .unwrap()
+                .analyzed
+        );
+        // Excluding a photo drops it from flipbooks and person filters while
+        // leaving its face assignments intact.
+        assert!(catalog.set_flipbook_excluded(ids[2], true).await.unwrap());
+        assert!(
+            !catalog
+                .set_flipbook_excluded("missing-photo", true)
+                .await
+                .unwrap()
+        );
+        let excluded = queue.people_with_flipbooks().await.unwrap();
+        assert_eq!(excluded.people[0].frames.len(), 1);
+        assert_eq!(excluded.people[0].frames[0].photo_id, ids[0]);
+        assert_eq!(
+            queue.person_photos(&person.id).await.unwrap().photo_ids,
+            vec![ids[1], ids[0]],
+        );
+        assert!(
+            catalog
+                .list()
+                .await
+                .unwrap()
+                .iter()
+                .any(|photo| photo.id == ids[2] && photo.flipbook_excluded)
+        );
+        assert!(catalog.set_flipbook_excluded(ids[2], false).await.unwrap());
+        assert_eq!(
+            queue.people_with_flipbooks().await.unwrap().people[0].frames[0].photo_id,
+            ids[2]
         );
         queue.assign_faces(&assignments).await.unwrap();
 

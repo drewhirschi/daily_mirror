@@ -49,6 +49,9 @@ pub struct Photo {
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thumbnail_url: Option<String>,
+    /// Photographs the owner has excluded from every person's flipbook.
+    #[serde(default)]
+    pub flipbook_excluded: bool,
 }
 
 #[derive(Debug)]
@@ -623,6 +626,7 @@ fn photo(id: &str) -> Photo {
         id: id.to_owned(),
         url: format!("/api/photos/{id}"),
         thumbnail_url: None,
+        flipbook_excluded: false,
     }
 }
 

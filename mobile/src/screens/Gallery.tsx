@@ -18,6 +18,7 @@ import {
 } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { useSession, type ActiveSession } from "../session";
 import { writeCatalog } from "../cache/thumbnails";
@@ -26,6 +27,7 @@ import {
   DEFAULT_DENSITY,
   densityAfterPinch,
   densityLabels,
+  filterSummary,
   photoSections,
   selectPhotos,
   type Density,
@@ -133,31 +135,20 @@ export function Gallery({
       style={{ flex: 1, backgroundColor: c.background }}
     >
       <View
-        style={{
-          paddingHorizontal: 22,
-          paddingTop: 12,
-          paddingBottom: 18,
-          gap: 18,
-        }}
+        style={[
+          styles.row,
+          {
+            justifyContent: "space-between",
+            paddingHorizontal: 22,
+            paddingTop: 12,
+            paddingBottom: 10,
+            gap: 12,
+          },
+        ]}
       >
-        <View style={[styles.row, { justifyContent: "space-between" }]}>
-          <View>
-            <Text style={[styles.title, { color: c.text }]}>Archive</Text>
-            <Text style={{ color: c.secondary, marginTop: 5, fontSize: 15 }}>
-              {selectedPhotos.length.toLocaleString()}{" "}
-              {selectedPhotos.length === 1 ? "moment" : "moments"}, collected
-              over time
-            </Text>
-          </View>
-          <IconButton
-            icon={hasFilters ? "filter" : "filter-outline"}
-            label="Filter photographs"
-            onPress={() => setFilterOpen(true)}
-          />
-        </View>
         <Text
           accessibilityRole="adjustable"
-          accessibilityLabel="Archive detail"
+          accessibilityLabel="Archive"
           accessibilityValue={{ text: densityLabels[density] }}
           accessibilityHint="Swipe up for more detail or down for less detail."
           accessibilityActions={[
@@ -170,22 +161,43 @@ export function Gallery({
             if (nativeEvent.actionName === "decrement")
               setDensity((current) => densityAfterPinch(current, 0.5));
           }}
-          style={{ color: c.secondary, fontSize: 14 }}
+          style={[styles.title, { color: c.text }]}
         >
-          {densityLabels[density]} · Pinch to change the view
+          Archive
         </Text>
-        {hasFilters ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setFilterOpen(true)}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Filter photographs. ${filterSummary(from, to, personId ? personName || "Selected person" : undefined)}`}
+          onPress={() => setFilterOpen(true)}
+          style={({ pressed }) => [
+            styles.row,
+            {
+              gap: 6,
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              borderRadius: 12,
+              backgroundColor: hasFilters ? c.tint : "transparent",
+              opacity: pressed ? 0.6 : 1,
+              flexShrink: 1,
+            },
+          ]}
+        >
+          <Ionicons
+            name={hasFilters ? "calendar" : "calendar-outline"}
+            size={18}
+            color={c.accent}
+          />
+          <Text
+            numberOfLines={1}
+            style={{ color: c.accent, fontSize: 15, fontWeight: "600" }}
           >
-            <Text style={{ color: c.accent }}>
-              {personId ? `${personName || "Selected person"} · ` : ""}
-              {from?.toLocaleDateString() || "Beginning"} —{" "}
-              {to?.toLocaleDateString() || "Today"}
-            </Text>
-          </Pressable>
-        ) : null}
+            {filterSummary(
+              from,
+              to,
+              personId ? personName || "Selected person" : undefined,
+            )}
+          </Text>
+        </Pressable>
       </View>
       {photos.isError ? (
         <Pressable

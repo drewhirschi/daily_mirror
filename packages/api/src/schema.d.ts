@@ -364,6 +364,42 @@ export interface paths {
         patch: operations["patchApiPhotosById"];
         trace?: never;
     };
+    "/api/photos/{id}/faces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Face bounds and identities for one photograph, so viewers can label who
+         *     the pipeline found without loading the admin dashboard.
+         */
+        get: operations["getApiPhotosByIdFaces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/photos/{id}/flipbook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["putApiPhotosByIdFlipbook"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/uploads": {
         parameters: {
             query?: never;
@@ -549,6 +585,13 @@ export interface components {
             photo_id: string;
             photo_url: string;
         };
+        /**
+         * @description Whether a photograph may appear in people's flipbooks. The flag lives on
+         *     the photo, so it survives rotation, which discards and re-detects faces.
+         */
+        FlipbookMembership: {
+            included: boolean;
+        };
         Health: {
             software_version: string;
             status: string;
@@ -632,9 +675,27 @@ export interface components {
             photo_ids: string[];
         };
         Photo: {
+            /** @description Photographs the owner has excluded from every person's flipbook. */
+            flipbook_excluded?: boolean;
             id: string;
             thumbnail_url?: string | null;
             url: string;
+        };
+        PhotoFace: {
+            /** @description Fractions of the oriented image, 0..1. */
+            bounds: components["schemas"]["AdminBounds"];
+            id: string;
+            /** @description `confirmed`, `proposed`, or `unknown`. */
+            identity_state: string;
+            person_id?: string | null;
+            person_name?: string | null;
+        };
+        /** @description Faces detected in one photograph, for drawing labels over the image. */
+        PhotoFacesResponse: {
+            /** @description False until the face pipeline has analyzed the current media revision. */
+            analyzed: boolean;
+            faces: components["schemas"]["PhotoFace"][];
+            photo_id: string;
         };
         PhotoList: {
             photos: components["schemas"]["Photo"][];
@@ -1247,6 +1308,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getApiPhotosByIdFaces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoFacesResponse"];
+                };
+            };
+        };
+    };
+    putApiPhotosByIdFlipbook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlipbookMembership"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlipbookMembership"];
+                };
             };
         };
     };

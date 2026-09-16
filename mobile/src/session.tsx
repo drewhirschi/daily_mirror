@@ -17,6 +17,7 @@ import {
   type NativeSession,
   type PasswordLogin,
   type Photo,
+  type SignupRequest,
 } from "@daily-mirror/api";
 import {
   createImageCache,
@@ -40,9 +41,13 @@ type SessionContext = {
   error: string;
   lastServer: string;
   signIn(origin: string, credentials: PasswordLogin): Promise<void>;
+  signUp(origin: string, account: SignupRequest): Promise<void>;
   signInWithPasskey(origin: string, username: string): Promise<void>;
   signOut(localOnly?: boolean): Promise<void>;
   expire(): Promise<void>;
+  /** True for the first session of a brand new account, to show onboarding. */
+  firstRun: boolean;
+  acknowledgeFirstRun(): void;
 };
 const Context = createContext<SessionContext | null>(null);
 export const useSession = () => {
@@ -57,6 +62,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastServer, setLastServer] = useState(DEFAULT_SERVER);
+  const [firstRun, setFirstRun] = useState(false);
   const ending = useRef<Promise<void> | null>(null);
 
   const open = useCallback(async (stored: StoredSession) => {
@@ -77,6 +83,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const session = activeRef.current;
     activeRef.current = null;
     setActive(null);
+    setFirstRun(false);
     const cleanup = async () => {
       try {
         await SecureStore.deleteItemAsync(SESSION_KEY);
@@ -175,6 +182,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await saveSession(api, result);
   };
 
+  const signUp = async (origin: string, account: SignupRequest) => {
+    await ending.current;
+    setError("");
+    const api = new MirrorApi(origin, undefined, __DEV__);
+    let result: NativeSession;
+    try {
+      result = await api.signup(account);
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 403)
+        throw new Error("This server does not allow sign-ups.");
+      if (caught instanceof ApiError && caught.status === 409)
+        throw new Error("That username is taken.");
+      if (caught instanceof ApiError && caught.status === 404)
+        throw new Error(
+          "This server needs the onboarding API update before you can create an account.",
+        );
+      throw caught;
+    }
+    setFirstRun(true);
+    await saveSession(api, result);
+  };
+
   const signInWithPasskey = async (origin: string, username: string) => {
     await ending.current;
     setError("");
@@ -237,9 +266,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         error,
         lastServer,
         signIn,
+        signUp,
         signInWithPasskey,
         signOut,
         expire,
+        firstRun,
+        acknowledgeFirstRun: () => setFirstRun(false),
       }}
     >
       {children}

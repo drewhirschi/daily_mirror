@@ -10,6 +10,7 @@ snapr/target/
 captures/
 device/target/
 processor/target/
+crates/*/target/
 processor/.env.*
 !processor/.env.example
 processor/models/*.onnx

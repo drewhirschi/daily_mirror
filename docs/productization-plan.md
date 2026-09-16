@@ -18,7 +18,9 @@ enhancement remains a later, server-side concern.
 - Keep the backend target and device credential in runtime configuration; do
   not compile either into the device binary.
 - Treat an ESP32 device as a later hardware port, not as a requirement for the
-  first enclosed Pi version.
+  first enclosed Pi version. Superseded 2026-09-15: the ESP32-P4 is now the
+  product target and the Pi is the experiment rig. See
+  [device-pairing-plan.md](device-pairing-plan.md).
 
 ## Proposed physical interaction
 

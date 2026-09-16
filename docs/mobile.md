@@ -244,6 +244,30 @@ JSN's Xcode 16.4 build failed because ExpoModulesJSI needs Swift tools 6.2;
 use Xcode 26 or newer for this app. See `docs/mobile-handoff.md` for the active
 simulator, running Metro, logs, and the localhost IPv6 workaround.
 
+On September 16, 2026 the Debug simulator build succeeded on JSN with
+Xcode 26.6 in 78 seconds, and the signup/household/guided-capture flow was
+driven end to end against a local Rust server. Debug builds need one
+workaround, now in `scripts/mobile-mac.sh build`. React Native and Expo both
+ship separate Debug and Release copies of their prebuilt frameworks, and both
+projects' script phases decide which to install by grepping
+`GCC_PREPROCESSOR_DEFINITIONS` for `DEBUG=1`. CocoaPods never defines that for
+pod targets, so a Debug build installs the *Release* frameworks. The link then
+fails on debug-only symbols (`RCTPackagerConnection`, `react::Sealable`,
+`ShadowNode::getDebugName`), and forcing only React Native to Debug moves the
+problem to a `SIGSEGV` in `react::Props::Props()`, because `Props` has a
+different layout in the two configurations. Build with
+`GCC_PREPROCESSOR_DEFINITIONS='$(inherited) DEBUG=1'` so every artifact agrees.
+Each swap is additionally skipped when its `.last_build_configuration` marker
+is absent, since the scripts assume an unmarked tree is already Debug, while
+`pod install` in fact lays down Release; write `Release` into those markers
+first. A stale `derivedDataPath` can also keep Release copies under
+`XCFrameworkIntermediates`, so change the configuration with a clean build.
+
+Note that `NSAllowsArbitraryLoads` is false and only `NSAllowsLocalNetworking`
+is set, which exempts RFC 1918 addresses but not Tailscale's 100.64/10 range.
+Reach a workstation server from the simulator over `localhost` (for example an
+`ssh -R 3100:127.0.0.1:3100` reverse tunnel) rather than a Tailscale IP.
+
 Automated checks cover disk reuse across restarts, concurrency, size limits,
 LRU eviction, missing files, revision/deletion invalidation, cancellation on
 logout, date grouping/filtering, credential origin isolation, and the real

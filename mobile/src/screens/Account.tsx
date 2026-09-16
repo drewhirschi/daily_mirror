@@ -11,9 +11,11 @@ import { Button, styles, useColors } from "../ui";
 export function Account({
   session,
   onClearCache,
+  onOpenDevices,
 }: {
   session: ActiveSession;
   onClearCache(): Promise<void>;
+  onOpenDevices(): void;
 }) {
   const c = useColors();
   const { signOut } = useSession();
@@ -85,6 +87,13 @@ export function Account({
           <Text selectable style={{ color: c.secondary, lineHeight: 22 }}>
             {session.api.origin}
           </Text>
+        </View>
+        <View style={[styles.card, { backgroundColor: c.card }]}>
+          <Text style={[styles.subtitle, { color: c.text }]}>Your mirrors</Text>
+          <Text style={{ color: c.secondary, lineHeight: 23 }}>
+            See the mirrors in your household, and add a new one.
+          </Text>
+          <Button title="Mirrors" quiet onPress={onOpenDevices} />
         </View>
         <View style={[styles.card, { backgroundColor: c.card }]}>
           <Text style={[styles.subtitle, { color: c.text }]}>

@@ -8,6 +8,7 @@ import {
   DefaultTheme,
 } from "@react-navigation/native";
 import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/unstable";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import {
   QueryCache,
   QueryClient,
@@ -21,10 +22,15 @@ import { SessionProvider, useSession, type ActiveSession } from "./session";
 import { Flipbooks } from "./components/Flipbooks";
 import { Gallery } from "./screens/Gallery";
 import { Account } from "./screens/Account";
+import { Devices } from "./screens/Devices";
+import { AddMirror } from "./screens/AddMirror";
 import { SignIn } from "./screens/SignIn";
 import { useColors } from "./ui";
 
 const Tab = createNativeBottomTabNavigator();
+// Mirrors are household settings rather than a browsing surface, so they live
+// in a stack pushed from the existing Account tab instead of a fourth tab.
+const AccountStack = createNativeStackNavigator();
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -151,7 +157,46 @@ function SignedIn({ session }: { session: ActiveSession }) {
             {() => <Flipbooks session={session} cacheVersion={cacheVersion} />}
           </Tab.Screen>
           <Tab.Screen name="Account">
-            {() => <Account session={session} onClearCache={clearCache} />}
+            {() => (
+              <AccountStack.Navigator
+                screenOptions={{ headerShown: true, headerLargeTitle: false }}
+              >
+                <AccountStack.Screen
+                  name="AccountHome"
+                  options={{ headerShown: false }}
+                >
+                  {({ navigation }) => (
+                    <Account
+                      session={session}
+                      onClearCache={clearCache}
+                      onOpenDevices={() => navigation.navigate("Devices")}
+                    />
+                  )}
+                </AccountStack.Screen>
+                <AccountStack.Screen
+                  name="Devices"
+                  options={{ title: "Your mirrors" }}
+                >
+                  {({ navigation }) => (
+                    <Devices
+                      session={session}
+                      onAdd={() => navigation.navigate("AddMirror")}
+                    />
+                  )}
+                </AccountStack.Screen>
+                <AccountStack.Screen
+                  name="AddMirror"
+                  options={{ title: "Add a mirror" }}
+                >
+                  {({ navigation }) => (
+                    <AddMirror
+                      session={session}
+                      onDone={() => navigation.popTo("Devices")}
+                    />
+                  )}
+                </AccountStack.Screen>
+              </AccountStack.Navigator>
+            )}
           </Tab.Screen>
         </Tab.Navigator>
       </NavigationContainer>

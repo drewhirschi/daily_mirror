@@ -29,9 +29,25 @@ cmd_boot() {
   fi
   emulator -list-avds | grep -qx "$AVD" || die "AVD '$AVD' not found (checked \$ANDROID_AVD_HOME=$ANDROID_AVD_HOME)"
   local start; start=$(date +%s)
-  echo "booting $AVD headlessly..."
-  nohup emulator -avd "$AVD" -no-window -no-audio \
-    -gpu swiftshader_indirect -no-boot-anim >/tmp/android-emulator-"$AVD".log 2>&1 &
+  # Extra emulator flags for one boot, word-split like a command line. The
+  # virtual scene camera reads its posters from flags only, so face capture
+  # runs as:
+  #   EMULATOR_EXTRA_ARGS="-virtualscene-poster wall=/path/face.png" ... boot
+  local extra=()
+  [ -n "${EMULATOR_EXTRA_ARGS:-}" ] && read -r -a extra <<<"$EMULATOR_EXTRA_ARGS"
+  # The virtual scene camera only exists when the emulator renders a real
+  # window on a real GPU, so face capture needs EMULATOR_WINDOW=1 and a
+  # hardware GPU. Screen recording works either way.
+  local mode=(-no-window -gpu "${EMULATOR_GPU:-swiftshader_indirect}")
+  local how="headlessly"
+  if [ -n "${EMULATOR_WINDOW:-}" ]; then
+    mode=(-gpu "${EMULATOR_GPU:-host}")
+    how="with a window"
+  fi
+  echo "booting $AVD $how${extra[0]+ with: ${extra[*]}}..."
+  nohup emulator -avd "$AVD" "${mode[@]}" -no-audio \
+    -no-boot-anim "${extra[@]+${extra[@]}}" \
+    >/tmp/android-emulator-"$AVD".log 2>&1 &
   adb wait-for-device
   while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]; do
     sleep 2
@@ -93,10 +109,10 @@ cmd_stop() {
   pkill -f 'expo start' 2>/dev/null || true
   # adb emu kill returns before qemu actually exits; wait it out
   for _ in $(seq 1 30); do
-    pgrep -f 'qemu-system-x86_64-headless' >/dev/null || break
+    pgrep -f 'qemu-system-x86_64' >/dev/null || break
     sleep 1
   done
-  if pgrep -f 'qemu-system-x86_64-headless' >/dev/null; then
+  if pgrep -f 'qemu-system-x86_64' >/dev/null; then
     echo "warning: emulator process still alive" >&2
   else
     echo "stopped emulator and Metro"

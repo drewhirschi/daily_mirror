@@ -127,6 +127,100 @@ A cold boot takes about **28 seconds** on this machine. `adb devices` then
 shows `emulator-5554  device` and `adb shell getprop ro.product.model` reports
 `sdk_gphone64_x86_64`.
 
+## The virtual scene camera (face enrollment)
+
+Guided enrollment in `mobile/src/screens/EnrollmentCapture.tsx` needs the
+camera to show a face. The emulator's *virtual scene* camera renders a 3D room
+that can carry a caller-supplied poster image, so a committed face photo from
+`data/faces/` can stand in for a person.
+
+### Only the back camera can be the virtual scene
+
+`hw.camera.front = virtualscene` is silently ignored. The emulator then creates
+no front camera at all, `adb shell dumpsys media.camera` reports
+`Number of camera devices: 1`, and CameraX logs
+
+```
+CameraValidator: Camera LENS_FACING_FRONT verification failed
+```
+
+while the app shows a black viewfinder. Configure the scene on the back camera
+and use the capture screen's switch-camera control to reach it:
+
+```ini
+hw.camera.back = virtualscene
+hw.camera.front = emulated
+```
+
+### It also needs a window
+
+With `-no-window` the emulator logs
+`emulatorSetupEnvironment: Environment scene is not required` and builds no
+scene camera. `scripts/android-emulator.sh` therefore takes three optional
+variables:
+
+| Variable | Meaning |
+| --- | --- |
+| `EMULATOR_WINDOW` | Any non-empty value drops `-no-window` and boots with a window |
+| `EMULATOR_GPU` | Overrides the renderer (`swiftshader_indirect` headless, `host` windowed) |
+| `EMULATOR_EXTRA_ARGS` | Extra emulator flags, word-split like a command line |
+
+On this workstation `-gpu host` dies during GL initialisation because the
+NVIDIA kernel module and userspace libraries are out of sync
+(`nvidia-smi` reports `Driver/library version mismatch`, and Mesa falls back to
+`llvmpipe`), so the working combination is a window plus software GL:
+
+```sh
+DISPLAY=:0 EMULATOR_WINDOW=1 EMULATOR_GPU=swiftshader_indirect \
+  EMULATOR_EXTRA_ARGS="-virtualscene-poster wall=/path/to/face.png" \
+  ./scripts/android-emulator.sh boot
+```
+
+### Placing the poster
+
+`emulator -help-virtualscene-poster` accepts the poster names the scene
+defines, and `adb emu virtualscene-image wall <png>` swaps the image at
+runtime without a reboot — useful for switching between two people mid-session.
+
+The poster *geometry* comes from
+`$ANDROID_HOME/emulator/resources/Toren1BD.posters`, outside the repository.
+The stock `wall` poster sits behind the default camera position, so it never
+appears in frame. The camera looks toward **-Z**, and these values put a
+portrait face in the middle of the viewfinder:
+
+```
+poster wall
+size 1.14 1.49
+position 0.04 -0.235 -3.0
+rotation 0 0 0
+default poster.png
+```
+
+Keep a copy of the original file (`Toren1BD.posters.orig`) before editing it.
+To re-derive the numbers for a different device or scene, point the poster at a
+labelled grid image, screenshot the viewfinder, and read the cell labels: one
+screenshot gives both the scale and the offset.
+
+### Still capture needs working host GL
+
+The preview renders correctly under software GL, but `takePictureAsync` returns
+a **black JPEG with the emulator HAL's yellow timestamp** burned into the
+bottom-left corner — on the emulated front camera as well as the virtual scene.
+The face is then never detected and every slot reports `retake`. Fixing this
+needs a host GPU the emulator can render with; until then, exercise the server
+side by posting the enrollment photos through the API instead (see
+`docs/mobile-onboarding-plan.md` for the routes).
+
+### adb input quirks on this image
+
+- `adb shell input text` silently drops `/`. Send slashes as
+  `adb shell input keyevent 76` (`KEYCODE_SLASH`) and type the rest in pieces.
+- Clearing a field with a run of `KEYCODE_DEL` events takes minutes. Use
+  `adb shell input keycombination 113 29` (Ctrl+A) then one `keyevent 67`.
+- `adb shell uiautomator dump` frequently returns a **stale** view tree while
+  the camera preview is on screen, so drive the capture screen by coordinate
+  rather than by view lookup.
+
 ## Build and install the debug dev client
 
 The native Android project is generated, not committed — the root

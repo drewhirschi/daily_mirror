@@ -30,8 +30,15 @@ run `cargo run --locked --bin suggest_faces` from `server/`.
 
 ## Matching policy
 
-- Enrollment requires five distinct manually confirmed photos across three
-  capture dates (using the stored date in `photos.captured_at`).
+- A person is enrolled by either path: five distinct guided onboarding photos,
+  or five distinct manually confirmed photos across three capture dates (using
+  the stored date in `photos.captured_at`).
+- Guided onboarding (see `docs/mobile-onboarding-plan.md`) captures five
+  directions in one sitting, so those photos are exempt from the three-day
+  rule. Processing completion attaches the single detected face to the person
+  the photo was taken for, as `confirmed` with source `enrollment`. Zero or
+  several detected faces leave the faces unknown and the app asks for a
+  retake. The three-day rule still applies to the manual path.
 - Profiles use normalized centroids of normalized SFace embeddings. One face
   per person per photo contributes, preventing duplicate detections from
   counting as independent examples.
@@ -40,8 +47,9 @@ run `cargo run --locked --bin suggest_faces` from `server/`.
   These are initial conservative thresholds, not validated accuracy guarantees.
 - People with fewer examples still compete; they cannot receive suggestions
   until enrolled, but prevent weak matches being assigned to other people.
-- Only `confirmed` faces with source `manual` teach profiles. Confirming a
-  suggestion uses this same manual path. Proposed faces never teach themselves.
+- Only `confirmed` faces with source `manual` or `enrollment` teach profiles.
+  Confirming a suggestion uses the manual path. Proposed faces never teach
+  themselves. Both kinds of evidence feed one centroid.
 - Suggestions store state `proposed`, source `centroid-v1`, and the similarity
   in `identity_score`. Manual confirmation clears that score and stores source
   `manual`. Manual Unknown stores source `manual-rejected`.

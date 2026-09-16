@@ -115,6 +115,8 @@ impl PhotoCatalog {
                 )
                 .await?;
                 ensure_column(&connection, "media_revision", "INTEGER NOT NULL DEFAULT 0").await?;
+                ensure_column(&connection, "source", "TEXT NOT NULL DEFAULT 'device'").await?;
+                ensure_column(&connection, "enrollment_person_id", "TEXT").await?;
                 Ok(database)
             })
             .await
@@ -132,6 +134,37 @@ impl PhotoCatalog {
              ON CONFLICT(id) DO UPDATE SET byte_size = excluded.byte_size, updated_at = CURRENT_TIMESTAMP",
             params![id, storage_key, id_to_timestamp(id), byte_size as i64],
         ).await.map_err(io::Error::other)?;
+        Ok(())
+    }
+
+    /// Reserve an onboarding capture so completion can attach its single face
+    /// to the person being enrolled.
+    pub async fn reserve_enrollment(
+        &self,
+        id: &str,
+        storage_key: &str,
+        byte_size: u64,
+        person_id: &str,
+    ) -> io::Result<()> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        connection
+            .execute(
+                "INSERT INTO photos (id, storage_key, captured_at, byte_size, status,
+                 source, enrollment_person_id)
+             VALUES (?1, ?2, ?3, ?4, 'pending', 'enrollment', ?5)
+             ON CONFLICT(id) DO UPDATE SET byte_size = excluded.byte_size,
+                 source = 'enrollment', enrollment_person_id = excluded.enrollment_person_id,
+                 updated_at = CURRENT_TIMESTAMP",
+                params![
+                    id,
+                    storage_key,
+                    id_to_timestamp(id),
+                    byte_size as i64,
+                    person_id
+                ],
+            )
+            .await
+            .map_err(io::Error::other)?;
         Ok(())
     }
 

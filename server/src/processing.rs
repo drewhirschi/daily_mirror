@@ -410,6 +410,25 @@ impl ProcessingQueue {
             insert_face(&transaction, photo_id, pipeline_version, ordinal, face).await?;
         }
 
+        // Guided onboarding captures carry the person they were taken for. One
+        // detected face is unambiguous evidence, so confirm it as enrollment
+        // before matching runs. Zero or several faces stay unknown and the
+        // status endpoint asks for a retake.
+        if result.faces.len() == 1
+            && let Some(person_id) = enrollment_person_id(&transaction, photo_id).await?
+        {
+            transaction
+                .execute(
+                    "UPDATE faces SET person_id = ?3, identity_state = 'confirmed',
+                         identity_source = 'enrollment', identity_score = NULL,
+                         updated_at = CURRENT_TIMESTAMP
+                     WHERE photo_id = ?1 AND pipeline_version = ?2",
+                    params![photo_id, pipeline_version, person_id],
+                )
+                .await
+                .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
+        }
+
         crate::face_matching::propose(&transaction, pipeline_version, Some(photo_id))
             .await
             .map_err(ProcessingError::Storage)?;
@@ -685,6 +704,30 @@ async fn insert_face(
         .await
         .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
     Ok(())
+}
+
+/// Reads the enrollment target inside the completion transaction so the photo
+/// row and the faces it produced are always observed together.
+async fn enrollment_person_id(
+    transaction: &libsql::Transaction,
+    photo_id: &str,
+) -> Result<Option<String>, ProcessingError> {
+    let mut rows = transaction
+        .query(
+            "SELECT enrollment_person_id FROM photos WHERE id = ?1",
+            params![photo_id],
+        )
+        .await
+        .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
+    let Some(row) = rows
+        .next()
+        .await
+        .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?
+    else {
+        return Ok(None);
+    };
+    row.get(0)
+        .map_err(|error| ProcessingError::Storage(io::Error::other(error)))
 }
 
 fn validate_lease_input(pipeline_version: &str, lease_token: &str) -> Result<(), ProcessingError> {

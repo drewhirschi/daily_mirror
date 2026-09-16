@@ -125,10 +125,23 @@ project IDs are assumed or embedded here.
 ## Current functionality
 
 Archive opens in Days. Pinch inward on the grid to move to Months, then Years;
-spread outward to move back toward Days. Person and date filters can be combined.
+spread outward to move back toward Days. The header is one row: the Archive
+title and a date chip ("All dates", or the selected range with the person in
+front) that opens the filters. Person and date filters can be combined.
 Person filtering includes all confirmed/suggested photos, including multiple
-photographs on the same day. The detail label supports VoiceOver
-increment/decrement actions without restoring the top segmented tabs.
+photographs on the same day. The Archive title supports VoiceOver
+increment/decrement actions for density without restoring the top segmented
+tabs.
+
+The photo viewer applies a rotation on the device immediately and keeps it
+until the server's new media revision arrives; deleting removes the photo from
+the grid and closes the viewer before the request completes, and any failure
+is reported and the archive refetched. The bottom bar has two extra controls:
+a book toggle that leaves the photograph out of every flipbook (a durable flag
+on the photo, so it survives rotation and re-analysis), and a people toggle
+that draws a box and name tag over each detected face. Confirmed names are
+green, suggested matches are yellow with a trailing "?", and unmatched faces
+are labeled Unknown. Photographs that have not been analyzed yet say so.
 
 Flipbooks offer pull-to-refresh, a refresh button, and a reload when returning
 to the tab. Tap the person's name to open the people picker. Playback follows

@@ -70,3 +70,33 @@ test("flipbook media permits only same-origin face crops", () => {
   ])
     assert.throws(() => mediaUrl("https://mirror.example", path));
 });
+
+test("photo faces and flipbook membership address the photo routes", async () => {
+  const original = globalThis.fetch;
+  const calls: [string, RequestInit | undefined][] = [];
+  globalThis.fetch = (async (url, options) => {
+    calls.push([String(url), options]);
+    return new Response(JSON.stringify({ included: false }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+  try {
+    const api = new MirrorApi("https://mirror.example", "session-secret");
+    await api.photoFaces("photo/1");
+    assert.equal(
+      calls[0][0],
+      "https://mirror.example/api/photos/photo%2F1/faces",
+    );
+    const membership = await api.setFlipbookMembership("photo/1", false);
+    assert.equal(
+      calls[1][0],
+      "https://mirror.example/api/photos/photo%2F1/flipbook",
+    );
+    assert.equal(calls[1][1]?.method, "PUT");
+    assert.equal(calls[1][1]?.body, JSON.stringify({ included: false }));
+    assert.equal(membership.included, false);
+  } finally {
+    globalThis.fetch = original;
+  }
+});

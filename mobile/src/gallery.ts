@@ -111,3 +111,51 @@ export function photoSections(
   }
   return groups;
 }
+
+const shortDate = (date: Date) =>
+  date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+/** The Archive header chip reads as a date range, with the person in front. */
+export function filterSummary(from?: Date, to?: Date, person?: string) {
+  const range =
+    !from && !to
+      ? "All dates"
+      : `${from ? shortDate(from) : "Start"} – ${to ? shortDate(to) : "Today"}`;
+  return person ? `${person} · ${range}` : range;
+}
+
+/** Where a contain-fit image lands inside its frame, in frame coordinates. */
+export function containedRect(
+  frame: { width: number; height: number },
+  image: { width: number; height: number },
+) {
+  if (image.width <= 0 || image.height <= 0)
+    return { x: 0, y: 0, width: frame.width, height: frame.height };
+  const scale = Math.min(
+    frame.width / image.width,
+    frame.height / image.height,
+  );
+  const width = image.width * scale;
+  const height = image.height * scale;
+  return {
+    x: (frame.width - width) / 2,
+    y: (frame.height - height) / 2,
+    width,
+    height,
+  };
+}
+
+/** Shrink so a quarter-turned image still fits the same frame. */
+export function rotatedFitScale(
+  frame: { width: number; height: number },
+  image: { width: number; height: number } | undefined,
+  degrees: number,
+) {
+  if (degrees % 180 === 0) return 1;
+  if (!image)
+    return (
+      Math.min(frame.width, frame.height) / Math.max(frame.width, frame.height)
+    );
+  const shown = containedRect(frame, image);
+  return Math.min(1, frame.width / shown.height, frame.height / shown.width);
+}

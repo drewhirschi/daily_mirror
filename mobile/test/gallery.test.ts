@@ -2,8 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_DENSITY,
+  containedRect,
   densityAfterPinch,
+  filterSummary,
   photoSections,
+  rotatedFitScale,
   selectPhotos,
 } from "../src/gallery";
 
@@ -64,4 +67,47 @@ test("archive starts in days and pinches through months and years in both direct
   for (const scale of [0.85, 1, 1.2]) {
     assert.equal(densityAfterPinch("month", scale), "month");
   }
+});
+test("header filter summary shows dates, with the person in front", () => {
+  assert.equal(filterSummary(), "All dates");
+  assert.match(filterSummary(new Date(2026, 8, 1)), /^Sep 1 – Today$/);
+  assert.match(
+    filterSummary(undefined, new Date(2026, 8, 15), "Drew"),
+    /^Drew · Start – Sep 15$/,
+  );
+});
+test("face overlays and rotations follow the contain-fit image", () => {
+  const frame = { width: 400, height: 800 };
+  const landscape = { width: 4000, height: 3000 };
+  assert.deepEqual(containedRect(frame, landscape), {
+    x: 0,
+    y: 250,
+    width: 400,
+    height: 300,
+  });
+  assert.equal(rotatedFitScale(frame, landscape, 0), 1);
+  // A 400×300 image turned on its side is 300×400, which already fits.
+  assert.equal(rotatedFitScale(frame, landscape, 90), 1);
+  // A square image at full width must shrink to fit the width when turned.
+  assert.equal(
+    rotatedFitScale(
+      { width: 400, height: 300 },
+      { width: 10, height: 10 },
+      -90,
+    ),
+    1,
+  );
+  // A tall 80×400 image turned on its side is 400 wide, over a 300 frame.
+  assert.equal(
+    rotatedFitScale(
+      { width: 300, height: 400 },
+      { width: 20, height: 100 },
+      90,
+    ),
+    0.75,
+  );
+  assert.equal(
+    rotatedFitScale({ width: 300, height: 400 }, undefined, 90),
+    0.75,
+  );
 });

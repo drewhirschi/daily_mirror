@@ -115,6 +115,12 @@ impl PhotoCatalog {
                 )
                 .await?;
                 ensure_column(&connection, "media_revision", "INTEGER NOT NULL DEFAULT 0").await?;
+                ensure_column(
+                    &connection,
+                    "flipbook_excluded",
+                    "INTEGER NOT NULL DEFAULT 0",
+                )
+                .await?;
                 Ok(database)
             })
             .await
@@ -192,7 +198,7 @@ impl PhotoCatalog {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         let mut rows = connection
             .query(
-                "SELECT id, thumbnail_status, media_revision FROM photos WHERE status = 'ready' ORDER BY captured_at DESC, id DESC",
+                "SELECT id, thumbnail_status, media_revision, flipbook_excluded FROM photos WHERE status = 'ready' ORDER BY captured_at DESC, id DESC",
                 (),
             )
             .await
@@ -205,10 +211,12 @@ impl PhotoCatalog {
             let revision = u64::try_from(media_revision).map_err(|_| {
                 io::Error::new(io::ErrorKind::InvalidData, "invalid photo media revision")
             })?;
+            let flipbook_excluded: i64 = row.get(3).map_err(io::Error::other)?;
             photos.push(Photo {
                 url: format!("/api/photos/{id}?rev={revision}"),
                 thumbnail_url: (thumbnail_status == "ready")
                     .then(|| format!("/api/photos/{id}/thumbnail?rev={revision}")),
+                flipbook_excluded: flipbook_excluded != 0,
                 id,
             });
         }
@@ -298,6 +306,20 @@ impl PhotoCatalog {
         } else {
             Ok(())
         }
+    }
+
+    /// Returns `false` when no ready photo exists for `id`.
+    pub async fn set_flipbook_excluded(&self, id: &str, excluded: bool) -> io::Result<bool> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let changed = connection
+            .execute(
+                "UPDATE photos SET flipbook_excluded = ?2, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?1 AND status = 'ready'",
+                params![id, i64::from(excluded)],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        Ok(changed > 0)
     }
 
     pub async fn repair_ready_size(&self, id: &str, byte_size: u64) -> io::Result<()> {
@@ -454,6 +476,7 @@ mod tests {
                     id: id.to_owned(),
                     url: format!("/api/photos/{id}"),
                     thumbnail_url: None,
+                    flipbook_excluded: false,
                 },
                 "photos/test.jpg".to_owned(),
             )])

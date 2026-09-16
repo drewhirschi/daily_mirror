@@ -8,6 +8,8 @@ export type Passkey = components["schemas"]["PasskeySummary"];
 export type NativeSession = components["schemas"]["NativeSession"];
 export type PasswordLogin = components["schemas"]["PasswordLogin"];
 export type PhotoList = components["schemas"]["PhotoList"];
+export type PhotoFace = components["schemas"]["PhotoFace"];
+export type PhotoFaces = components["schemas"]["PhotoFacesResponse"];
 
 export class ApiError extends Error {
   constructor(
@@ -170,6 +172,21 @@ export class MirrorApi {
     return this.request<void>(`/api/photos/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+  }
+  photoFaces(id: string, signal?: AbortSignal) {
+    return this.request<PhotoFaces>(
+      `/api/photos/${encodeURIComponent(id)}/faces`,
+      { signal },
+    );
+  }
+  setFlipbookMembership(id: string, included: boolean) {
+    const membership: components["schemas"]["FlipbookMembership"] = {
+      included,
+    };
+    return this.request<components["schemas"]["FlipbookMembership"]>(
+      `/api/photos/${encodeURIComponent(id)}/flipbook`,
+      { method: "PUT", body: JSON.stringify(membership) },
+    );
   }
   media(path: string) {
     return mediaUrl(this.origin, path);

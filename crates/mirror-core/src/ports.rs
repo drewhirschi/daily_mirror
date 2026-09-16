@@ -57,7 +57,12 @@ pub trait Store {
     fn device_id(&mut self) -> Result<String, Self::Error>;
     fn load(&mut self) -> Result<Option<Provisioned>, Self::Error>;
     fn save(&mut self, provisioned: &Provisioned) -> Result<(), Self::Error>;
+    /// Mint the identifier for the next capture. The store owns the naming
+    /// scheme because it also owns the queue's file layout.
+    fn next_capture_id(&mut self) -> Result<String, Self::Error>;
     fn enqueue(&mut self, capture_id: &str, jpeg: &[u8]) -> Result<QueuedCapture, Self::Error>;
+    /// Read a queued JPEG back for upload.
+    fn read(&mut self, capture_id: &str) -> Result<Vec<u8>, Self::Error>;
     fn pending(&mut self) -> Result<Vec<QueuedCapture>, Self::Error>;
     fn remove(&mut self, capture_id: &str) -> Result<(), Self::Error>;
     /// Erase credentials, token, queue and settings, and regenerate the device id.
@@ -68,6 +73,11 @@ pub trait Net {
     type Error: core::fmt::Debug;
     fn start_provisioning(&mut self, device_id: &str) -> Result<(), Self::Error>;
     fn stop_provisioning(&mut self) -> Result<(), Self::Error>;
+    /// Non-blocking: the credentials the app delivered over the provisioning
+    /// link, if any have arrived since the last poll.
+    fn poll_credentials(&mut self) -> Option<ReceivedCredentials>;
+    /// Report pairing progress back over the provisioning link.
+    fn report(&mut self, result: &crate::contract::ProvisioningResult) -> Result<(), Self::Error>;
     fn join(&mut self, ssid: &str, psk: &str) -> Result<(), Self::Error>;
     fn is_connected(&mut self) -> bool;
     fn claim(

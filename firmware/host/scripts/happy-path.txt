@@ -1,0 +1,18 @@
+# The out-of-box flow, against a server on port 3000.
+#
+#   cargo run -- --script scripts/happy-path.txt --store /tmp/mirror-script
+#
+# First boot enters pairing on its own, so there is no long-press here. Times
+# are milliseconds on a virtual clock; the run takes no real time.
+
+# The app sends Wi-Fi credentials and a claim token.
+1000 credentials {"ssid":"home","psk":"secret","server_url":"http://127.0.0.1:3000","claim_token":"ct_replace_me"}
+
+# Proof of possession: the user presses the button within 30 s.
+2000 click
+
+# Take a photograph now that the device is claimed. The countdown is 3 s, so
+# the shutter fires around 8 s and the upload follows.
+5000 click
+
+12000 stop

@@ -29,9 +29,6 @@ const config: ExpoConfig = {
       backgroundColor: "#275D3B",
     },
   },
-  android: {
-    package: "app.dailymirror.android",
-  },
   plugins: [
     "expo-image",
     "expo-secure-store",

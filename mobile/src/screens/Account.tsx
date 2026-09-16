@@ -1,4 +1,6 @@
 import { useCallback, useState } from "react";
+
+const deviceName = Platform.OS === "ios" ? "iPhone" : "phone";
 import {
   Alert,
   Linking,
@@ -6,6 +8,7 @@ import {
   ScrollView,
   Text,
   View,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
@@ -46,11 +49,11 @@ export function Account({
     } catch {
       Alert.alert(
         "The server could not be reached",
-        "You can sign out on this iPhone now. Your server session will expire automatically.",
+        `You can sign out on this ${deviceName} now. Your server session will expire automatically.`,
         [
           { text: "Try later", style: "cancel" },
           {
-            text: "Sign out on this iPhone",
+            text: `Sign out on this ${deviceName}`,
             style: "destructive",
             onPress: () => void logout(true),
           },
@@ -116,7 +119,7 @@ export function Account({
         </Pressable>
         <View style={[styles.card, { backgroundColor: c.card }]}>
           <Text style={[styles.subtitle, { color: c.text }]}>
-            On this iPhone
+            On this {deviceName}
           </Text>
           <Text style={{ color: c.text, fontSize: 32, fontWeight: "600" }}>
             {(stats.bytes / 1024 / 1024).toFixed(1)}{" "}

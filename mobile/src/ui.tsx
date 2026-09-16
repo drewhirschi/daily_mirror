@@ -74,16 +74,19 @@ export function Button({
   busy,
   quiet,
   danger,
+  accessibilityLabel,
 }: {
   title: string;
   onPress(): void;
   busy?: boolean;
   quiet?: boolean;
   danger?: boolean;
+  accessibilityLabel?: string;
 }) {
   const c = useColors();
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel ?? title}
       accessibilityRole="button"
       disabled={busy}
       onPress={onPress}

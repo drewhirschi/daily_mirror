@@ -220,6 +220,7 @@ export function Household({
                           : "Take photos"
                       }
                       quiet
+                      accessibilityLabel={`Take photos of ${person.display_name}`}
                       onPress={() => setCapturing(person)}
                     />
                   </View>

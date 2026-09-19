@@ -24,7 +24,7 @@ somewhere else and under what terms.
    Raspberry Pi Ltd). The file carries its own SPDX header and must not be
    relicensed. An ESP32-P4 firmware image that includes it should be treated
    as carrying GPL-2.0 source-availability obligations until this is resolved
-   (see docs/firmware-roadmap.md, "Open questions").
+   (see ../../docs/firmware-roadmap.md, "Open questions").
 
 4. components/mirror_board/src/ov5640_af_cfg.h  (provenance unclear)
    OV5640 autofocus microcode and command-register definitions, copied from

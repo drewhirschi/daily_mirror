@@ -1,7 +1,7 @@
 # ESP32 camera bring-up notes
 
 What it took to get a photo out of each board, recorded 2026-09-17 to 09-19 so
-nobody has to rediscover it. The firmware itself lives in `firmware/`; the plan
+nobody has to rediscover it. The firmware itself lives in `firmware/esp-idf/`; the plan
 is in [firmware-roadmap.md](firmware-roadmap.md).
 
 ## The two bench boards

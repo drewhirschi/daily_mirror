@@ -11,7 +11,7 @@ protocol and server contract; this file owns the device side.
 | --- | --- | --- |
 | Language | C on ESP-IDF. Every camera, ISP, provisioning and hosted-Wi-Fi API we depend on is C, and both boards work today in C. A Rust spike (esp-idf-svc HTTP server on the S3) built and ran, so Rust stays possible later for the platform-neutral core, but it is not on the path. | 2026-09-19 |
 | Boards | Two supported targets behind one app: ESP32-P4 + Arducam IMX519 (MIPI CSI, ISP on the P4, Wi-Fi via the ESP32-C6) and ESP32-S3 + OV5640 (DVP, on-sensor ISP and JPEG, native Wi-Fi and BLE). | 2026-09-19 |
-| Structure | One project under `firmware/`. Shared app in `main/`, everything board-specific behind `components/mirror_board`. | 2026-09-19 |
+| Structure | One ESP-IDF project under `firmware/esp-idf/`, beside the Rust host simulator in `firmware/host/`. Shared app in `main/`, everything board-specific behind `components/mirror_board`. | 2026-09-19 |
 | First-run configuration | Settings live in NVS and are edited from the admin page. With no Wi-Fi the device raises its own access point on 10.10.0.1 and serves the same page. BLE onboarding replaces this for end users later and writes the same NVS keys. | 2026-09-19 |
 | Discovery | mDNS hostname `mirror-<last 3 MAC bytes>.local` and a `_dailymirror._tcp` service with `id`, `board`, `fw`, `claimed` records. | 2026-09-19 |
 
@@ -28,13 +28,13 @@ protocol and server contract; this file owns the device side.
 
 ## Milestone 1: mergeable firmware (this PR)
 
-- [x] Unify the two bench apps into `firmware/` with the board adapter layer.
+- [x] Unify the two bench apps into `firmware/esp-idf/` with the board adapter layer.
 - [x] `mirror_config`: NVS settings and the `/config` admin form.
 - [x] `mirror_mdns`: hostname and service advertisement on both boards.
 - [x] Access-point fallback on 10.10.0.1 when Wi-Fi is unset or unreachable.
 - [x] Two-slot OTA partition layout, so later updates never need USB.
 - [x] Debug logging kept but off by default behind Kconfig switches.
-- [x] Third-party notices for everything borrowed (`firmware/NOTICE`).
+- [x] Third-party notices for everything borrowed (`firmware/esp-idf/NOTICE`).
 - [ ] Declare the project's own license at the repository root; the repo currently declares none.
 - [ ] Fetch `/config` over the fallback access point from a phone (the dev machine has no Wi-Fi radio, so only the serial log has confirmed it).
 - [ ] End-to-end upload test once a device token is in the settings.

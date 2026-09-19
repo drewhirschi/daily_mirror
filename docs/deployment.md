@@ -74,8 +74,9 @@ login creates a 30-day session; a signed-in user can enroll passkeys from the
 Account page. `/healthz` and the bearer-authenticated device upload path remain
 available without a gallery session.
 
-`server/vercel.json` schedules `GET /api/maintenance/reconcile` once per day at
-09:00 UTC. Vercel sends `CRON_SECRET` as a Bearer authorization header. The
+The `#[nextrs::cron]` attribute on the route schedules
+`GET /api/maintenance/reconcile` once per day at 09:00 UTC, emitted into the
+generated `.nextrs/vercel.json` at deploy time. Vercel sends `CRON_SECRET` as a Bearer authorization header. The
 server rejects missing or incorrect secrets, lists R2, repairs complete
 `pending` uploads, inserts objects that have no catalog row, and reports—but
 does not automatically delete—catalog rows whose objects are missing. The job

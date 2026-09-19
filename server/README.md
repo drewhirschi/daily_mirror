@@ -98,8 +98,9 @@ Production also runs an authenticated daily reconciliation at
 `GET /api/maintenance/reconcile`. It repairs R2 objects missing catalog rows,
 completed uploads stranded in `pending`, and missing thumbnails, while leaving
 size mismatches hidden for investigation. `CRON_SECRET` stays in Vercel; Vercel
-supplies it as a Bearer token when invoking the schedule declared in
-`vercel.json`.
+supplies it as a Bearer token when invoking the schedule declared by the
+`#[nextrs::cron]` attribute on the route and emitted into the generated
+`.nextrs/vercel.json`.
 
 Every ready photo also has one `photo_processing` row for the active face
 pipeline. Upload completion creates it; reconciliation inserts any missing
@@ -171,7 +172,9 @@ just server-health https://your-project.vercel.app
 
 The Vercel recipes use the generated prebuilt deployment path: Rust and the web
 bundle compile on this computer, the function artifact is verified, and only
-then is it uploaded. Git-triggered Vercel builds are disabled in `vercel.json`.
+then is it uploaded. `nextrs deploy` compiles one function per bundle in
+`nextrs.toml`, so each gets its own cargo features. Git-triggered Vercel builds
+are disabled in the generated `.nextrs/vercel.json`.
 See `docs/deployment.md` at the repository root for the one-time R2 and Vercel
 setup.
 

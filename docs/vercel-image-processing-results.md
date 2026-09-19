@@ -81,6 +81,34 @@ removed afterward. Final production queue: **59 complete, 0 pending, 0 leased,
 
 ## Operations and limitations
 
+### Hosted inference concurrency
+
+`DAILY_MIRROR_HOSTED_CONCURRENCY` sets how many hosted inference workers may
+hold a lease at once. It defaults to `1`, must parse as a whole number from `1`
+to `8`, and an out-of-range or unparseable value is rejected when the worker
+reads it rather than silently falling back, so a typo makes the invocation fail
+visibly instead of quietly changing throughput. The variable belongs on the
+vision bundle, which is where the claim gate runs; the web bundles only dispatch
+to it. Each invocation still claims exactly one photo, so the variable is purely
+a cap on how many invocations may be mid-inference for one pipeline version.
+Raising it changes nothing else: per-photo dispatch from upload finalization,
+the chained dispatch of the next photo, five-minute leases and the recovery cron
+all behave as before, and a worker that finds the queue empty or already at the
+limit returns its fast `idle-or-busy` report without claiming.
+
+The ceiling is memory, not CPU. A single warm inference peaked at **469,180 KiB**
+(about 470 MB) of process RSS on the 2 GB function measured above, and the
+MediaPipe engine is cached per process, so concurrent invocations do not share
+that cost. Four concurrent workers therefore sit near 1.9 GB of the 2 GB budget
+with nothing left for the JPEG buffers and runtime overhead that ride along with
+each request, which makes **4 the sensible ceiling on the default plan** and 2 or
+3 the comfortable operating range; the allowed maximum of 8 is only reachable on
+a function with a larger memory size. Exceeding the real budget does not degrade
+gracefully — the function is OOM-killed mid-inference, which drops the lease
+without a result, and the photo waits for its five-minute lease to expire before
+the recovery cron retries it, so over-provisioning trades a small latency win for
+much worse tail latency.
+
 The compatible native build remains a prepared-cache workflow: see
 [scripts/native/README.md](../scripts/native/README.md). Private models/libraries
 are ignored build assets and must be preserved or restored from their upstream

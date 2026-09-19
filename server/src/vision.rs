@@ -2,7 +2,7 @@
 use crate::{
     background::{self, RunRequest},
     photos::PhotoStore,
-    processing::{ProcessingQueue, active_pipeline_version},
+    processing::{ProcessingQueue, active_pipeline_version, hosted_concurrency},
 };
 use axum::http::StatusCode;
 use daily_mirror_processor::{FaceProcessor, mediapipe_engine::MediaPipeFaceEngine};
@@ -36,8 +36,14 @@ pub async fn run(
 ) -> Result<RunReport, StatusCode> {
     let started = Instant::now();
     let pipeline = active_pipeline_version().map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+    let concurrency = hosted_concurrency().map_err(|error| {
+        eprintln!("hosted processing configuration rejected: {error}");
+        StatusCode::SERVICE_UNAVAILABLE
+    })?;
+    // Up to `concurrency` invocations may hold a lease at once; each still
+    // handles exactly one photo. See `claim_hosted` for how the fan-out arises.
     let photo = queue
-        .claim_hosted(&pipeline, request.photo_id.as_deref())
+        .claim_hosted(&pipeline, request.photo_id.as_deref(), concurrency)
         .await
         .map_err(|e| e.status_code())?;
     let Some(photo) = photo else {

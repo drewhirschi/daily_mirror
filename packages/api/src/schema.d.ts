@@ -196,6 +196,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Self-service signup. Disabled unless `DAILY_MIRROR_ALLOW_SIGNUP=1`, because
+         *     every session can still read every household's photos.
+         */
+        post: operations["postApiAuthSignup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getApiHousehold"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["postApiHouseholdPeople"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household/people/{person_id}/enrollment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getApiHouseholdPeopleByPerson_idEnrollment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household/people/{person_id}/enrollment/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Session authenticated: the caller's own household decides who may be
+         *     enrolled, so the device upload token plays no part here.
+         */
+        post: operations["postApiHouseholdPeopleByPerson_idEnrollmentUploads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household/people/{person_id}/enrollment/uploads/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["postApiHouseholdPeopleByPerson_idEnrollmentUploadsByPhoto_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/maintenance/process": {
         parameters: {
             query?: never;
@@ -441,6 +545,31 @@ export interface components {
             display_name: string;
             id: string;
         };
+        EnrollmentPhoto: {
+            captured_at: string;
+            /** Format: int32 */
+            face_count?: number | null;
+            photo_id: string;
+            /** @description `uploading`, `processing`, `enrolled`, `retake` or `failed`. */
+            status: string;
+            thumbnail_url?: string | null;
+        };
+        EnrollmentStatus: {
+            enrolled: boolean;
+            /** Format: int32 */
+            enrolled_photos: number;
+            person_id: string;
+            photos: components["schemas"]["EnrollmentPhoto"][];
+            /** Format: int32 */
+            required_photos: number;
+        };
+        EnrollmentSummary: {
+            enrolled: boolean;
+            /** Format: int32 */
+            enrolled_photos: number;
+            /** Format: int32 */
+            required_photos: number;
+        };
         FaceAssignmentUpdate: {
             dismiss?: boolean;
             face_id: string;
@@ -474,6 +603,20 @@ export interface components {
             grid_size: number;
             id: string;
             person_ids: string[];
+        };
+        HouseholdPerson: {
+            display_name: string;
+            enrollment: components["schemas"]["EnrollmentSummary"];
+            id: string;
+        };
+        HouseholdSummary: {
+            display_name: string;
+            /** Format: int32 */
+            grid_size: number;
+            id: string;
+            people: components["schemas"]["HouseholdPerson"][];
+            /** @description The member representing the signed-in user, when onboarding created one. */
+            self_person_id?: string | null;
         };
         HouseholdsResponse: {
             households: components["schemas"]["HouseholdConfig"][];
@@ -572,6 +715,11 @@ export interface components {
             /** Format: int32 */
             degrees: number;
         };
+        SignupRequest: {
+            display_name: string;
+            password: string;
+            username: string;
+        };
         UpdateHouseholdRequest: {
             display_name: string;
             /** Format: int32 */
@@ -588,6 +736,10 @@ export interface components {
             method: string;
             url: string;
         };
+        /**
+         * @description The capture a client wants to upload. Shared by the device flow and
+         *     guided enrollment so both grant the same contract.
+         */
         UploadRequest: {
             capture_id: string;
             /** Format: int64 */
@@ -596,7 +748,11 @@ export interface components {
         };
         User: {
             display_name: string;
+            /** @description Set once the user completes household onboarding. */
+            household_id?: string | null;
             id: string;
+            /** @description The person record in the catalog that represents this user. */
+            person_id?: string | null;
             username: string;
         };
     };
@@ -928,6 +1084,138 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PasskeyList"];
                 };
+            };
+        };
+    };
+    postApiAuthSignup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSession"];
+                };
+            };
+        };
+    };
+    getApiHousehold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdSummary"];
+                };
+            };
+        };
+    };
+    postApiHouseholdPeople: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePersonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdPerson"];
+                };
+            };
+        };
+    };
+    getApiHouseholdPeopleByPerson_idEnrollment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentStatus"];
+                };
+            };
+        };
+    };
+    postApiHouseholdPeopleByPerson_idEnrollmentUploads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadGrant"];
+                };
+            };
+        };
+    };
+    postApiHouseholdPeopleByPerson_idEnrollmentUploadsByPhoto_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The enrollment photo was accepted for processing */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

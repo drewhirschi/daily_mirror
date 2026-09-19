@@ -17,6 +17,16 @@ const config: ExpoConfig = {
       ITSAppUsesNonExemptEncryption: false,
       NSLocalNetworkUsageDescription:
         "Connect to your Daily Mirror development server on your local network.",
+      NSCameraUsageDescription:
+        "Take enrollment photos so Daily Mirror can recognise the people in your household.",
+    },
+  },
+  android: {
+    package: "app.dailymirror.android",
+    permissions: ["CAMERA"],
+    adaptiveIcon: {
+      foregroundImage: "./assets/icon.png",
+      backgroundColor: "#275D3B",
     },
   },
   plugins: [
@@ -25,6 +35,17 @@ const config: ExpoConfig = {
     "expo-status-bar",
     "expo-dev-client",
     "@react-native-community/datetimepicker",
+    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "Take enrollment photos so Daily Mirror can recognise the people in your household.",
+        // Enrollment takes stills only, so no microphone or barcode support.
+        microphonePermission: false,
+        recordAudioAndroid: false,
+        barcodeScannerEnabled: false,
+      },
+    ],
   ],
 };
 

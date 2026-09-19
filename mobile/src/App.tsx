@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, AppState, View } from "react-native";
+import { ActivityIndicator, AppState, Modal, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -21,6 +21,7 @@ import { SessionProvider, useSession, type ActiveSession } from "./session";
 import { Flipbooks } from "./components/Flipbooks";
 import { Gallery } from "./screens/Gallery";
 import { Account } from "./screens/Account";
+import { Household } from "./screens/Household";
 import { SignIn } from "./screens/SignIn";
 import { useColors } from "./ui";
 
@@ -67,9 +68,11 @@ function Root() {
 }
 
 function SignedIn({ session }: { session: ActiveSession }) {
-  const { expire } = useSession();
+  const { expire, firstRun, acknowledgeFirstRun } = useSession();
   const c = useColors();
   const [cacheVersion, setCacheVersion] = useState(0);
+  // A brand new account lands on the household screen to add people.
+  const [householdOpen, setHouseholdOpen] = useState(firstRun);
   const [client] = useState(
     () =>
       new QueryClient({
@@ -151,9 +154,30 @@ function SignedIn({ session }: { session: ActiveSession }) {
             {() => <Flipbooks session={session} cacheVersion={cacheVersion} />}
           </Tab.Screen>
           <Tab.Screen name="Account">
-            {() => <Account session={session} onClearCache={clearCache} />}
+            {() => (
+              <Account
+                session={session}
+                onClearCache={clearCache}
+                onOpenHousehold={() => setHouseholdOpen(true)}
+              />
+            )}
           </Tab.Screen>
         </Tab.Navigator>
+        <Modal
+          visible={householdOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setHouseholdOpen(false)}
+        >
+          <Household
+            session={session}
+            firstRun={firstRun}
+            onClose={() => {
+              setHouseholdOpen(false);
+              acknowledgeFirstRun();
+            }}
+          />
+        </Modal>
       </NavigationContainer>
     </QueryClientProvider>
   );

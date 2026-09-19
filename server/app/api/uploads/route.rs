@@ -2,28 +2,12 @@ use axum::{
     Extension, Json,
     http::{HeaderMap, StatusCode},
 };
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 
-use crate::photos::{PhotoStore, UploadTarget};
+use crate::photos::PhotoStore;
 use crate::catalog::PhotoCatalog;
 use crate::upload_auth;
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct UploadRequest {
-    pub capture_id: String,
-    pub content_type: String,
-    pub content_length: u64,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct UploadGrant {
-    pub method: String,
-    pub url: String,
-    pub headers: std::collections::BTreeMap<String, String>,
-    pub expires_in_seconds: Option<u64>,
-    pub complete_url: String,
-}
+pub use crate::upload_flow::{UploadGrant, UploadRequest};
+use crate::upload_flow::upload_grant;
 
 #[nextrs::api]
 pub async fn post(
@@ -50,15 +34,8 @@ pub async fn post(
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         })?;
 
-    Ok(Json(grant(target, &request.capture_id)))
-}
-
-fn grant(target: UploadTarget, id: &str) -> UploadGrant {
-    UploadGrant {
-        method: target.method,
-        url: target.url,
-        headers: target.headers,
-        expires_in_seconds: target.expires_in_seconds,
-        complete_url: format!("/api/uploads/{id}"),
-    }
+    Ok(Json(upload_grant(
+        target,
+        format!("/api/uploads/{}", request.capture_id),
+    )))
 }

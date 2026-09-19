@@ -107,7 +107,9 @@ pi-health:
 deploy-check: check
     cd server && test -x node_modules/.bin/vercel
     cd server && test -f .vercel/project.json || { echo "server is not linked; run: cd server && ./node_modules/.bin/vercel link" >&2; exit 1; }
-    cd server && test -f api/index.rs && test -f vercel.json && test -x scripts/deploy-prebuilt.sh
+    cd server && test -x scripts/deploy-prebuilt.sh
+    cd server && test ! -f vercel.json || { echo "server/vercel.json shadows the generated .nextrs/vercel.json; move settings into [vercel] in nextrs.toml" >&2; exit 1; }
+    cd server && nextrs bundles plan > /dev/null
     bash -n scripts/deploy-device.sh
     bash -n server/scripts/deploy-prebuilt.sh
 

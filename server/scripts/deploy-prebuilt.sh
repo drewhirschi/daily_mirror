@@ -1,56 +1,62 @@
 #!/bin/bash
-# Prebuilt Vercel deploy: build on YOUR machine, upload only artifacts.
-# Cloud builds recompile the whole Rust dependency tree from scratch on a
-# small builder (~6-10 minutes, plus per-account queue time); this flow
-# deploys in seconds. Git-push auto-builds are disabled in vercel.json
-# ("git": {"deploymentEnabled": false}) — this script IS the deploy path.
+# Deploy the server to Vercel via nextrs, the bundle-aware build.
 #
 #   scripts/deploy-prebuilt.sh             # production
 #   scripts/deploy-prebuilt.sh --preview   # preview deploy
+#   scripts/deploy-prebuilt.sh --skip-cron # skip Cloudflare cron triggers
+#
+# `nextrs deploy` is the whole ship path: it regenerates .nextrs/vercel.json
+# from nextrs.toml, compiles one function per bundle in nextrs.toml with that
+# bundle's cargo features, uploads the prebuilt output, then deploys the
+# Cloudflare cron triggers. Git-push auto-builds stay disabled — this script
+# IS the deploy path.
+#
+# Do NOT call `vercel build` here. It knows nothing about server bundles and
+# compiles a single api/index.rs with default features only, which silently
+# drops face-inference and makes /api/processing/run return 503 forever.
 #
 # One-time setup:
 #   npm i -g vercel && vercel login && vercel link
-#   cargo install cargo-zigbuild     # cross-compiles for Lambda's glibc
-#   pip install ziglang              # zig toolchain (or install zig any way)
+#   cargo install cargo-nextrs cargo-zigbuild   # zigbuild targets Lambda glibc
+#   pip install ziglang                         # zig toolchain
+#   ../scripts/native/build.sh                  # builds resources/vision
 #
 # Full guide: https://nextrs-docs.vercel.app/docs/deploy-prebuilt
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-[ "${1:-}" = "--preview" ] && FLAGS=() || FLAGS=(--prod)
+command -v nextrs >/dev/null || {
+  echo "ERROR: cargo-nextrs is not installed; run: cargo install cargo-nextrs" >&2
+  exit 1
+}
 
-vercel pull --yes --environment=production > /dev/null
-vercel build "${FLAGS[@]}"
+test -f .vercel/project.json || {
+  echo "ERROR: server is not linked to a Vercel project; run: vercel link" >&2
+  exit 1
+}
 
-# Refuse to ship if the Rust function silently failed to build (the classic
-# missing-cargo-zigbuild failure: everything green, no binary in the output).
-if ! find .vercel/output/functions -name '*.func' -type d 2>/dev/null | grep -q .; then
-  echo "ERROR: no function in .vercel/output — is cargo-zigbuild installed and zig reachable?" >&2
+# A hand-written vercel.json shadows the generated .nextrs/vercel.json and
+# silently reintroduces the single-function, default-features build. The
+# generated file is the only supported config while bundles are in use.
+if [ -f vercel.json ]; then
+  echo "ERROR: server/vercel.json exists and would shadow the generated" >&2
+  echo "       .nextrs/vercel.json. Move its settings into [vercel] in" >&2
+  echo "       nextrs.toml and delete the file." >&2
   exit 1
 fi
 
-# vercel-rust records the executable under target/, which is excluded from the
-# upload. Copy it into the function so the Build Output is self-contained.
-python3 - <<'PY'
-import json
-import shutil
-from pathlib import Path
+# Every bundle needs its declared assets on disk; resources/vision is
+# gitignored and built separately, so a fresh clone fails here, not in prod.
+missing=$(nextrs bundles plan \
+  | python3 -c 'import json,sys,os
+plan = json.load(sys.stdin)
+print(" ".join(
+    a for b in plan["bundles"].values() for a in b["assets"] if not os.path.exists(a)
+))')
+if [ -n "$missing" ]; then
+  echo "ERROR: bundle assets are missing: $missing" >&2
+  echo "       Build them first (see scripts/native/build.sh)." >&2
+  exit 1
+fi
 
-for config_path in Path(".vercel/output/functions").glob("**/*.func/.vc-config.json"):
-    config = json.loads(config_path.read_text())
-    source = config.get("filePathMap", {}).get(config.get("handler", "executable"))
-    if not source:
-        continue
-    source_path = Path(source)
-    if not source_path.is_file():
-        raise SystemExit(f"ERROR: function executable does not exist: {source_path}")
-    bundled_name = config.get("handler", "executable")
-    destination = config_path.parent / bundled_name
-    shutil.copy2(source_path, destination)
-    destination.chmod(destination.stat().st_mode | 0o111)
-    config.pop("filePathMap", None)
-    config_path.write_text(json.dumps(config, indent=2) + "\n")
-    print(f"==> bundled {source_path} as {destination}")
-PY
-
-vercel deploy --prebuilt "${FLAGS[@]}"
+exec nextrs deploy "$@"

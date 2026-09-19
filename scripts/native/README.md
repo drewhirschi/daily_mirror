@@ -30,6 +30,22 @@ Cargo's registry, target directory and scratch state live in the
 `daily-mirror-build` Docker volume, which is what keeps a warm build near 20
 seconds. Removing that volume costs a slow rebuild, nothing more.
 
+A cargo cache from an earlier build tree can be copied in to skip that first
+slow build, adjusting the source path. Fingerprints are keyed to the
+toolchain's path, so a cache from a differently laid out image rebuilds
+anyway; correctness does not depend on it.
+
+```bash
+docker volume create daily-mirror-build
+docker run --rm -v daily-mirror-build:/dst -v /path/to/old/container-target:/src:ro \
+  debian:bullseye-slim sh -c 'mkdir -p /dst/target && cp -a /src/. /dst/target/'
+docker run --rm -v daily-mirror-build:/build debian:bullseye-slim \
+  chown -R "$(id -u)":"$(id -g)" /build
+```
+
+The second command matters: files copied as root are unwritable by the build,
+which runs as the calling user.
+
 The image carries its own Rust 1.96.0, `cargo-nextrs` (pinned to the rev in
 `server/Cargo.toml`), `cargo-zigbuild` and `zig`. `nextrs` must be compiled
 inside the image: a host-built CLI needs glibc 2.43 and cannot run there.

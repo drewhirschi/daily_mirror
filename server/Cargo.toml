@@ -25,6 +25,10 @@ path = "api/index.rs"
 name = "daily-mirror-auth"
 path = "src/bin/daily_mirror_auth.rs"
 
+[[bin]]
+name = "daily-mirror-onboarding"
+path = "src/bin/daily_mirror_onboarding.rs"
+
 [features]
 default = ["image-processing"]
 image-processing = ["dep:image"]

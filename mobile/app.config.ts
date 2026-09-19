@@ -19,6 +19,16 @@ const config: ExpoConfig = {
         "Connect to your Daily Mirror development server and to a mirror you are setting up on your local network.",
       NSLocationWhenInUseUsageDescription:
         "iOS needs location access to confirm this iPhone is joined to the mirror's own Wi-Fi network while you set it up.",
+      NSCameraUsageDescription:
+        "Take enrollment photos so Daily Mirror can recognise the people in your household.",
+    },
+  },
+  android: {
+    package: "app.dailymirror.android",
+    permissions: ["CAMERA"],
+    adaptiveIcon: {
+      foregroundImage: "./assets/icon.png",
+      backgroundColor: "#275D3B",
     },
   },
   plugins: [
@@ -40,6 +50,17 @@ const config: ExpoConfig = {
           "iOS needs location access to confirm this iPhone is joined to the mirror's own Wi-Fi network while you set it up.",
         localNetworkPermission:
           "Allow Daily Mirror to talk to a mirror on your local network while you set it up.",
+      },
+    ],
+    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "Take enrollment photos so Daily Mirror can recognise the people in your household.",
+        // Enrollment takes stills only, so no microphone or barcode support.
+        microphonePermission: false,
+        recordAudioAndroid: false,
+        barcodeScannerEnabled: false,
       },
     ],
   ],

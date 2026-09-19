@@ -1,0 +1,24 @@
+version: "0.3.1-dailymirror"
+description: >-
+  Vendored, trimmed copy of mushBrainDave/esp32-p4-imx-camera's
+  esp_cam_sensor_imx: the Sony IMX519 MIPI-CSI driver and the AK7375 autofocus
+  VCM, for the ESP32-P4 esp_cam_sensor / esp_video framework. See README.md for
+  what was taken, what was dropped, and the licences involved.
+url: https://github.com/mushBrainDave/esp32-p4-imx-camera/tree/main/components/esp_cam_sensor_imx
+license: "Apache-2.0 AND GPL-2.0-only"
+
+# No `targets:` key, deliberately. Upstream declares esp32p4, which is true of
+# the drivers - but a local component under components/ is part of *every*
+# build of this project, and the component manager then refuses the whole S3
+# build with "is not compatible with target esp32s3" before any of the
+# conditionals in CMakeLists.txt get a chance to run. Instead the dependency
+# below carries the target rule, and CMakeLists registers an empty component
+# when CONFIG_CAMERA_IMX519 is off - which it is on every non-P4 board.
+dependencies:
+  idf: ">=5.4"
+  # The core sensor framework this add-on plugs into, via its
+  # .esp_cam_sensor_detect_fn / .esp_cam_motor_detect_fn linker sections.
+  espressif/esp_cam_sensor:
+    version: "^2.4"
+    rules:
+      - if: "target == esp32p4"

@@ -1,0 +1,18 @@
+# The P4 core is RISC-V with the F (single-precision float) and C (compressed)
+# extensions. Getting this wrong is the most common first-build failure: the
+# C3/C6 target riscv32imc-esp-espidf looks similar and links nothing.
+[build]
+target = "riscv32imafc-esp-espidf"
+
+[target.riscv32imafc-esp-espidf]
+linker = "ldproxy"
+runner = "espflash flash --monitor"
+rustflags = ["--cfg", "espidf_time64"]
+
+[unstable]
+build-std = ["std", "panic_abort"]
+
+[env]
+MCU = "esp32p4"
+# ESP-IDF 5.3 is the first release that supports the P4 and esp_wifi_remote.
+ESP_IDF_VERSION = "v5.3.2"

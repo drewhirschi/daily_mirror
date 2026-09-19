@@ -1,0 +1,87 @@
+# The ESP32-P4 firmware.
+#
+# This crate is deliberately OUTSIDE the firmware workspace (see
+# ../Cargo.toml): resolving and building `esp-idf-svc` needs the espup Rust
+# toolchain, an ESP-IDF 5.3+ checkout, and the component manager, none of which
+# a plain `cargo test` machine has. Build it from this directory.
+#
+#     cargo build --release            # target comes from .cargo/config.toml
+#     cargo espflash flash --monitor
+#
+# Target: riscv32imafc-esp-espidf — the P4's RISC-V core has the F and C
+# extensions, so it is NOT the same target as the C3/C6 (riscv32imc). Wi-Fi is
+# not on the P4 die at all; it arrives over esp-hosted from the companion C6,
+# which is why esp_wifi_remote and esp_hosted are pulled in as components.
+
+[package]
+name = "daily-mirror-firmware-esp32p4"
+description = "ESP32-P4 adapters for the Daily Mirror device runtime: GPIO button, RMT ring, NVS + SD store, hosted Wi-Fi with SoftAP provisioning, and the IMX519 camera."
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+resolver = "3"
+
+[dependencies]
+daily-mirror-core = { path = "../../crates/mirror-core" }
+esp-idf-svc = { version = "0.51", features = ["binstart", "alloc"] }
+esp-idf-hal = "0.45"
+esp-idf-sys = { version = "0.36", features = ["binstart"] }
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+embedded-svc = "0.28"
+
+[build-dependencies]
+embuild = "0.33"
+
+[features]
+default = []
+# Skip the camera and upload the flashed fixture JPEG instead. This is bring-up
+# step five in the README: it proves pairing, claim and upload on the board
+# before the IMX519 is on the bench.
+fixture-camera = []
+
+[profile.release]
+opt-level = "s"
+# The ESP-IDF's C stack traces are worth the size.
+debug = true
+
+[profile.dev]
+opt-level = "z"
+
+# ESP-IDF components pulled from the Espressif component registry and from
+# GitHub. `esp-idf-sys` writes these into the generated project's
+# `idf_component.yml`; `components.yml` in this directory is the same list in
+# the format `idf.py` wants, for anyone building the C project directly.
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/esp_hosted", version = "*" }
+bindings_header = "bindings.h"
+bindings_module = "hosted"
+
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/esp_wifi_remote", version = "*" }
+
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/network_provisioning", version = "*" }
+bindings_header = "bindings.h"
+bindings_module = "provisioning"
+
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/esp_video", version = "*" }
+bindings_header = "bindings.h"
+bindings_module = "video"
+
+# The IMX519 is not one of the sixteen sensors in `esp_cam_sensor`. This is the
+# community port: register tables lifted from the Raspberry Pi kernel driver
+# (GPL — check the licence before shipping), binned modes up to 1080p, and
+# direct DW9714 focus control, which is what makes the Pi rig's focus work
+# transferable.
+[[package.metadata.esp-idf-sys.extra_components]]
+component_dirs = ["components/esp32p4-imx519-driver/components"]
+bindings_header = "bindings.h"
+bindings_module = "imx519"
+
+[package.metadata.esp-idf-sys]
+esp_idf_version = "v5.3.2"
+esp_idf_sdkconfig_defaults = ["sdkconfig.defaults"]

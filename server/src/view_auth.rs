@@ -51,14 +51,16 @@ fn bypasses_authentication(method: &Method, path: &str) -> bool {
         || path.starts_with("/icons/")
         || path.starts_with("/dist/")
         || path.starts_with("/api/auth/login/")
+        || (method == Method::POST && path == "/api/auth/signup")
         || path.starts_with("/api/processing/")
         || (method == Method::GET
             && matches!(
                 path,
                 "/api/maintenance/reconcile" | "/api/maintenance/process"
             ))
+        // The claim token is the credential here; the device has no session.
         || (method == Method::POST
-            && (matches!(path, "/api/uploads" | "/api/photos")
+            && (matches!(path, "/api/uploads" | "/api/photos" | "/api/devices/claim")
                 || path.starts_with("/api/uploads/")))
 }
 
@@ -91,11 +93,26 @@ mod tests {
             &Method::POST,
             "/api/auth/login/passkey/start"
         ));
+        // Signup has no session yet; the route gates itself and shares the
+        // password login rate limiter.
+        assert!(bypasses_authentication(&Method::POST, "/api/auth/signup"));
+        assert!(!bypasses_authentication(&Method::GET, "/api/auth/signup"));
+        assert!(!bypasses_authentication(&Method::GET, "/api/household"));
+        assert!(!bypasses_authentication(
+            &Method::POST,
+            "/api/household/people"
+        ));
         assert!(bypasses_authentication(
             &Method::GET,
             "/api/maintenance/reconcile"
         ));
         assert!(bypasses_authentication(&Method::POST, "/api/uploads"));
+        assert!(bypasses_authentication(&Method::POST, "/api/devices/claim"));
+        assert!(!bypasses_authentication(&Method::GET, "/api/devices"));
+        assert!(!bypasses_authentication(
+            &Method::POST,
+            "/api/devices/claim-tokens"
+        ));
         assert!(bypasses_authentication(
             &Method::POST,
             "/api/processing/claim"

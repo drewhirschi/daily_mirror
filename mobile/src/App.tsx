@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, AppState, View } from "react-native";
+import { ActivityIndicator, AppState, Modal, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -8,6 +8,7 @@ import {
   DefaultTheme,
 } from "@react-navigation/native";
 import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/unstable";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import {
   QueryCache,
   QueryClient,
@@ -21,10 +22,16 @@ import { SessionProvider, useSession, type ActiveSession } from "./session";
 import { Flipbooks } from "./components/Flipbooks";
 import { Gallery } from "./screens/Gallery";
 import { Account } from "./screens/Account";
+import { Devices } from "./screens/Devices";
+import { AddMirror } from "./screens/AddMirror";
+import { Household } from "./screens/Household";
 import { SignIn } from "./screens/SignIn";
 import { useColors } from "./ui";
 
 const Tab = createNativeBottomTabNavigator();
+// Mirrors are household settings rather than a browsing surface, so they live
+// in a stack pushed from the existing Account tab instead of a fourth tab.
+const AccountStack = createNativeStackNavigator();
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -67,9 +74,11 @@ function Root() {
 }
 
 function SignedIn({ session }: { session: ActiveSession }) {
-  const { expire } = useSession();
+  const { expire, firstRun, acknowledgeFirstRun } = useSession();
   const c = useColors();
   const [cacheVersion, setCacheVersion] = useState(0);
+  // A brand new account lands on the household screen to add people.
+  const [householdOpen, setHouseholdOpen] = useState(firstRun);
   const [client] = useState(
     () =>
       new QueryClient({
@@ -151,9 +160,64 @@ function SignedIn({ session }: { session: ActiveSession }) {
             {() => <Flipbooks session={session} cacheVersion={cacheVersion} />}
           </Tab.Screen>
           <Tab.Screen name="Account">
-            {() => <Account session={session} onClearCache={clearCache} />}
+            {() => (
+              <AccountStack.Navigator
+                screenOptions={{ headerShown: true, headerLargeTitle: false }}
+              >
+                <AccountStack.Screen
+                  name="AccountHome"
+                  options={{ headerShown: false }}
+                >
+                  {({ navigation }) => (
+                    <Account
+                      session={session}
+                      onClearCache={clearCache}
+                      onOpenDevices={() => navigation.navigate("Devices")}
+                      onOpenHousehold={() => setHouseholdOpen(true)}
+                    />
+                  )}
+                </AccountStack.Screen>
+                <AccountStack.Screen
+                  name="Devices"
+                  options={{ title: "Your mirrors" }}
+                >
+                  {({ navigation }) => (
+                    <Devices
+                      session={session}
+                      onAdd={() => navigation.navigate("AddMirror")}
+                    />
+                  )}
+                </AccountStack.Screen>
+                <AccountStack.Screen
+                  name="AddMirror"
+                  options={{ title: "Add a mirror" }}
+                >
+                  {({ navigation }) => (
+                    <AddMirror
+                      session={session}
+                      onDone={() => navigation.popTo("Devices")}
+                    />
+                  )}
+                </AccountStack.Screen>
+              </AccountStack.Navigator>
+            )}
           </Tab.Screen>
         </Tab.Navigator>
+        <Modal
+          visible={householdOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setHouseholdOpen(false)}
+        >
+          <Household
+            session={session}
+            firstRun={firstRun}
+            onClose={() => {
+              setHouseholdOpen(false);
+              acknowledgeFirstRun();
+            }}
+          />
+        </Modal>
       </NavigationContainer>
     </QueryClientProvider>
   );

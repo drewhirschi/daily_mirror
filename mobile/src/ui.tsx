@@ -24,6 +24,20 @@ export function useColors() {
   };
 }
 
+/** The shared text field appearance used by the sign-in and onboarding forms. */
+export function useInputStyle() {
+  const c = useColors();
+  return {
+    backgroundColor: c.card,
+    color: c.text,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 17,
+  } as const;
+}
+
 export function IconButton({
   icon,
   label,
@@ -60,16 +74,19 @@ export function Button({
   busy,
   quiet,
   danger,
+  accessibilityLabel,
 }: {
   title: string;
   onPress(): void;
   busy?: boolean;
   quiet?: boolean;
   danger?: boolean;
+  accessibilityLabel?: string;
 }) {
   const c = useColors();
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel ?? title}
       accessibilityRole="button"
       disabled={busy}
       onPress={onPress}

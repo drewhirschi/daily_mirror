@@ -1,0 +1,36 @@
+# The ESP-IDF component manifest, mirroring the `extra_components` entries in
+# Cargo.toml. `esp-idf-sys` generates its own `idf_component.yml` from those;
+# this file is here so the same component set can be built straight from
+# `idf.py` when debugging a C-side problem without Rust in the way.
+#
+# Copy it to `main/idf_component.yml` in a plain ESP-IDF project.
+dependencies:
+  idf:
+    version: ">=5.3.0"
+
+  # Wi-Fi is physically on the companion ESP32-C6. esp_wifi_remote is the API
+  # shim; esp_hosted is the SDIO transport underneath it.
+  espressif/esp_hosted:
+    version: "*"
+  espressif/esp_wifi_remote:
+    version: "*"
+
+  # SoftAP provisioning: the Curve25519 handshake, proof of possession, and the
+  # custom endpoint that carries the claim token.
+  espressif/network_provisioning:
+    version: "*"
+
+  # MIPI CSI capture, the ISP pipeline, and hardware JPEG encoding.
+  espressif/esp_video:
+    version: "*"
+
+  # The IMX519 is not one of the sixteen sensors in Espressif's
+  # esp_cam_sensor. This community port carries register tables derived from
+  # the Raspberry Pi kernel driver and drives the DW9714 focus motor directly,
+  # which is what makes the Pi rig's focus work transferable.
+  #
+  # GPL-derived: review the licence before shipping firmware built on it.
+  imx519:
+    git: https://github.com/NB11B/esp32p4-imx519-driver
+    path: components/esp_cam_sensor_imx519
+    version: main

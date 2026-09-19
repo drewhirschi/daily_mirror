@@ -1,0 +1,40 @@
+Daily Mirror camera firmware: third-party notices
+
+The license of the Daily Mirror project's own code is declared at the
+repository root, not here. This file records what in this directory came from
+somewhere else and under what terms.
+
+1. components/esp_cam_sensor_imx/  (Apache-2.0)
+   Vendored and trimmed from mushBrainDave/esp32-p4-imx-camera
+   (https://github.com/mushBrainDave/esp32-p4-imx-camera), directory
+   components/esp_cam_sensor_imx. The upstream LICENSE is kept in that
+   directory. Changes: upstream's IMX219, IMX708 and DW9807 drivers removed;
+   an IMX519 sensor driver (sensors/imx519/) and an AK7375 focus-motor driver
+   (motors/ak7375/) added, written by following the structure of upstream's
+   IMX708 and DW9807 drivers.
+
+2. components/mirror_board/src/board_p4_imx519.c  (Apache-2.0)
+   Portions of the capture-task and hardware-JPEG code are adapted from the
+   same project's imx708_wifi_snapshot example.
+
+3. components/esp_cam_sensor_imx/sensors/imx519/private_include/imx519_settings.h
+   (GPL-2.0-only)
+   IMX519 register initialisation tables taken verbatim from the Raspberry Pi
+   Linux kernel driver drivers/media/i2c/imx519.c (Arducam Technology /
+   Raspberry Pi Ltd). The file carries its own SPDX header and must not be
+   relicensed. An ESP32-P4 firmware image that includes it should be treated
+   as carrying GPL-2.0 source-availability obligations until this is resolved
+   (see ../../docs/firmware-roadmap.md, "Open questions").
+
+4. components/mirror_board/src/ov5640_af_cfg.h  (provenance unclear)
+   OV5640 autofocus microcode and command-register definitions, copied from
+   0015/ESP32-OV5640-AF (https://github.com/0015/ESP32-OV5640-AF). That
+   repository's LICENSE is MIT and the file header says "released into the
+   public domain", but the microcode itself is OmniVision's and its
+   redistribution terms have not been established. Used on the ESP32-S3 board
+   only. Resolve before distributing S3 firmware images.
+
+5. Fetched at build time by the IDF component manager, not stored here:
+   esp_cam_sensor, esp32-camera, esp_hosted, esp_wifi_remote, led_strip, mdns
+   and their dependencies (Apache-2.0); esp_video and esp_ipa ("Espressif MIT
+   License"). esp_ipa and esp_h264 link prebuilt static libraries.

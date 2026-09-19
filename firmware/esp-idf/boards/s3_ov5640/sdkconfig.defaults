@@ -1,0 +1,22 @@
+# Freenove ESP32-S3-WROOM CAM + OV5640 (autofocus module).
+# Applied on top of ../../sdkconfig.defaults.
+
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_MIRROR_BOARD_S3_OV5640=y
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+# 8 MB octal PSRAM on this module. The camera's two 5 MP frame buffers live
+# here, as does the committed photo.
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+# The CH340 bridge on this board is reliable at 921600 and no faster.
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=921600
+
+# FREERTOS_HZ is deliberately left at the 100 Hz default. The OV5640 autofocus
+# poll loops count in ticks - vTaskDelay(1), not pdMS_TO_TICKS(5), which rounds
+# to *zero* ticks at 100 Hz and turns the wait into a spin that starves the
+# very I2C traffic it is waiting on. Their iteration counts were tuned against
+# 10 ms ticks; raising HZ shortens every AF timeout by the same factor.

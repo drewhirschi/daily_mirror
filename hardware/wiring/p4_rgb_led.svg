@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="560" viewBox="0 0 860 560" font-family="system-ui, sans-serif" font-size="14">
+  <rect width="860" height="560" fill="#fff"/>
+  <text x="20" y="30" font-size="18" font-weight="bold">ESP32-P4: four-leg RGB LED + pushbutton (common-anode shown)</text>
+
+  <!-- board -->
+  <rect x="50" y="70" width="230" height="400" rx="8" fill="#e8ecf4" stroke="#333"/>
+  <text x="80" y="100" font-weight="bold">ESP32-P4 header</text>
+
+  <!-- pin stubs -->
+  <g stroke="#333" stroke-width="2">
+    <line x1="280" y1="150" x2="330" y2="150"/>
+    <line x1="280" y1="210" x2="330" y2="210"/>
+    <line x1="280" y1="270" x2="330" y2="270"/>
+    <line x1="280" y1="330" x2="330" y2="330"/>
+    <line x1="280" y1="390" x2="330" y2="390"/>
+    <line x1="280" y1="440" x2="330" y2="440"/>
+  </g>
+  <g text-anchor="end">
+    <text x="270" y="155">3V3</text>
+    <text x="270" y="215">GPIO 21 (red)</text>
+    <text x="270" y="275">GPIO 22 (green)</text>
+    <text x="270" y="335">GPIO 23 (blue)</text>
+    <text x="270" y="395">GPIO 20 (button)</text>
+    <text x="270" y="445">GND</text>
+  </g>
+
+  <!-- resistors on the three colour lines -->
+  <g stroke="#333" stroke-width="2" fill="#fff">
+    <rect x="370" y="200" width="70" height="20"/>
+    <rect x="370" y="260" width="70" height="20"/>
+    <rect x="370" y="320" width="70" height="20"/>
+  </g>
+  <g fill="#333" font-size="12">
+    <text x="375" y="196">R1 330 Ω</text>
+    <text x="375" y="256">R2 330 Ω</text>
+    <text x="375" y="316">R3 330 Ω</text>
+  </g>
+  <g stroke="#333" stroke-width="2">
+    <line x1="330" y1="210" x2="370" y2="210"/>
+    <line x1="440" y1="210" x2="560" y2="210"/>
+    <line x1="330" y1="270" x2="370" y2="270"/>
+    <line x1="440" y1="270" x2="560" y2="270"/>
+    <line x1="330" y1="330" x2="370" y2="330"/>
+    <line x1="440" y1="330" x2="560" y2="330"/>
+    <!-- 3V3 to common -->
+    <line x1="330" y1="150" x2="600" y2="150"/>
+    <line x1="600" y1="150" x2="600" y2="240"/>
+  </g>
+
+  <!-- LED package -->
+  <rect x="560" y="120" width="200" height="240" rx="14" fill="#f6f6f6" stroke="#999" stroke-dasharray="4 3"/>
+  <text x="590" y="140" fill="#666" font-size="12">4-leg RGB LED (top view)</text>
+  <!-- three diodes: anode side at common node, cathode toward resistors -->
+  <g stroke="#333" stroke-width="2">
+    <!-- red -->
+    <polygon points="600,196 600,224 574,210" fill="#d33"/>
+    <line x1="574" y1="196" x2="574" y2="224"/>
+    <line x1="560" y1="210" x2="574" y2="210"/>
+    <line x1="600" y1="210" x2="600" y2="240"/>
+    <!-- green -->
+    <polygon points="600,256 600,284 574,270" fill="#2a2"/>
+    <line x1="574" y1="256" x2="574" y2="284"/>
+    <line x1="560" y1="270" x2="574" y2="270"/>
+    <line x1="600" y1="240" x2="600" y2="300"/>
+    <!-- blue -->
+    <polygon points="600,316 600,344 574,330" fill="#36c"/>
+    <line x1="574" y1="316" x2="574" y2="344"/>
+    <line x1="560" y1="330" x2="574" y2="330"/>
+    <line x1="600" y1="300" x2="600" y2="330"/>
+  </g>
+  <circle cx="600" cy="240" r="4" fill="#333"/>
+  <text x="612" y="244" font-size="12">common (longest leg)</text>
+  <text x="612" y="214" font-size="12" fill="#d33">red leg</text>
+  <text x="612" y="274" font-size="12" fill="#2a2">green leg</text>
+  <text x="612" y="334" font-size="12" fill="#36c">blue leg</text>
+
+  <!-- leg order -->
+  <text x="560" y="385" font-size="12" fill="#333">Leg order, flat side / longest leg 2nd from left:</text>
+  <text x="560" y="403" font-size="12" fill="#333">R · common · G · B</text>
+
+  <!-- button -->
+  <g stroke="#333" stroke-width="2">
+    <line x1="330" y1="390" x2="420" y2="390"/>
+    <circle cx="420" cy="390" r="4" fill="#333"/>
+    <line x1="420" y1="390" x2="480" y2="365"/>
+    <circle cx="490" cy="390" r="4" fill="#333"/>
+    <line x1="490" y1="390" x2="560" y2="390"/>
+    <line x1="560" y1="390" x2="560" y2="440"/>
+    <line x1="330" y1="440" x2="560" y2="440"/>
+    <line x1="560" y1="440" x2="560" y2="465"/>
+    <line x1="540" y1="465" x2="580" y2="465"/>
+    <line x1="547" y1="472" x2="573" y2="472"/>
+    <line x1="554" y1="479" x2="566" y2="479"/>
+  </g>
+  <text x="400" y="360" font-weight="bold">SW1 pushbutton</text>
+
+  <text x="50" y="505" fill="#333">Common anode: common leg → 3V3; a colour turns ON when its GPIO is driven LOW (firmware inverts the PWM).</text>
+  <text x="50" y="525" fill="#333">Common cathode instead: common leg → GND, everything else identical, colour ON when GPIO is HIGH.</text>
+  <text x="50" y="545" fill="#333">One 330 Ω per colour (never on the common). ~6 mA per colour at 3.3 V. Button: internal pull-up, no resistor.</text>
+</svg>

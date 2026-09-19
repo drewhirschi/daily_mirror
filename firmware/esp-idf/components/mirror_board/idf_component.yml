@@ -1,0 +1,37 @@
+dependencies:
+  idf: ">=5.4"
+
+  # ESP32-P4: MIPI-CSI capture and the ISP live in esp_video; the IMX519 and
+  # AK7375 drivers are the vendored component in ../esp_cam_sensor_imx, which
+  # the component manager finds locally and does not download.
+  espressif/esp_video:
+    version: "^2.4"
+    rules:
+      - if: "target == esp32p4"
+
+  # The P4 has no radio. esp_wifi_remote routes the esp_wifi API to an
+  # ESP32-C6 and esp_hosted carries it over SDIO; the P4<->C6 pins are
+  # esp_hosted's built-in ESP32-P4 defaults and match the Waveshare board, so
+  # nothing is overridden. Pinned to 2.x: 3.x moves the transport around and
+  # has not been on this bench.
+  espressif/esp_hosted:
+    version: "^2.12.12"
+    rules:
+      - if: "target == esp32p4"
+  espressif/esp_wifi_remote:
+    version: "*"
+    rules:
+      - if: "target == esp32p4"
+
+  # ESP32-S3: DVP capture, with the OV5640 producing JPEG itself.
+  espressif/esp32-camera:
+    version: "*"
+    rules:
+      - if: "target == esp32s3"
+
+  # The WS2812 on the S3 board. The P4 rig uses a discrete RGB LED on LEDC
+  # PWM instead, which needs no component.
+  espressif/led_strip:
+    version: "^3"
+    rules:
+      - if: "target == esp32s3"

@@ -11,9 +11,12 @@ captures/
 device/target/
 processor/target/
 crates/*/target/
+firmware/target/
+firmware/*/target/
 processor/.env.*
 !processor/.env.example
 processor/models/*.onnx
 processor/models/*.task
 
 __pycache__/
+firmware/host/data/

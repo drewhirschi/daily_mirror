@@ -16,6 +16,7 @@ const MAX_FACES_PER_PHOTO: usize = 100;
 const MAX_LANDMARKS_PER_FACE: usize = 1_000;
 const MAX_EMBEDDING_DIMENSION: usize = 4_096;
 const MAX_HOSTED_ATTEMPTS: i64 = 5;
+const MAX_HOSTED_CONCURRENCY: u32 = 8;
 
 #[derive(Clone, Debug)]
 pub struct ProcessingQueue {
@@ -126,33 +127,52 @@ impl ProcessingQueue {
         &self,
         request: &ClaimRequest,
     ) -> Result<Vec<ClaimedPhoto>, ProcessingError> {
-        self.claim_selected(request, None, false).await
+        self.claim_selected(request, None, None).await
     }
 
-    /// Serialize hosted inference across instances using the durable lease.
+    /// Bound hosted inference across instances using the durable lease: a claim
+    /// only succeeds while fewer than `concurrency` unexpired `vercel-%` leases
+    /// exist for this pipeline. Each invocation still takes exactly one photo,
+    /// so `concurrency` is the number of hosted workers that may run at once.
     /// Desktop workers retain their existing claim behavior.
+    ///
+    /// N concurrent invocations arise because dispatch is per photo: upload
+    /// finalization (`PATCH /api/uploads/{id}`), direct uploads and re-processing
+    /// each call `background::notify` with their own photo id, so five parallel
+    /// uploads post five independent `/api/processing/run` requests. Each worker
+    /// then chains `notify(None)` when it finishes, which drains whatever is
+    /// still pending; workers that find the queue empty or at the limit return
+    /// the fast `idle-or-busy` report instead of claiming.
     pub async fn claim_hosted(
         &self,
         pipeline: &str,
         photo_id: Option<&str>,
+        concurrency: u32,
     ) -> Result<Option<ClaimedPhoto>, ProcessingError> {
         if let Some(id) = photo_id {
             crate::photos::validate_capture_id(id)
                 .map_err(|e| ProcessingError::InvalidInput(e.to_string()))?;
         }
+        let concurrency = validate_hosted_concurrency(concurrency)
+            .map_err(|error| ProcessingError::InvalidInput(error.to_string()))?;
         let request = ClaimRequest {
             worker_id: format!("vercel-{}", Uuid::new_v4()),
             pipeline_version: pipeline.to_owned(),
             limit: 1,
         };
-        Ok(self.claim_selected(&request, photo_id, true).await?.pop())
+        Ok(self
+            .claim_selected(&request, photo_id, Some(concurrency))
+            .await?
+            .pop())
     }
 
+    /// `hosted_concurrency` is `None` for desktop workers and `Some(limit)` for
+    /// hosted ones, where `limit` caps the unexpired hosted leases per pipeline.
     async fn claim_selected(
         &self,
         request: &ClaimRequest,
         photo_id: Option<&str>,
-        hosted: bool,
+        hosted_concurrency: Option<u32>,
     ) -> Result<Vec<ClaimedPhoto>, ProcessingError> {
         validate_identifier("worker ID", &request.worker_id)
             .map_err(|error| ProcessingError::InvalidInput(error.to_string()))?;
@@ -176,7 +196,10 @@ impl ProcessingQueue {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .await
             .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
-        if hosted {
+        // Zero disables the hosted gate entirely for desktop claims; a hosted
+        // claim always carries a validated 1..=8 limit.
+        let hosted_limit = i64::from(hosted_concurrency.unwrap_or(0));
+        if hosted_concurrency.is_some() {
             transaction.execute(
                 "UPDATE photo_processing SET status = 'failed',
                     last_error = COALESCE(last_error, 'Hosted worker exhausted its attempts'),
@@ -195,19 +218,19 @@ impl ProcessingQueue {
                  WHERE processing.pipeline_version = ?1
                    AND photos.status = 'ready'
                    AND (?3 IS NULL OR processing.photo_id = ?3)
-                   AND (?4 = 0 OR NOT EXISTS (
-                     SELECT 1 FROM photo_processing busy
+                   AND (?4 = 0 OR (
+                     SELECT COUNT(*) FROM photo_processing busy
                      WHERE busy.pipeline_version = ?1 AND busy.status = 'leased'
                        AND busy.leased_by LIKE 'vercel-%'
                        AND busy.lease_expires_at > CURRENT_TIMESTAMP
-                   ))
+                   ) < ?4)
                    AND (
                      (processing.status = 'pending' AND processing.available_at <= CURRENT_TIMESTAMP)
                      OR (processing.status = 'leased' AND processing.lease_expires_at <= CURRENT_TIMESTAMP)
                    )
                  ORDER BY photos.captured_at, photos.id
                  LIMIT ?2",
-                params![request.pipeline_version.clone(), i64::from(request.limit), photo_id, i64::from(hosted)],
+                params![request.pipeline_version.clone(), i64::from(request.limit), photo_id, hosted_limit],
             )
             .await
             .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
@@ -408,6 +431,25 @@ impl ProcessingQueue {
 
         for (ordinal, face) in result.faces.iter().enumerate() {
             insert_face(&transaction, photo_id, pipeline_version, ordinal, face).await?;
+        }
+
+        // Guided onboarding captures carry the person they were taken for. One
+        // detected face is unambiguous evidence, so confirm it as enrollment
+        // before matching runs. Zero or several faces stay unknown and the
+        // status endpoint asks for a retake.
+        if result.faces.len() == 1
+            && let Some(person_id) = enrollment_person_id(&transaction, photo_id).await?
+        {
+            transaction
+                .execute(
+                    "UPDATE faces SET person_id = ?3, identity_state = 'confirmed',
+                         identity_source = 'enrollment', identity_score = NULL,
+                         updated_at = CURRENT_TIMESTAMP
+                     WHERE photo_id = ?1 AND pipeline_version = ?2",
+                    params![photo_id, pipeline_version, person_id],
+                )
+                .await
+                .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
         }
 
         crate::face_matching::propose(&transaction, pipeline_version, Some(photo_id))
@@ -646,6 +688,39 @@ pub fn active_pipeline_version() -> io::Result<String> {
     Ok(value)
 }
 
+/// How many hosted inference workers may hold a lease at once. Default 1, which
+/// reproduces the original single-lease gate. Invalid values are an error here
+/// rather than a silent fallback, so a typo fails the invocation visibly.
+pub fn hosted_concurrency() -> io::Result<u32> {
+    let Ok(value) = std::env::var("DAILY_MIRROR_HOSTED_CONCURRENCY") else {
+        return Ok(1);
+    };
+    let parsed = value.trim().parse::<u32>().map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "DAILY_MIRROR_HOSTED_CONCURRENCY must be a whole number between 1 and \
+                 {MAX_HOSTED_CONCURRENCY}, got {value:?}"
+            ),
+        )
+    })?;
+    validate_hosted_concurrency(parsed)
+}
+
+fn validate_hosted_concurrency(value: u32) -> io::Result<u32> {
+    if (1..=MAX_HOSTED_CONCURRENCY).contains(&value) {
+        Ok(value)
+    } else {
+        Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "hosted inference concurrency must be between 1 and \
+                 {MAX_HOSTED_CONCURRENCY}, got {value}"
+            ),
+        ))
+    }
+}
+
 async fn insert_face(
     transaction: &libsql::Transaction,
     photo_id: &str,
@@ -685,6 +760,30 @@ async fn insert_face(
         .await
         .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
     Ok(())
+}
+
+/// Reads the enrollment target inside the completion transaction so the photo
+/// row and the faces it produced are always observed together.
+async fn enrollment_person_id(
+    transaction: &libsql::Transaction,
+    photo_id: &str,
+) -> Result<Option<String>, ProcessingError> {
+    let mut rows = transaction
+        .query(
+            "SELECT enrollment_person_id FROM photos WHERE id = ?1",
+            params![photo_id],
+        )
+        .await
+        .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?;
+    let Some(row) = rows
+        .next()
+        .await
+        .map_err(|error| ProcessingError::Storage(io::Error::other(error)))?
+    else {
+        return Ok(None);
+    };
+    row.get(0)
+        .map_err(|error| ProcessingError::Storage(io::Error::other(error)))
 }
 
 fn validate_lease_input(pipeline_version: &str, lease_token: &str) -> Result<(), ProcessingError> {
@@ -1070,7 +1169,7 @@ mod tests {
         fixture.queue.reconcile_missing("face-v1").await.unwrap();
         let first = fixture
             .queue
-            .claim_hosted("face-v1", Some(b))
+            .claim_hosted("face-v1", Some(b), 1)
             .await
             .unwrap()
             .unwrap();
@@ -1078,7 +1177,7 @@ mod tests {
         assert!(
             fixture
                 .queue
-                .claim_hosted("face-v1", Some(a))
+                .claim_hosted("face-v1", Some(a), 1)
                 .await
                 .unwrap()
                 .is_none()
@@ -1088,7 +1187,7 @@ mod tests {
         ).await.unwrap();
         let recovered = fixture
             .queue
-            .claim_hosted("face-v1", Some(b))
+            .claim_hosted("face-v1", Some(b), 1)
             .await
             .unwrap()
             .unwrap();
@@ -1108,13 +1207,87 @@ mod tests {
         assert_eq!(
             fixture
                 .queue
-                .claim_hosted("face-v1", None)
+                .claim_hosted("face-v1", None, 1)
                 .await
                 .unwrap()
                 .unwrap()
                 .photo_id,
             a
         );
+        fixture.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn hosted_claims_run_in_parallel_up_to_the_configured_limit() {
+        let fixture = Fixture::new("hosted-parallel").await;
+        let ids = [
+            "20260907T130000Z-hosted010",
+            "20260907T130001Z-hosted011",
+            "20260907T130002Z-hosted012",
+        ];
+        for id in ids {
+            fixture.ready_photo(id).await;
+        }
+        fixture.queue.reconcile_missing("face-v1").await.unwrap();
+
+        let first = fixture
+            .queue
+            .claim_hosted("face-v1", None, 2)
+            .await
+            .unwrap()
+            .expect("first hosted claim below the limit");
+        let second = fixture
+            .queue
+            .claim_hosted("face-v1", None, 2)
+            .await
+            .unwrap()
+            .expect("second hosted claim below the limit");
+        assert_ne!(first.photo_id, second.photo_id);
+        assert_eq!(fixture.queue.status("face-v1").await.unwrap().leased, 2);
+        assert!(
+            fixture
+                .queue
+                .claim_hosted("face-v1", None, 2)
+                .await
+                .unwrap()
+                .is_none(),
+            "a third hosted claim must be idle at limit 2"
+        );
+
+        // An expired lease no longer occupies a slot, so the third photo claims.
+        fixture
+            .catalog
+            .connection()
+            .await
+            .unwrap()
+            .execute(
+                "UPDATE photo_processing SET lease_expires_at = datetime(CURRENT_TIMESTAMP, '-1 second') WHERE photo_id = ?1",
+                params![first.photo_id.clone()],
+            )
+            .await
+            .unwrap();
+        let third = fixture
+            .queue
+            .claim_hosted("face-v1", Some(ids[2]), 2)
+            .await
+            .unwrap()
+            .expect("an expired lease must not count toward the limit");
+        assert_eq!(third.photo_id, ids[2]);
+        fixture.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn hosted_concurrency_rejects_values_outside_one_through_eight() {
+        assert!(super::validate_hosted_concurrency(0).is_err());
+        assert!(super::validate_hosted_concurrency(9).is_err());
+        assert_eq!(super::validate_hosted_concurrency(1).unwrap(), 1);
+        assert_eq!(super::validate_hosted_concurrency(8).unwrap(), 8);
+
+        let fixture = Fixture::new("hosted-limit-invalid").await;
+        assert!(matches!(
+            fixture.queue.claim_hosted("face-v1", None, 0).await,
+            Err(ProcessingError::InvalidInput(_))
+        ));
         fixture.cleanup().await;
     }
 
@@ -1126,7 +1299,7 @@ mod tests {
         fixture.queue.reconcile_missing("face-v1").await.unwrap();
         fixture
             .queue
-            .claim_hosted("face-v1", None)
+            .claim_hosted("face-v1", None, 1)
             .await
             .unwrap()
             .unwrap();
@@ -1136,7 +1309,7 @@ mod tests {
         assert!(
             fixture
                 .queue
-                .claim_hosted("face-v1", None)
+                .claim_hosted("face-v1", None, 1)
                 .await
                 .unwrap()
                 .is_none()

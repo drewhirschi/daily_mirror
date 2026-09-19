@@ -196,6 +196,171 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Self-service signup. Disabled unless `DAILY_MIRROR_ALLOW_SIGNUP=1`, because
+         *     every session can still read every household's photos.
+         */
+        post: operations["postApiAuthSignup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's household devices. Session authenticated by `view_auth`. */
+        get: operations["getApiDevices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redeem a claim token for a per-device bearer token.
+         * @description Deliberately unauthenticated: the claim token is the credential, and the
+         *     device has no session. 409 means the device already belongs to another
+         *     household and was not released by a full reset.
+         */
+        post: operations["postApiDevicesClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/devices/claim-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mint a single-use claim token bound to the signed-in user's household.
+         * @description The app hands the token to a device over the local provisioning link; the
+         *     device redeems it at `POST /api/devices/claim` within
+         *     `CLAIM_TOKEN_TTL_SECONDS`.
+         */
+        post: operations["postApiDevicesClaim-tokens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getApiHousehold"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["postApiHouseholdPeople"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household/people/{person_id}/enrollment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getApiHouseholdPeopleByPerson_idEnrollment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household/people/{person_id}/enrollment/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Session authenticated: the caller's own household decides who may be
+         *     enrolled, so the device upload token plays no part here.
+         */
+        post: operations["postApiHouseholdPeopleByPerson_idEnrollmentUploads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/household/people/{person_id}/enrollment/uploads/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["postApiHouseholdPeopleByPerson_idEnrollmentUploadsByPhoto_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/maintenance/process": {
         parameters: {
             query?: never;
@@ -429,6 +594,15 @@ export interface components {
         BatchAssignFacesResponse: {
             assignments: components["schemas"]["AssignFaceResponse"][];
         };
+        /** @description Response of `POST /api/devices/claim-tokens`. Requires a user session. */
+        ClaimTokenGrant: {
+            /** @description Single-use, bound to the caller's household. */
+            claim_token: string;
+            /** @description RFC 3339 timestamp after which the token is rejected. */
+            expires_at: string;
+            /** @description Origin the device should store and use for every later request. */
+            server_url: string;
+        };
         CreateHouseholdRequest: {
             display_name: string;
             /** Format: int32 */
@@ -440,6 +614,70 @@ export interface components {
         CreatePersonResponse: {
             display_name: string;
             id: string;
+        };
+        /**
+         * @description Body of `POST /api/devices/claim`. The claim token is the credential; no
+         *     other authentication is required.
+         */
+        DeviceClaimRequest: {
+            claim_token: string;
+            /**
+             * @description Stable identifier generated by the device on first boot and regenerated
+             *     by a full reset.
+             */
+            device_id: string;
+            firmware_version: string;
+            /** @description Free-form hardware label, e.g. `esp32-p4-imx519` or `host`. */
+            hardware: string;
+        };
+        /** @description Response of `POST /api/devices/claim`. */
+        DeviceClaimed: {
+            /** @description Human-readable name assigned by the server, editable later in the app. */
+            device_name: string;
+            /** @description Long-lived bearer token. The device stores it and never shows it to the app. */
+            device_token: string;
+            household_id: string;
+        };
+        /**
+         * @description Response of `GET /api/devices`: every device paired to the caller's
+         *     household, newest claim first.
+         */
+        DeviceListResponse: {
+            devices: components["schemas"]["DeviceSummary"][];
+        };
+        /** @description Summary row returned to the app for the household's devices. */
+        DeviceSummary: {
+            claimed_at: string;
+            device_id: string;
+            device_name: string;
+            firmware_version: string;
+            hardware: string;
+            last_seen_at?: string | null;
+        };
+        EnrollmentPhoto: {
+            captured_at: string;
+            /** Format: int32 */
+            face_count?: number | null;
+            photo_id: string;
+            /** @description `uploading`, `processing`, `enrolled`, `retake` or `failed`. */
+            status: string;
+            thumbnail_url?: string | null;
+        };
+        EnrollmentStatus: {
+            enrolled: boolean;
+            /** Format: int32 */
+            enrolled_photos: number;
+            person_id: string;
+            photos: components["schemas"]["EnrollmentPhoto"][];
+            /** Format: int32 */
+            required_photos: number;
+        };
+        EnrollmentSummary: {
+            enrolled: boolean;
+            /** Format: int32 */
+            enrolled_photos: number;
+            /** Format: int32 */
+            required_photos: number;
         };
         FaceAssignmentUpdate: {
             dismiss?: boolean;
@@ -474,6 +712,20 @@ export interface components {
             grid_size: number;
             id: string;
             person_ids: string[];
+        };
+        HouseholdPerson: {
+            display_name: string;
+            enrollment: components["schemas"]["EnrollmentSummary"];
+            id: string;
+        };
+        HouseholdSummary: {
+            display_name: string;
+            /** Format: int32 */
+            grid_size: number;
+            id: string;
+            people: components["schemas"]["HouseholdPerson"][];
+            /** @description The member representing the signed-in user, when onboarding created one. */
+            self_person_id?: string | null;
         };
         HouseholdsResponse: {
             households: components["schemas"]["HouseholdConfig"][];
@@ -572,6 +824,11 @@ export interface components {
             /** Format: int32 */
             degrees: number;
         };
+        SignupRequest: {
+            display_name: string;
+            password: string;
+            username: string;
+        };
         UpdateHouseholdRequest: {
             display_name: string;
             /** Format: int32 */
@@ -588,6 +845,10 @@ export interface components {
             method: string;
             url: string;
         };
+        /**
+         * @description The capture a client wants to upload. Shared by the device flow and
+         *     guided enrollment so both grant the same contract.
+         */
         UploadRequest: {
             capture_id: string;
             /** Format: int64 */
@@ -596,7 +857,11 @@ export interface components {
         };
         User: {
             display_name: string;
+            /** @description Set once the user completes household onboarding. */
+            household_id?: string | null;
             id: string;
+            /** @description The person record in the catalog that represents this user. */
+            person_id?: string | null;
             username: string;
         };
     };
@@ -928,6 +1193,199 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PasskeyList"];
                 };
+            };
+        };
+    };
+    postApiAuthSignup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NativeSession"];
+                };
+            };
+        };
+    };
+    getApiDevices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceListResponse"];
+                };
+            };
+        };
+    };
+    postApiDevicesClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceClaimRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceClaimed"];
+                };
+            };
+        };
+    };
+    "postApiDevicesClaim-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimTokenGrant"];
+                };
+            };
+        };
+    };
+    getApiHousehold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdSummary"];
+                };
+            };
+        };
+    };
+    postApiHouseholdPeople: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePersonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdPerson"];
+                };
+            };
+        };
+    };
+    getApiHouseholdPeopleByPerson_idEnrollment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentStatus"];
+                };
+            };
+        };
+    };
+    postApiHouseholdPeopleByPerson_idEnrollmentUploads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadGrant"];
+                };
+            };
+        };
+    };
+    postApiHouseholdPeopleByPerson_idEnrollmentUploadsByPhoto_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The enrollment photo was accepted for processing */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

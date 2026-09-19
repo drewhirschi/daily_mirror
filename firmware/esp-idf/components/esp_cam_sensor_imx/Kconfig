@@ -1,0 +1,43 @@
+menu "Camera Sensor (IMX add-on)"
+
+    config CAMERA_IMX519
+        bool "Support IMX519 (Arducam 16MP autofocus)"
+        default n
+        help
+            Enable the Sony IMX519 MIPI-CSI driver (Arducam 16MP AF module).
+            Modes are 2x2-binned RAW10 crops; autofocus is the separate AK7375
+            VCM driver below.
+
+    if CAMERA_IMX519
+
+        config CAMERA_IMX519_AUTO_DETECT_MIPI_INTERFACE_SENSOR
+            bool "Auto-detect IMX519 on the MIPI-CSI interface"
+            default y
+
+        config CAMERA_IMX519_MIPI_IF_FORMAT_INDEX_DEFAULT
+            int "Default MIPI-CSI mode index"
+            default 0
+            range 0 2
+            help
+              0 - 1920x1080 RAW10 30fps, 2x2 binned crop of a 3840x2160 window (82% FOV)
+              1 - 1280x720 RAW10 30fps, 2x2 binned crop of a 2560x1440 window (55% FOV)
+              2 - 2328x1748 RAW10 30fps, 2x2 binned full field. Wider than the
+                  P4 datapath limit (~1920); experimental.
+
+        config CAMERA_IMX519_DEBUG_LOG
+            bool "Log every exposure and gain write (bench debugging)"
+            default n
+            help
+                Prints each exposure/gain request the ISP's auto-exposure makes
+                and what the driver actually wrote. Useful when AE misbehaves;
+                noisy otherwise. Off in shipping builds.
+
+    endif # CAMERA_IMX519
+
+endmenu
+
+menu "Camera Motor (IMX add-on)"
+
+    rsource "motors/ak7375/Kconfig.ak7375"
+
+endmenu

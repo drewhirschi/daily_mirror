@@ -1,0 +1,159 @@
+menu "Daily Mirror board"
+
+choice MIRROR_BOARD
+    prompt "Target board"
+    default MIRROR_BOARD_P4_IMX519 if IDF_TARGET_ESP32P4
+    default MIRROR_BOARD_S3_OV5640 if IDF_TARGET_ESP32S3
+    help
+        Which hardware this image is for. Normally set by the per-board
+        sdkconfig.defaults file that `-DMIRROR_BOARD=<name>` selects; see
+        firmware/README.md. Exactly one board adapter is compiled in.
+
+    config MIRROR_BOARD_P4_IMX519
+        bool "ESP32-P4 + Arducam IMX519 (MIPI-CSI, AK7375 autofocus)"
+        depends on IDF_TARGET_ESP32P4
+
+    config MIRROR_BOARD_S3_OV5640
+        bool "ESP32-S3 + OV5640 (DVP, AF firmware blob)"
+        depends on IDF_TARGET_ESP32S3
+
+endchoice
+
+config MIRROR_BUTTON_GPIO
+    int "Shutter button GPIO (momentary switch to GND, internal pull-up)"
+    default 20 if MIRROR_BOARD_P4_IMX519
+    default 1 if MIRROR_BOARD_S3_OV5640
+    default 0
+    range -1 56
+    help
+        The press flow's button. -1 disables the button task, leaving
+        POST /press as the only trigger.
+
+config MIRROR_JPEG_QUALITY
+    int "JPEG quality (0-100)"
+    default 90
+    range 10 100
+    help
+        On the P4 this is the hardware encoder's quality. On the S3 it is
+        mapped onto esp32-camera's inverted 0-63 scale.
+
+menu "Status LED"
+
+if MIRROR_BOARD_S3_OV5640
+
+config MIRROR_LED_WS2812_GPIO
+    int "WS2812 data GPIO"
+    default 48
+    range 0 48
+    help
+        The single addressable LED on the Freenove ESP32-S3-WROOM CAM board.
+
+endif # MIRROR_BOARD_S3_OV5640
+
+if MIRROR_BOARD_P4_IMX519
+
+config MIRROR_LED_R_GPIO
+    int "RGB LED red GPIO (LEDC PWM)"
+    default 21
+    range 0 56
+
+config MIRROR_LED_G_GPIO
+    int "RGB LED green GPIO (LEDC PWM)"
+    default 22
+    range 0 56
+
+config MIRROR_LED_B_GPIO
+    int "RGB LED blue GPIO (LEDC PWM)"
+    default 23
+    range 0 56
+
+config MIRROR_LED_COMMON_ANODE
+    bool "RGB LED is common anode (common leg to 3V3)"
+    default y
+    help
+        A four-leg RGB LED with one 330 ohm resistor per colour. Common anode
+        means the common leg goes to 3V3 and each channel is pulled low to
+        light, so the PWM duty is inverted. Get this backwards and the LED is
+        on when it should be off and vice versa - it is not a wiring fault, it
+        is this flag.
+
+endif # MIRROR_BOARD_P4_IMX519
+
+endmenu # Status LED
+
+menu "Camera pins"
+
+if MIRROR_BOARD_P4_IMX519
+
+config MIRROR_CAM_SCCB_SDA_GPIO
+    int "Camera I2C (SCCB) SDA GPIO"
+    default 7
+    range 0 56
+
+config MIRROR_CAM_SCCB_SCL_GPIO
+    int "Camera I2C (SCCB) SCL GPIO"
+    default 8
+    range 0 56
+
+endif # MIRROR_BOARD_P4_IMX519
+
+if MIRROR_BOARD_S3_OV5640
+
+config MIRROR_CAM_XCLK_GPIO
+    int "Camera XCLK GPIO"
+    default 15
+config MIRROR_CAM_SDA_GPIO
+    int "Camera SCCB SDA GPIO"
+    default 4
+config MIRROR_CAM_SCL_GPIO
+    int "Camera SCCB SCL GPIO"
+    default 5
+config MIRROR_CAM_D0_GPIO
+    int "Camera D0 GPIO"
+    default 11
+config MIRROR_CAM_D1_GPIO
+    int "Camera D1 GPIO"
+    default 9
+config MIRROR_CAM_D2_GPIO
+    int "Camera D2 GPIO"
+    default 8
+config MIRROR_CAM_D3_GPIO
+    int "Camera D3 GPIO"
+    default 10
+config MIRROR_CAM_D4_GPIO
+    int "Camera D4 GPIO"
+    default 12
+config MIRROR_CAM_D5_GPIO
+    int "Camera D5 GPIO"
+    default 18
+config MIRROR_CAM_D6_GPIO
+    int "Camera D6 GPIO"
+    default 17
+config MIRROR_CAM_D7_GPIO
+    int "Camera D7 GPIO"
+    default 16
+config MIRROR_CAM_VSYNC_GPIO
+    int "Camera VSYNC GPIO"
+    default 6
+config MIRROR_CAM_HREF_GPIO
+    int "Camera HREF GPIO"
+    default 7
+config MIRROR_CAM_PCLK_GPIO
+    int "Camera PCLK GPIO"
+    default 13
+
+config MIRROR_CAM_VFLIP
+    bool "Flip the image vertically"
+    default y
+    help
+        The Freenove module is mounted upside down on the bench rig.
+
+config MIRROR_CAM_HMIRROR
+    bool "Mirror the image horizontally"
+    default n
+
+endif # MIRROR_BOARD_S3_OV5640
+
+endmenu # Camera pins
+
+endmenu # Daily Mirror board

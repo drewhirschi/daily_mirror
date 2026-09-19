@@ -1,0 +1,35 @@
+menu "Daily Mirror settings defaults"
+
+    comment "Build-time fallbacks used only when NVS has no value."
+    comment "Leave empty in git; set them in a git-ignored sdkconfig for bench builds."
+
+    config MIRROR_DEFAULT_WIFI_SSID
+        string "Default Wi-Fi SSID"
+        default ""
+        help
+            Used when no SSID has been stored through the /config page.
+            Keep this empty in anything committed to the repository.
+
+    config MIRROR_DEFAULT_WIFI_PASS
+        string "Default Wi-Fi password"
+        default ""
+        help
+            Used when no password has been stored through the /config page.
+            This ends up in the firmware image in plain text, so set it only in
+            a git-ignored sdkconfig on a bench build, never in source control.
+
+    config MIRROR_DEFAULT_SERVER_URL
+        string "Default server URL"
+        default ""
+        help
+            Base URL uploads are sent to, e.g. https://mirror.example.com.
+            Must start with http:// or https:// when non-empty.
+
+    config MIRROR_DEFAULT_UPLOAD_TOKEN
+        string "Default upload token"
+        default ""
+        help
+            Bearer token for the upload server. Same warning as the Wi-Fi
+            password: a build-time default is baked into the image.
+
+endmenu

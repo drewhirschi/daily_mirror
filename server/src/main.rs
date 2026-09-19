@@ -5,6 +5,13 @@ use std::net::{IpAddr, Ipv4Addr};
 
 #[tokio::main]
 async fn main() {
+    // `.env.local` holds the ignored per-developer configuration that the
+    // `daily-mirror-auth` and `daily-mirror-onboarding` binaries already read,
+    // so the dev server must honour the same file or the CLI and the server
+    // disagree about the database, storage and signup settings. Existing
+    // process variables still win, so a one-off override on the command line
+    // keeps working.
+    dotenvy::from_filename(".env.local").ok();
     dotenvy::dotenv().ok();
 
     let app = server::app();

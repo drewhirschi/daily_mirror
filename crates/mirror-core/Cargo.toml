@@ -6,8 +6,15 @@ rust-version = "1.88"
 publish = false
 description = "Platform-neutral device logic for Daily Mirror: state machine, button gestures, ring patterns, and the pairing contract shared with the server."
 
+[features]
+default = []
+# Derives `utoipa::ToSchema` on the wire models so the server can publish them
+# in its OpenAPI document. Off by default: firmware targets never need it.
+utoipa = ["dep:utoipa"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+utoipa = { version = "5", optional = true }
 
 [dev-dependencies]
 serde_json = "1"

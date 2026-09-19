@@ -1,0 +1,22 @@
+# Settings shared by every board. Per-board files live in
+# boards/<name>/sdkconfig.defaults and are applied after this one.
+
+# Two OTA slots; see partitions.csv for why.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# app_main runs the whole bring-up, including camera init.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# Frame buffers, the published frame and the committed photo all live in PSRAM.
+CONFIG_SPIRAM=y
+
+# Browsers send long Cookie/Accept headers; the 512-byte default rejects them
+# with a 431 that looks like the device being down.
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
+
+# HTTPS uploads verify against the Mozilla root bundle compiled into the image.
+# The bench builds used CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY, which makes an
+# upload trivially interceptable; that is deliberately NOT set here.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y

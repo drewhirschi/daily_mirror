@@ -27,5 +27,10 @@ pub async fn post(
         .mint_claim_token(&user, &server_url)
         .await
         .map(Json)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+        .map_err(|error| match error.kind() {
+            // No household row means no invite has been accepted and no signup
+            // has happened for this account; not a server fault.
+            std::io::ErrorKind::NotFound => StatusCode::NOT_FOUND,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        })
 }

@@ -61,11 +61,26 @@ async fn pairing_mints_claims_lists_and_authenticates_uploads() {
     let auth = AuthStore::local(database.clone());
     let catalog = PhotoCatalog::local(database);
     let registry = DeviceRegistry::new(ProcessingQueue::new(catalog.clone()));
-    let user = auth
-        .create_user("pairer", "Pairer", "strong-test-password")
+    // Signup is what puts a user in a household; membership lives in the
+    // household_users join table, which pairing and onboarding both read.
+    let user = server::onboarding::signup(
+        &auth,
+        &ProcessingQueue::new(catalog.clone()),
+        &server::onboarding::SignupRequest {
+            username: "pairer".to_owned(),
+            display_name: "Pairer".to_owned(),
+            password: "strong-test-password".to_owned(),
+        },
+    )
+    .await
+    .unwrap();
+    let session = auth.create_session(&user.id).await.unwrap().token;
+    // An account that never signed up has no household and cannot mint.
+    let homeless = auth
+        .create_user("homeless", "Homeless", "strong-test-password")
         .await
         .unwrap();
-    let session = auth.create_session(&user.id).await.unwrap().token;
+    let homeless_session = auth.create_session(&homeless.id).await.unwrap().token;
 
     let app = nextrs::router::build_router(server::generated_registry())
         .layer(Extension(PhotoStore::new(directory.join("photos"))))
@@ -90,6 +105,18 @@ async fn pairing_mints_claims_lists_and_authenticates_uploads() {
         .await
         .unwrap();
     assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+
+    let unhoused = app
+        .clone()
+        .oneshot(bearer_json(
+            "POST",
+            "/api/devices/claim-tokens",
+            &homeless_session,
+            serde_json::json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(unhoused.status(), StatusCode::NOT_FOUND);
 
     let minted = app
         .clone()

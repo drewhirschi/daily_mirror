@@ -15,7 +15,6 @@ use daily_mirror_core::contract::{
 };
 use libsql::{TransactionBehavior, params};
 use tokio::sync::OnceCell;
-use uuid::Uuid;
 
 use crate::auth::{User, random_token, secret_hash};
 use crate::processing::ProcessingQueue;
@@ -117,53 +116,20 @@ impl DeviceRegistry {
 
     /// The household a signed-in user pairs devices into.
     ///
-    /// TODO(tenancy): this server has no membership model yet — every account
-    /// sees every photo. Until one lands, a user is bound to the deployment's
-    /// existing household (created on demand) and that binding is recorded in
-    /// `household_users`, so device rows already carry the right foreign key
-    /// when real multi-tenancy arrives.
+    /// `household_users` is the single source of truth. A user without a row
+    /// is an error, never a reason to hand them somebody else's household:
+    /// there is no invite flow yet, so membership comes from signup or from an
+    /// administrator inserting the row.
     pub async fn household_for_user(&self, user: &User) -> io::Result<String> {
         self.ensure_schema().await?;
-        let connection = self.queue.catalog.connection().await?;
-        if let Some(id) = scalar(
-            &connection,
-            "SELECT household_id FROM household_users WHERE user_id = ?1",
-            params![user.id.clone()],
-        )
-        .await?
-        {
-            return Ok(id);
-        }
-        let household_id = match scalar(
-            &connection,
-            "SELECT id FROM households ORDER BY created_at, id LIMIT 1",
-            (),
-        )
-        .await?
-        {
-            Some(id) => id,
-            None => {
-                let id = Uuid::new_v4().to_string();
-                connection
-                    .execute(
-                        "INSERT INTO households (id, display_name, grid_size)
-                         VALUES (?1, ?2, 4)",
-                        params![id.clone(), "Home"],
-                    )
-                    .await
-                    .map_err(io::Error::other)?;
-                id
-            }
-        };
-        connection
-            .execute(
-                "INSERT INTO household_users (user_id, household_id) VALUES (?1, ?2)
-                 ON CONFLICT(user_id) DO NOTHING",
-                params![user.id.clone(), household_id.clone()],
-            )
-            .await
-            .map_err(io::Error::other)?;
-        Ok(household_id)
+        household_for_user(&self.queue, &user.id)
+            .await?
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "this account is not a member of any household",
+                )
+            })
     }
 
     pub async fn mint_claim_token(
@@ -388,6 +354,69 @@ impl DeviceRegistry {
 
 /// "Mirror 4F2A" from the trailing hex of a device ID, so a freshly paired
 /// device has a name a household can recognize before anyone renames it.
+/// `household_users` is where both pairing and onboarding answer "which
+/// household is this user in". A household may have many users; a user has at
+/// most one household. `households` and `household_users` live in the catalog
+/// database while `users` lives in the auth store, so the join is done here in
+/// Rust rather than in SQL.
+///
+/// The table is owned by [`DeviceRegistry::ensure_schema`]; onboarding reaches
+/// it through these functions so there is only one definition.
+pub(crate) async fn ensure_household_users(queue: &ProcessingQueue) -> io::Result<()> {
+    queue.ensure_schema().await?;
+    queue
+        .catalog
+        .connection()
+        .await?
+        .execute_batch(
+            "CREATE TABLE IF NOT EXISTS household_users (
+                user_id TEXT PRIMARY KEY,
+                household_id TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );",
+        )
+        .await
+        .map(|_| ())
+        .map_err(io::Error::other)
+}
+
+/// The household this user belongs to, or `None` when they have no row. There
+/// is deliberately no fallback to an existing household.
+pub async fn household_for_user(
+    queue: &ProcessingQueue,
+    user_id: &str,
+) -> io::Result<Option<String>> {
+    ensure_household_users(queue).await?;
+    let connection = queue.catalog.connection().await?;
+    scalar(
+        &connection,
+        "SELECT household_id FROM household_users WHERE user_id = ?1",
+        params![user_id.to_owned()],
+    )
+    .await
+}
+
+/// Record a user as a member of a household. Signup calls this for the
+/// household it just created; an administrator can call it to add a second
+/// user to an existing one.
+pub async fn join_household(
+    queue: &ProcessingQueue,
+    user_id: &str,
+    household_id: &str,
+) -> io::Result<()> {
+    ensure_household_users(queue).await?;
+    let connection = queue.catalog.connection().await?;
+    connection
+        .execute(
+            "INSERT INTO household_users (user_id, household_id) VALUES (?1, ?2)
+             ON CONFLICT(user_id) DO UPDATE SET household_id = excluded.household_id",
+            params![user_id.to_owned(), household_id.to_owned()],
+        )
+        .await
+        .map(|_| ())
+        .map_err(io::Error::other)
+}
+
 pub fn friendly_device_name(device_id: &str) -> String {
     let suffix: String = device_id
         .chars()
@@ -523,11 +552,46 @@ mod tests {
             }
         }
 
+        /// A signed-up user: an account plus its own household, the way
+        /// onboarding's signup creates one. Membership only ever comes from a
+        /// `household_users` row.
         async fn user(&self, username: &str) -> User {
+            let user = self
+                .auth
+                .create_user(username, username, "strong-test-password")
+                .await
+                .unwrap();
+            let household = self.household(username).await;
+            super::join_household(&self.registry.queue, &user.id, &household)
+                .await
+                .unwrap();
+            user
+        }
+
+        /// An account with no household row at all.
+        async fn unlinked_user(&self, username: &str) -> User {
             self.auth
                 .create_user(username, username, "strong-test-password")
                 .await
                 .unwrap()
+        }
+
+        async fn household(&self, display_name: &str) -> String {
+            self.registry.ensure_schema().await.unwrap();
+            let id = uuid::Uuid::new_v4().to_string();
+            self.registry
+                .queue
+                .catalog
+                .connection()
+                .await
+                .unwrap()
+                .execute(
+                    "INSERT INTO households (id, display_name, grid_size) VALUES (?1, ?2, 4)",
+                    libsql::params![id.clone(), display_name.to_owned()],
+                )
+                .await
+                .unwrap();
+            id
         }
     }
 
@@ -660,24 +724,11 @@ mod tests {
         let fixture = Fixture::new("conflict").await;
         let owner = fixture.user("owner").await;
         let stranger = fixture.user("stranger").await;
-        // Bind the owner first so the stranger does not inherit the same
-        // deployment household.
+        // Each signed-up user has their own household.
         let owned = fixture.registry.household_for_user(&owner).await.unwrap();
-        // Give the stranger a household of their own.
-        let other = uuid::Uuid::new_v4().to_string();
-        let connection = fixture.registry.queue.catalog.connection().await.unwrap();
-        connection
-            .execute(
-                "INSERT INTO households (id, display_name, grid_size) VALUES (?1, 'Other', 4)",
-                libsql::params![other.clone()],
-            )
-            .await
-            .unwrap();
-        connection
-            .execute(
-                "INSERT INTO household_users (user_id, household_id) VALUES (?1, ?2)",
-                libsql::params![stranger.id.clone(), other.clone()],
-            )
+        let other = fixture
+            .registry
+            .household_for_user(&stranger)
             .await
             .unwrap();
 
@@ -719,19 +770,34 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn every_user_of_this_single_tenant_deployment_shares_one_household() {
+    async fn membership_comes_only_from_the_join_table() {
         let fixture = Fixture::new("household").await;
         let first = fixture.user("first").await;
-        let second = fixture.user("second").await;
         let household = fixture.registry.household_for_user(&first).await.unwrap();
-        assert_eq!(
-            fixture.registry.household_for_user(&second).await.unwrap(),
-            household
-        );
         // Stable across calls.
         assert_eq!(
             fixture.registry.household_for_user(&first).await.unwrap(),
             household
         );
+
+        // A household holds many users, but only through an explicit row.
+        let second = fixture.unlinked_user("second").await;
+        let error = fixture
+            .registry
+            .household_for_user(&second)
+            .await
+            .unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+        super::join_household(&fixture.registry.queue, &second.id, &household)
+            .await
+            .unwrap();
+        assert_eq!(
+            fixture.registry.household_for_user(&second).await.unwrap(),
+            household
+        );
+
+        // No fallback: a fresh account never inherits an existing household.
+        let third = fixture.unlinked_user("third").await;
+        assert!(fixture.registry.household_for_user(&third).await.is_err());
     }
 }

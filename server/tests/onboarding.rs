@@ -93,7 +93,9 @@ async fn signup_is_refused_until_it_is_explicitly_enabled() {
     assert_eq!(session["expires_in_seconds"], 30 * 24 * 60 * 60);
     let token = session["token"].as_str().unwrap().to_owned();
     let person_id = session["user"]["person_id"].as_str().unwrap().to_owned();
-    assert!(session["user"]["household_id"].is_string());
+    // Membership is not on the user: it lives in the household_users join
+    // table and is observed through /api/household below.
+    assert!(session["user"]["household_id"].is_null());
 
     // The new session immediately sees its own household.
     let household = fixture

@@ -172,22 +172,16 @@ pub async fn signup(
             _ => OnboardingError::Storage(error),
         })?;
     match link_new_household(queue, &user).await {
-        Ok((household_id, person_id)) => {
-            match auth
-                .link_household(&user.id, &household_id, &person_id)
-                .await
-            {
-                Ok(()) => Ok(User {
-                    household_id: Some(household_id),
-                    person_id: Some(person_id),
-                    ..user
-                }),
-                Err(error) => {
-                    let _ = auth.delete_user(&user.id).await;
-                    Err(storage(error))
-                }
+        Ok((_household_id, person_id)) => match auth.link_person(&user.id, &person_id).await {
+            Ok(()) => Ok(User {
+                person_id: Some(person_id),
+                ..user
+            }),
+            Err(error) => {
+                let _ = auth.delete_user(&user.id).await;
+                Err(storage(error))
             }
-        }
+        },
         Err(error) => {
             let _ = auth.delete_user(&user.id).await;
             Err(error)
@@ -204,6 +198,11 @@ async fn link_new_household(
         .await
         .map_err(storage)?;
     let person = add_person(queue, &household.id, &user.display_name).await?;
+    // The join table is the single source of truth for membership, so the row
+    // is written here rather than on the user record.
+    crate::devices::join_household(queue, &user.id, &household.id)
+        .await
+        .map_err(storage)?;
     Ok((household.id, person.id))
 }
 
@@ -276,9 +275,13 @@ fn other(error: impl std::fmt::Display) -> OnboardingError {
     OnboardingError::Storage(io::Error::other(error.to_string()))
 }
 
-fn household_of(user: &User) -> Result<&str, OnboardingError> {
-    user.household_id
-        .as_deref()
+/// Which household this user is in, from the `household_users` join table that
+/// pairing owns. There is one source of truth for both features and no
+/// fallback: a signed-in user with no row is an error.
+async fn household_of(queue: &ProcessingQueue, user: &User) -> Result<String, OnboardingError> {
+    crate::devices::household_for_user(queue, &user.id)
+        .await
+        .map_err(storage)?
         .ok_or(OnboardingError::NoHousehold)
 }
 
@@ -286,7 +289,8 @@ pub async fn household_for_user(
     queue: &ProcessingQueue,
     user: &User,
 ) -> Result<HouseholdSummary, OnboardingError> {
-    let household_id = household_of(user)?;
+    let household_id = household_of(queue, user).await?;
+    let household_id = household_id.as_str();
     queue.ensure_schema().await.map_err(storage)?;
     let pipeline = active_pipeline_version().map_err(storage)?;
     let connection = queue.catalog.connection().await.map_err(storage)?;
@@ -348,7 +352,7 @@ pub async fn add_household_person(
     user: &User,
     display_name: &str,
 ) -> Result<HouseholdPerson, OnboardingError> {
-    let household_id = household_of(user)?.to_owned();
+    let household_id = household_of(queue, user).await?;
     add_person(queue, &household_id, display_name).await
 }
 
@@ -357,7 +361,7 @@ async fn require_membership(
     user: &User,
     person_id: &str,
 ) -> Result<(), OnboardingError> {
-    let household_id = household_of(user)?;
+    let household_id = household_of(queue, user).await?;
     if Uuid::parse_str(person_id).is_err() {
         return Err(OnboardingError::PersonNotInHousehold);
     }
@@ -679,7 +683,11 @@ mod tests {
     async fn signup_creates_a_linked_household_and_person() {
         let fixture = Fixture::new("signup").await;
         let user = fixture.signup("drew").await;
-        let household_id = user.household_id.clone().unwrap();
+        // Membership lives in the household_users join table, not on the user.
+        let household_id = crate::devices::household_for_user(&fixture.queue, &user.id)
+            .await
+            .unwrap()
+            .unwrap();
         let person_id = user.person_id.clone().unwrap();
 
         let stored = fixture
@@ -688,7 +696,6 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(stored.household_id, Some(household_id.clone()));
         assert_eq!(stored.person_id, Some(person_id.clone()));
 
         let summary = household_for_user(&fixture.queue, &user).await.unwrap();

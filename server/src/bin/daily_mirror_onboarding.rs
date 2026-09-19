@@ -38,10 +38,13 @@ async fn main() -> io::Result<()> {
                 },
             )
             .await?;
+            let household = server::devices::household_for_user(&queue, &user.id)
+                .await?
+                .unwrap_or_else(|| "-".to_owned());
             println!(
                 "Created {} with household {} and person {}",
                 user.username,
-                user.household_id.as_deref().unwrap_or("-"),
+                household,
                 user.person_id.as_deref().unwrap_or("-"),
             );
         }

@@ -44,7 +44,6 @@ pub struct User {
     pub username: String,
     pub display_name: String,
     /// Set once the user completes household onboarding.
-    pub household_id: Option<String>,
     /// The person record in the catalog that represents this user.
     pub person_id: Option<String>,
 }
@@ -184,7 +183,6 @@ impl AuthStore {
                     )
                     .await
                     .map_err(io::Error::other)?;
-                ensure_column(&connection, "household_id", "TEXT").await?;
                 ensure_column(&connection, "person_id", "TEXT").await?;
                 Ok(database)
             })
@@ -208,7 +206,6 @@ impl AuthStore {
             id: Uuid::new_v4().to_string(),
             username,
             display_name,
-            household_id: None,
             person_id: None,
         };
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
@@ -240,7 +237,7 @@ impl AuthStore {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         let mut rows = connection
             .query(
-                "SELECT id, username, display_name, household_id, person_id, password_hash
+                "SELECT id, username, display_name, person_id, password_hash
                  FROM users WHERE username = ?1 COLLATE NOCASE",
                 params![username],
             )
@@ -253,10 +250,9 @@ impl AuthStore {
                     id: row.get(0).map_err(io::Error::other)?,
                     username: row.get(1).map_err(io::Error::other)?,
                     display_name: row.get(2).map_err(io::Error::other)?,
-                    household_id: row.get(3).map_err(io::Error::other)?,
-                    person_id: row.get(4).map_err(io::Error::other)?,
+                    person_id: row.get(3).map_err(io::Error::other)?,
                 }),
-                Some(row.get::<String>(5).map_err(io::Error::other)?),
+                Some(row.get::<String>(4).map_err(io::Error::other)?),
             ),
             None => (None, None),
         };
@@ -283,7 +279,7 @@ impl AuthStore {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         let mut rows = connection
             .query(
-                "SELECT id, username, display_name, household_id, person_id FROM users
+                "SELECT id, username, display_name, person_id FROM users
                  WHERE username = ?1 COLLATE NOCASE",
                 params![username],
             )
@@ -376,7 +372,7 @@ impl AuthStore {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         let mut rows = connection
             .query(
-                "SELECT id, username, display_name, household_id, person_id
+                "SELECT id, username, display_name, person_id
                  FROM users WHERE id = ?1",
                 params![id],
             )
@@ -423,7 +419,7 @@ impl AuthStore {
         let mut rows = connection
             .query(
                 "SELECT users.id, users.username, users.display_name,
-                        users.household_id, users.person_id
+                        users.person_id
                  FROM auth_sessions
                  JOIN users ON users.id = auth_sessions.user_id
                  WHERE auth_sessions.token_hash = ?1 AND auth_sessions.expires_at > ?2",
@@ -581,20 +577,16 @@ impl AuthStore {
         }
     }
 
-    /// Point a user at the household and person record created during signup.
-    pub async fn link_household(
-        &self,
-        user_id: &str,
-        household_id: &str,
-        person_id: &str,
-    ) -> io::Result<()> {
+    /// Point a user at the person record created during signup. Which
+    /// household the user belongs to lives in `household_users` in the catalog
+    /// database; this only records which face in it is them.
+    pub async fn link_person(&self, user_id: &str, person_id: &str) -> io::Result<()> {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         let changed = connection
             .execute(
-                "UPDATE users SET household_id = ?2, person_id = ?3,
-                     updated_at = CURRENT_TIMESTAMP
+                "UPDATE users SET person_id = ?2, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ?1",
-                params![user_id, household_id, person_id],
+                params![user_id, person_id],
             )
             .await
             .map_err(io::Error::other)?;
@@ -687,8 +679,7 @@ fn row_to_user(row: Option<libsql::Row>) -> io::Result<Option<User>> {
             id: row.get(0).map_err(io::Error::other)?,
             username: row.get(1).map_err(io::Error::other)?,
             display_name: row.get(2).map_err(io::Error::other)?,
-            household_id: row.get(3).map_err(io::Error::other)?,
-            person_id: row.get(4).map_err(io::Error::other)?,
+            person_id: row.get(3).map_err(io::Error::other)?,
         })
     })
     .transpose()

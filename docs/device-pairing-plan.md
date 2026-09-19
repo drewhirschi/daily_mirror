@@ -188,7 +188,7 @@ flowchart TB
 
 | Fact | Consequence |
 | --- | --- |
-| No IMX519 driver | `esp_cam_sensor` supports sixteen MIPI sensors; the IMX519 is not one. One community port exists (register tables from the Raspberry Pi kernel driver, GPL) offering binned modes up to 1080p. The DW9714 focus motor is driven directly, so the Pi rig's focus work transfers. |
+| IMX519 driver is ours | `esp_cam_sensor` has no IMX519 support, so `firmware/components/esp_cam_sensor_imx` carries our own sensor driver (register tables from the Raspberry Pi kernel driver, GPL-2.0) with binned modes up to 1080p. The focus motor on the Arducam module is an **AK7375**, not a DW9714 as first assumed; the one community port that assumed DW9714 never moves the lens. Verified on hardware 2026-09-17; see [esp32-bringup.md](esp32-bringup.md). |
 | ISP caps at 1920×1080 | The product ships 1080p JPEGs in v1. Full-resolution raw bypass is off the table for now. |
 | BLE provisioning through the C6 is unfinished | Wi-Fi and SoftAP over esp-hosted are solid. `network_provisioning` does not yet list the P4 as a target; the upstream pull request has been open since October 2025. |
 

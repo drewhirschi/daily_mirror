@@ -1,0 +1,22 @@
+# ESP-IDF build output. The project puts sdkconfig inside the build directory
+# (see CMakeLists.txt), so `build*/` covers it along with build_p4/ and
+# build_s3/.
+build*/
+
+# Components downloaded by the IDF component manager. Reproducibility comes
+# from the version constraints in the idf_component.yml files, not from
+# committing the downloads.
+managed_components/
+
+# Written beside the manifest by the component manager and rewritten on every
+# board switch, so it is noise rather than a lock in a two-target project.
+dependencies.lock
+
+# In case someone builds with the stock (in-project) sdkconfig location.
+sdkconfig
+sdkconfig.old
+
+# Never. Credentials belong in /config at run time, or in a file outside the
+# repository passed as -DMIRROR_EXTRA_SDKCONFIG.
+wifi_credentials.h
+*.sdkconfig

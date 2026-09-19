@@ -1,0 +1,95 @@
+# Waveshare ESP32-P4-WIFI6 + Arducam IMX519 (AK7375 autofocus), Wi-Fi via the
+# on-board ESP32-C6. Applied on top of ../../sdkconfig.defaults.
+
+CONFIG_IDF_TARGET="esp32p4"
+CONFIG_MIRROR_BOARD_P4_IMX519=y
+
+# --- Chip revision -----------------------------------------------------------
+# This board is a P4 rev v1.3. ESP-IDF 5.5.5 defaults the minimum chip revision
+# to v3.1, and esptool then flatly refuses to flash: "requires chip revision in
+# range [v3.1 - ...]". These two are what make the image loadable at all.
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+
+# --- Flash and PSRAM ---------------------------------------------------------
+CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y
+CONFIG_SPI_FLASH_SUPPORT_GD_CHIP=y
+CONFIG_SPIRAM_MODE_HEX=y
+# 200 MHz PSRAM is gated behind the experimental-features flag; without it the
+# choice silently falls back to 20 MHz, which is far too slow to absorb a
+# full-rate camera frame and every capture comes back empty.
+CONFIG_IDF_EXPERIMENTAL_FEATURES=y
+CONFIG_SPIRAM_SPEED_200M=y
+# DMA writes to PSRAM go through L2. The 128 KB / 64-byte-line default turns the
+# camera's stream into short bursts; 256 KB with 128-byte lines lets the DMA
+# drain in half as many, larger PSRAM transactions.
+CONFIG_CACHE_L2_CACHE_256KB=y
+CONFIG_CACHE_L2_CACHE_LINE_128B=y
+
+# --- Console -----------------------------------------------------------------
+# The CH343 bridge on this board handles multi-megabaud comfortably, and the
+# baud is only settable under ESP_CONSOLE_UART_CUSTOM: under the default choice
+# the symbol has no prompt and kconfgen silently keeps 115200 whatever this
+# file says. "Custom" changes nothing else - its TX/RX pins default to GPIO
+# 37/38, which is what the default console already uses, and neither collides
+# with the camera I2C (7/8) or the SD card (39-44).
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=2000000
+
+# --- Camera: MIPI-CSI + ISP --------------------------------------------------
+CONFIG_ESP_VIDEO_ENABLE_MIPI_CSI_VIDEO_DEVICE=y
+CONFIG_ESP_VIDEO_ENABLE_ISP_VIDEO_DEVICE=y
+CONFIG_ESP_VIDEO_ENABLE_ISP_PIPELINE_CONTROLLER=y
+
+CONFIG_CAMERA_IMX519=y
+CONFIG_CAMERA_IMX519_AUTO_DETECT_MIPI_INTERFACE_SENSOR=y
+
+# --- Autofocus ---------------------------------------------------------------
+# The VCM is a separate chip from the sensor (AK7375 at I2C 0x0c - NOT a
+# DW9714/DW9807, whose two-byte word protocol leaves this lens motionless), so
+# it needs its own driver enabled. CAM_MOTOR_AK7375 selects
+# CAMERA_MOTOR_DEVICE_USED, which is what lets the three symbols below turn on.
+CONFIG_CAM_MOTOR_AK7375=y
+CONFIG_CAM_MOTOR_AK7375_AUTO_DETECT=y
+# These three all default to y once a motor driver exists, and are spelled out
+# so a future default change cannot quietly leave the lens unmoved - which
+# looks like a lens problem, not a config problem. Dropping any one gives a
+# different failure: without the IPA algorithm nothing decides where to focus,
+# without the motor controller esp_video has no way to reach the VCM, and
+# without the pipeline control the AF result is computed and then discarded.
+CONFIG_ESP_IPA_AF_ALGORITHM=y
+CONFIG_ESP_VIDEO_ENABLE_CAMERA_MOTOR_CONTROLLER=y
+CONFIG_ESP_VIDEO_ISP_PIPELINE_CONTROL_CAMERA_MOTOR=y
+
+# --- Wi-Fi through the ESP32-C6 ----------------------------------------------
+# The P4 has no radio. esp_wifi_remote routes esp_wifi calls to the C6 and
+# esp_hosted carries them over SDIO; the P4<->C6 pins are esp_hosted's built-in
+# ESP32-P4 defaults and match this board exactly, so nothing is overridden.
+# There is deliberately no SD card here: SD and esp_hosted share the SDMMC
+# peripheral and hit ESP-IDF issue 16233.
+CONFIG_SLAVE_IDF_TARGET_ESP32C6=y
+
+# esp_hosted warns at boot that the 100 Hz default causes "bus level jitters":
+# every wait on the SDIO transport rounds up to a 10 ms tick.
+CONFIG_FREERTOS_HZ=1000
+
+# esp_hosted's SDIO transport mempool is allocated up front from internal
+# DMA-capable RAM, and at the default queue sizes it does not fit alongside the
+# camera stack. The failure is spectacularly indirect: internal RAM runs out
+# during start-up and the *idle task's* stack is the allocation that returns
+# NULL, so the board asserts in prvCreateIdleTasks from vTaskStartScheduler -
+# before app_main runs, with nothing in the log connecting it to Wi-Fi.
+# Halving both queues halves that pool and leaves room. The obvious
+# alternative, CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y, does make it boot and
+# is what esp_hosted's help text suggests - but with the pool in PSRAM every
+# response larger than the initial TCP congestion window stalled. Keep the
+# transport's DMA buffers in internal RAM.
+CONFIG_ESP_HOSTED_SDIO_TX_Q_SIZE=10
+CONFIG_ESP_HOSTED_SDIO_RX_Q_SIZE=10
+
+# Throughput, not just connectivity. IDF's defaults (5760 = 4 x MSS) cap a
+# single TCP stream at about one window per round-trip, which throttles a
+# multi-MB response long before the radio does. 64800 is 45 x TCP_MSS, the
+# largest multiple fitting a 16-bit window without LWIP_WND_SCALE.
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=64800
+CONFIG_LWIP_TCP_WND_DEFAULT=64800

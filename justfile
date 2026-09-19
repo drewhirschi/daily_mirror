@@ -82,6 +82,64 @@ process environment="local":
     @test -f "processor/.env.{{environment}}" || { echo "missing processor/.env.{{environment}}; copy processor/.env.example and configure it" >&2; exit 1; }
     cd processor && DAILY_MIRROR_ENV="{{environment}}" cargo run --locked --release -- process
 
+# --- ESP32 camera firmware -------------------------------------------------
+# Every recipe below needs the ESP-IDF environment, which is a shell function
+# rather than a binary, so each one sources export.sh itself.
+#
+# MIRROR_BOARD is cached in the build directory the first time it is
+# configured, so only the build recipes pass it. Set DAILY_MIRROR_FW_EXTRA to a
+# credentials sdkconfig OUTSIDE this repository to bake in bench defaults; see
+# firmware/README.md.
+
+idf_export := "source ${IDF_PATH:-$HOME/esp/esp-idf}/export.sh >/dev/null"
+fw_extra := env_var_or_default("DAILY_MIRROR_FW_EXTRA", "")
+
+# Build the ESP32-P4 + IMX519 firmware.
+fw-build-p4:
+    cd firmware && {{idf_export}} && idf.py -B build_p4 -DMIRROR_BOARD=p4_imx519 \
+        {{ if fw_extra == "" { "" } else { "-DMIRROR_EXTRA_SDKCONFIG=" + fw_extra } }} build
+
+# Build the ESP32-S3 + OV5640 firmware.
+fw-build-s3:
+    cd firmware && {{idf_export}} && idf.py -B build_s3 -DMIRROR_BOARD=s3_ov5640 \
+        {{ if fw_extra == "" { "" } else { "-DMIRROR_EXTRA_SDKCONFIG=" + fw_extra } }} build
+
+# Build both boards from whatever state the build directories are in.
+fw-build: fw-build-p4 fw-build-s3
+
+# Flash the ESP32-P4 over its CH343 bridge, failing loudly if a write is not verified.
+fw-flash-p4 port="/dev/ttyACM0": fw-build-p4
+    cd firmware/build_p4 && {{idf_export}} && \
+        python -m esptool --chip esp32p4 -p {{port}} -b 921600 \
+            --before default_reset --after hard_reset write_flash "@flash_args" \
+        | tee /dev/stderr | grep -q "Hash of data verified" \
+        || { echo "flash NOT verified - the board is still running the old firmware" >&2; exit 1; }
+
+# Flash the ESP32-S3 over its CH340 bridge, failing loudly if a write is not verified.
+fw-flash-s3 port="/dev/ttyUSB0": fw-build-s3
+    cd firmware/build_s3 && {{idf_export}} && \
+        python -m esptool --chip esp32s3 -p {{port}} -b 921600 \
+            --before default_reset --after hard_reset write_flash "@flash_args" \
+        | tee /dev/stderr | grep -q "Hash of data verified" \
+        || { echo "flash NOT verified - the board is still running the old firmware" >&2; exit 1; }
+
+# Watch the ESP32-P4 console (2 Mbaud; Ctrl-] to quit).
+fw-monitor-p4 port="/dev/ttyACM0":
+    cd firmware && {{idf_export}} && idf.py -B build_p4 -p {{port}} monitor
+
+# Watch the ESP32-S3 console (921600 baud; Ctrl-] to quit).
+fw-monitor-s3 port="/dev/ttyUSB0":
+    cd firmware && {{idf_export}} && idf.py -B build_s3 -p {{port}} monitor
+
+# Open menuconfig for one board. Example: just fw-menuconfig p4_imx519
+fw-menuconfig board:
+    cd firmware && {{idf_export}} && idf.py -B "build_{{ if board == "p4_imx519" { "p4" } else { "s3" } }}" \
+        -DMIRROR_BOARD={{board}} menuconfig
+
+# Throw away both firmware build directories.
+fw-clean:
+    rm -rf firmware/build_p4 firmware/build_s3 firmware/dependencies.lock
+
 # Cross-compile the Pi service on this computer.
 device-build:
     cd device && cargo zigbuild --locked --release --target {{device_target}}

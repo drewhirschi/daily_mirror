@@ -1,0 +1,30 @@
+menuconfig CAM_MOTOR_AK7375
+    bool "AK7375 VCM (Arducam IMX519 autofocus)"
+    default n
+    select CAMERA_MOTOR_DEVICE_USED
+    help
+        Enable the Asahi Kasei AK7375 voice-coil-motor driver, the autofocus
+        actuator on the Arducam 16MP IMX519 module, at I2C 0x0c on the same
+        bus as the sensor. 12-bit DAC (0..4095).
+
+if CAM_MOTOR_AK7375
+
+    config CAM_MOTOR_AK7375_AUTO_DETECT
+        bool "Auto-detect the AK7375"
+        default y
+
+    config CAM_MOTOR_AK7375_INIT_POS
+        int "Lens park position at start-up (DAC code)"
+        range 0 4095
+        default 2048
+        help
+            Where the lens is placed as soon as the motor is detected. Measure
+            with the focus sweep; libcamera's imx519 tuning maps 0..15
+            dioptres onto roughly 445..925 on this DAC.
+
+    config CAM_MOTOR_AK7375_PERIOD_US
+        int "Settling time allowed per DAC code (microseconds)"
+        range 1 65535
+        default 1000
+
+endif # CAM_MOTOR_AK7375

@@ -1,0 +1,22 @@
+# Daily Mirror camera firmware partition table. Shared by both boards.
+#
+# Two OTA app slots, because a camera on a shelf in someone's house cannot be
+# updated with a USB cable, and a single-slot update that fails halfway leaves
+# a brick. There is no OTA client in the firmware yet - this is the layout it
+# will need, laid down now, because changing the partition table later means
+# erasing NVS and losing every device's settings in the field.
+#
+# 6 MB per slot: the P4 image carries esp_video, the IMX519 driver, esp_ipa,
+# the Wi-Fi stack and esp_hosted, and the stock 1 MB factory partition does not
+# come close. 6 MB leaves room for the JPEG encoder work and years of growth,
+# and the total (12.1 MB) fits the smaller of the two boards - 16 MB on the S3,
+# 32 MB on the P4 - so one table serves both.
+#
+# App partitions must start on a 64 KB boundary; 0x20000 + 6M = 0x620000 does.
+#
+# Name,     Type, SubType, Offset,   Size,  Flags
+nvs,        data, nvs,     0x9000,   0x6000,
+phy_init,   data, phy,     0xf000,   0x1000,
+otadata,    data, ota,     0x10000,  0x2000,
+ota_0,      app,  ota_0,   0x20000,  6M,
+ota_1,      app,  ota_1,   ,         6M,

@@ -1,0 +1,42 @@
+menu "Daily Mirror application"
+
+config MIRROR_FW_VERSION
+    string "Firmware version reported in mDNS and /stats"
+    default "0.1.0"
+
+config MIRROR_STA_TIMEOUT_S
+    int "Seconds to wait for a station address before starting the setup network"
+    default 60
+    range 10 600
+    help
+        The station keeps trying forever in the background either way; this is
+        only how long the device waits before *also* offering the fallback
+        access point, so someone can reach /config and fix the credentials.
+
+config MIRROR_AP_PASSWORD
+    string "WPA2 password for the fallback setup network"
+    default "dailymirror"
+    help
+        The setup access point is named after the mDNS hostname
+        (mirror-<last 3 MAC bytes>) and carries the same admin server, so
+        /config is reachable on a device that has never joined a network.
+
+        Eight characters or more, or the network comes up open. This is a
+        build-time default for bench units and is documented in
+        firmware/README.md - it is not a secret, and a shipping product should
+        derive a per-device password instead.
+
+config MIRROR_DEBUG_ISP_STATS
+    bool "Log the ISP 3A statistics at debug level"
+    default n
+    help
+        Turns esp_ipa and esp_video up to DEBUG at start-up: every
+        auto-exposure decision, white-balance gain and autofocus score. This is
+        how the IMX519's focus band and the purple-blacks pedestal were found,
+        so it stays available - but it is far too noisy to leave on, and on the
+        ESP32-S3 (which has no ISP) it does nothing.
+
+        See also CAMERA_IMX519_DEBUG_LOG under "Camera Sensor (IMX add-on)",
+        which logs the sensor-side exposure and gain writes.
+
+endmenu

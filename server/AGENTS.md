@@ -27,7 +27,7 @@ name. Full reference: <https://nextrs-docs.vercel.app/docs/conventions>
 
 ## Never hand-roll what the scaffold generates
 
-`build.rs`, `src/main.rs`, `api/index.rs`, `vercel.json`,
+`build.rs`, `src/main.rs`, `api/index.rs`, `.nextrs/vercel.json`,
 `scripts/deploy-prebuilt.sh`, and `.nextrs/` are generated wiring. Never edit
 generated output under `.nextrs/` or `public/dist/`; application seams are
 `app/**`, `components/**`, and `src/**`. `src/app.rs` is the shared Rust app,
@@ -86,7 +86,8 @@ export: <https://nextrs-docs.vercel.app/docs/telemetry>
 
 ## Deploys are prebuilt
 
-Git auto-builds are OFF (`vercel.json` sets `git.deploymentEnabled: false`);
+Git auto-builds are OFF (the generated `.nextrs/vercel.json` sets
+`git.deploymentEnabled: false`);
 pushing deploys nothing. The deploy path is:
 
 ```bash

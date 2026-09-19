@@ -1,0 +1,16 @@
+"""Open the assembled model with clean colors and visibility in desktop FreeCAD."""
+from pathlib import Path
+import json
+import FreeCAD as App
+import FreeCADGui as Gui
+root=Path(__file__).resolve().parent/'output'
+path=str(root/'DailyMirror-Rail-Enclosure-v2.FCStd')
+doc=next((d for d in App.listDocuments().values() if d.FileName==path),None)
+doc=doc or App.openDocument(path)
+scene=json.loads((root/'scene.json').read_text())
+for record in scene:
+    obj=doc.getObject(record['name'])
+    obj.ViewObject.ShapeColor=tuple(record['color'])
+    obj.ViewObject.Visibility=record['kind']=='part'
+Gui.activeDocument().activeView().viewAxonometric()
+Gui.activeDocument().activeView().fitAll()

@@ -1,0 +1,2 @@
+(sym_lib_table (version 7) (lib (name "DailyMirror") (type "KiCad") (uri "${KIPRJMOD}/libraries/DailyMirror.kicad_sym") (options "") (descr "Project controls symbols"))
+(lib (name "DailyMirrorParts") (type "KiCad") (uri "${KIPRJMOD}/libraries/DailyMirrorParts.kicad_sym") (options "") (descr "Sourced candidate parts; integration pending")))

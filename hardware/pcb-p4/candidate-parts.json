@@ -1,0 +1,1410 @@
+[
+  {
+    "ref": "U1",
+    "symbol": "ESP32-P4X",
+    "value": "ESP32-P4NRW32X",
+    "footprint": "ESP32-P4",
+    "sheet": "processor",
+    "pos": [
+      145,
+      173
+    ],
+    "schpos": [
+      111.76,
+      104.14
+    ],
+    "rotation": 0,
+    "manufacturer": "Espressif",
+    "mpn": "ESP32-P4NRW32X",
+    "source": "https://documentation.espressif.com/esp32-p4_datasheet_en.html",
+    "note": "Current X / rev3+ symbol. IMX519 full-resolution path unproven. 32 MB in-package PSRAM; external flash required.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "e2ace110-3f23-5451-8e79-d23ce0956401"
+  },
+  {
+    "ref": "U2",
+    "symbol": "ESP32-C6-MINI-1",
+    "value": "ESP32-C6-MINI-1-N4",
+    "footprint": "ESP32-C6-MINI-1",
+    "sheet": "processor",
+    "pos": [
+      185,
+      116
+    ],
+    "schpos": [
+      266.7,
+      93.98
+    ],
+    "rotation": 0,
+    "manufacturer": "Espressif",
+    "mpn": "ESP32-C6-MINI-1-N4",
+    "source": "https://www.espressif.com/sites/default/files/documentation/esp32-c6-mini-1_datasheet_en.pdf",
+    "note": "Wi-Fi/BLE companion. SDIO/ESP-Hosted integration pending. Antenna needs copper/component keepout.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "b2a6afd0-aff4-5e4f-ac0a-7f4db5aa7065"
+  },
+  {
+    "ref": "U3",
+    "symbol": "W25Q128JVS",
+    "value": "W25Q128JVSIQ",
+    "footprint": "SOIC-8_5.3x5.3mm_P1.27mm",
+    "sheet": "processor",
+    "pos": [
+      160,
+      175
+    ],
+    "schpos": [
+      226.06,
+      170.18
+    ],
+    "rotation": 0,
+    "manufacturer": "Winbond",
+    "mpn": "W25Q128JVSIQ",
+    "source": "https://www.winbond.com/resource-files/w25q128jv_dtr%20revc%2003272018%20plus.pdf",
+    "note": "16 MiB external SPI flash; boot flash voltage and strapping pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "59bcca49-cb6c-585d-9560-9b3bd8283b67"
+  },
+  {
+    "ref": "J2",
+    "symbol": "Conn_01x15",
+    "value": "Pi-style CSI camera - 15 pin",
+    "footprint": "Molex_200528-0150_1x15-1MP_P1.00mm_Horizontal",
+    "sheet": "processor",
+    "pos": [
+      173,
+      150
+    ],
+    "schpos": [
+      327.66,
+      177.8
+    ],
+    "rotation": 0,
+    "manufacturer": "Molex",
+    "mpn": "2005280150",
+    "source": "https://www.molex.com/en-us/products/part-detail/2005280150",
+    "note": "Bottom-contact, 1 mm pitch. Confirm actual Arducam module/ribbon contact side and pinout before wiring.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "55a1af1a-1a38-5384-b0b2-c9d79d55c75b"
+  },
+  {
+    "ref": "Y1",
+    "symbol": "Crystal_GND24",
+    "value": "40 MHz / 10 pF",
+    "footprint": "Crystal_SMD_3225-4Pin_3.2x2.5mm",
+    "sheet": "processor",
+    "pos": [
+      133,
+      173
+    ],
+    "schpos": [
+      132.08,
+      182.88
+    ],
+    "rotation": 0,
+    "manufacturer": "Abracon",
+    "mpn": "ABM8-40.000MHZ-10-1-U-T",
+    "source": "https://abracon.com/Support/SPICE/Resonators/ABM8-Series%20ParameterTest%20Data_SPICE%20MODEL.pdf",
+    "note": "Manufacturer test report gives +/-10 ppm. Ordering availability and temperature specification need confirmation; generic package model.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "1ae28c85-2980-565d-836b-559fd7eee894"
+  },
+  {
+    "ref": "U4",
+    "symbol": "TPS62132",
+    "value": "TPS62132RGTR",
+    "footprint": "VQFN-16-1EP_3x3mm_P0.5mm_EP1.68x1.68mm",
+    "sheet": "power",
+    "pos": [
+      120,
+      180
+    ],
+    "schpos": [
+      111.76,
+      76.2
+    ],
+    "rotation": 0,
+    "manufacturer": "Texas Instruments",
+    "mpn": "TPS62132RGTR",
+    "source": "https://www.ti.com/product/TPS62132",
+    "note": "Fixed 3.3 V, 3 A main buck. Inductor/output network and load budget pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "53b092b0-1eff-5603-a546-6460db847cfa"
+  },
+  {
+    "ref": "U5",
+    "symbol": "TLV62569DBV",
+    "value": "TLV62569DBVR",
+    "footprint": "SOT-23-5",
+    "sheet": "power",
+    "pos": [
+      131,
+      185
+    ],
+    "schpos": [
+      200.66,
+      76.2
+    ],
+    "rotation": 0,
+    "manufacturer": "Texas Instruments",
+    "mpn": "TLV62569DBVR",
+    "source": "https://www.ti.com/product/TLV62569",
+    "note": "P4 core buck. Use rev3+ feedback/control circuit, not a fixed generic 1.1 V assumption.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "f6256509-32d3-5bfa-8608-396772cf0765"
+  },
+  {
+    "ref": "U6",
+    "symbol": "TUSB320I",
+    "value": "TUSB320IRWBR",
+    "footprint": "Texas_X2QFN-12_1.6x1.6mm_P0.4mm",
+    "sheet": "power",
+    "pos": [
+      119,
+      166
+    ],
+    "schpos": [
+      68.58,
+      165.1
+    ],
+    "rotation": 0,
+    "manufacturer": "Texas Instruments",
+    "mpn": "TUSB320IRWBR",
+    "source": "https://www.ti.com/product/TUSB320/part-details/TUSB320IRWBR",
+    "note": "5 V Type-C source-current detection. Configure sink. Not a PD controller; gate load to advertised current. Stock availability not confirmed.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "0e24e68e-00eb-54c8-8c56-ebf4452b75c5"
+  },
+  {
+    "ref": "U8",
+    "symbol": "USBLC6-2SC6",
+    "value": "USBLC6-2SC6",
+    "footprint": "SOT-23-6",
+    "sheet": "power",
+    "pos": [
+      113,
+      190
+    ],
+    "schpos": [
+      157.48,
+      165.1
+    ],
+    "rotation": 0,
+    "manufacturer": "STMicroelectronics",
+    "mpn": "USBLC6-2SC6",
+    "source": "https://www.st.com/en/protection-devices/usblc6-2.html",
+    "note": "USB data-line ESD protection; additional VBUS/CC protection design pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "c403c910-e14a-5639-bd1b-a186b5fc0eb8"
+  },
+  {
+    "ref": "U9",
+    "symbol": "TPS22919DCK",
+    "value": "TPS22919DCKR",
+    "footprint": "SOT-363_SC-70-6",
+    "sheet": "power",
+    "pos": [
+      177,
+      161
+    ],
+    "schpos": [
+      251.46,
+      165.1
+    ],
+    "rotation": 0,
+    "manufacturer": "Texas Instruments",
+    "mpn": "TPS22919DCKR",
+    "source": "https://www.ti.com/product/TPS22919",
+    "note": "Camera power switch candidate; confirm camera module supply and startup current.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "1ac57f12-f638-5c41-b8f1-7f6b5c3f3843"
+  },
+  {
+    "ref": "J1",
+    "symbol": "USB_C_Receptacle_USB2.0_16P",
+    "value": "USB-C / 5 V",
+    "footprint": "USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal",
+    "sheet": "power",
+    "pos": [
+      120,
+      197
+    ],
+    "schpos": [
+      35.56,
+      76.2
+    ],
+    "rotation": 0,
+    "manufacturer": "GCT",
+    "mpn": "USB4105-GF-A",
+    "source": "https://gct.co/connector/USB4105",
+    "note": "Select exact stake length/order suffix with board thickness; input load protection/inrush circuitry pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "41d8466b-3eed-503b-afcc-77ea6de95b58"
+  },
+  {
+    "ref": "J3",
+    "symbol": "Conn_01x06",
+    "value": "Service UART / boot",
+    "footprint": "PinHeader_1x06_P2.54mm_Vertical",
+    "sheet": "power",
+    "pos": [
+      169,
+      180
+    ],
+    "schpos": [
+      337.82,
+      167.64
+    ],
+    "rotation": 0,
+    "manufacturer": "Generic",
+    "mpn": "TBD 1x06 2.54 mm header",
+    "source": "https://gitlab.com/kicad/libraries/kicad-footprints",
+    "note": "Service pinout not assigned; prefer production test pads in final design.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "86d85ddc-7e46-5fc8-91d0-145a99473dda"
+  },
+  {
+    "ref": "SW2",
+    "symbol": "SW_Push",
+    "value": "RESET",
+    "footprint": "SW_PUSH_6mm_H4.3mm",
+    "sheet": "power",
+    "pos": [
+      180,
+      181
+    ],
+    "schpos": [
+      287.02,
+      68.58
+    ],
+    "rotation": 0,
+    "manufacturer": "Generic",
+    "mpn": "TBD 6 mm tactile",
+    "source": "https://gitlab.com/kicad/libraries/kicad-footprints",
+    "note": "Generic body; choose exact switch force/actuator height for enclosure.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "7e008722-d949-5f1d-aafe-b2cbff73af53"
+  },
+  {
+    "ref": "SW3",
+    "symbol": "SW_Push",
+    "value": "BOOT",
+    "footprint": "SW_PUSH_6mm_H4.3mm",
+    "sheet": "power",
+    "pos": [
+      191,
+      181
+    ],
+    "schpos": [
+      337.82,
+      68.58
+    ],
+    "rotation": 0,
+    "manufacturer": "Generic",
+    "mpn": "TBD 6 mm tactile",
+    "source": "https://gitlab.com/kicad/libraries/kicad-footprints",
+    "note": "Generic body; choose exact switch force/actuator height for enclosure.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "23f65724-e8ba-5a14-8b80-e26ac2ea8c57"
+  },
+  {
+    "ref": "U7",
+    "symbol": "TPS61165DBV",
+    "value": "TPS61165DBVR",
+    "footprint": "SOT-23-6",
+    "sheet": "lighting",
+    "pos": [
+      181,
+      137
+    ],
+    "schpos": [
+      63.5,
+      78.74
+    ],
+    "rotation": 0,
+    "manufacturer": "Texas Instruments",
+    "mpn": "TPS61165DBVR",
+    "source": "https://www.ti.com/product/TPS61165",
+    "note": "Constant-current boost candidate. 1.2 A is switch rating, not available LED output current. Tentative eight-series / 100 mA for initial optical study only.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "51803459-c916-5503-8bb4-f73ba247293a"
+  },
+  {
+    "ref": "D10",
+    "symbol": "D_Schottky",
+    "value": "SS16-E3/61T",
+    "footprint": "D_SMA",
+    "sheet": "lighting",
+    "pos": [
+      190,
+      137
+    ],
+    "schpos": [
+      127,
+      71.12
+    ],
+    "rotation": 0,
+    "manufacturer": "Vishay",
+    "mpn": "SS16-E3/61T",
+    "source": "https://www.vishay.com/en/product/88746/",
+    "note": "Boost rectifier candidate; calculate peak current, losses and reverse voltage.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "5d0223b7-ee61-533c-a654-6c1554a7dd6c"
+  },
+  {
+    "ref": "D2",
+    "symbol": "LED_XPG3_thermal",
+    "value": "White 5000 K / CRI90",
+    "footprint": "LED_Cree-XP-G",
+    "sheet": "lighting",
+    "pos": [
+      122,
+      111
+    ],
+    "schpos": [
+      30.48,
+      154.94
+    ],
+    "rotation": 0,
+    "manufacturer": "Cree LED",
+    "mpn": "XPGDWT-U1-0000-00J3E",
+    "source": "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf",
+    "note": "Plain white XP-G3. Qty eight provisional. Shared XP-G footprint and package STEP are candidates, not an exact manufacturer XP-G3 model. Thermal pad electrically isolated from LED; heat-spreading copper required.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "05d75e30-b664-5d5e-9618-431c29191804"
+  },
+  {
+    "ref": "D3",
+    "symbol": "LED_XPG3_thermal",
+    "value": "White 5000 K / CRI90",
+    "footprint": "LED_Cree-XP-G",
+    "sheet": "lighting",
+    "pos": [
+      159,
+      111
+    ],
+    "schpos": [
+      73.66,
+      154.94
+    ],
+    "rotation": 0,
+    "manufacturer": "Cree LED",
+    "mpn": "XPGDWT-U1-0000-00J3E",
+    "source": "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf",
+    "note": "Plain white XP-G3. Qty eight provisional. Shared XP-G footprint and package STEP are candidates, not an exact manufacturer XP-G3 model. Thermal pad electrically isolated from LED; heat-spreading copper required.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "d812713f-b94f-51be-9dba-b67ff6d1837f"
+  },
+  {
+    "ref": "D4",
+    "symbol": "LED_XPG3_thermal",
+    "value": "White 5000 K / CRI90",
+    "footprint": "LED_Cree-XP-G",
+    "sheet": "lighting",
+    "pos": [
+      190,
+      130
+    ],
+    "schpos": [
+      116.84,
+      154.94
+    ],
+    "rotation": 0,
+    "manufacturer": "Cree LED",
+    "mpn": "XPGDWT-U1-0000-00J3E",
+    "source": "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf",
+    "note": "Plain white XP-G3. Qty eight provisional. Shared XP-G footprint and package STEP are candidates, not an exact manufacturer XP-G3 model. Thermal pad electrically isolated from LED; heat-spreading copper required.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "713c97bc-ee79-5523-94d5-e778ece25f34"
+  },
+  {
+    "ref": "D5",
+    "symbol": "LED_XPG3_thermal",
+    "value": "White 5000 K / CRI90",
+    "footprint": "LED_Cree-XP-G",
+    "sheet": "lighting",
+    "pos": [
+      190,
+      162
+    ],
+    "schpos": [
+      160.01999999999998,
+      154.94
+    ],
+    "rotation": 0,
+    "manufacturer": "Cree LED",
+    "mpn": "XPGDWT-U1-0000-00J3E",
+    "source": "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf",
+    "note": "Plain white XP-G3. Qty eight provisional. Shared XP-G footprint and package STEP are candidates, not an exact manufacturer XP-G3 model. Thermal pad electrically isolated from LED; heat-spreading copper required.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "7f9f1594-ea0b-5cc3-bcff-d1a2a5f54687"
+  },
+  {
+    "ref": "D6",
+    "symbol": "LED_XPG3_thermal",
+    "value": "White 5000 K / CRI90",
+    "footprint": "LED_Cree-XP-G",
+    "sheet": "lighting",
+    "pos": [
+      177,
+      190
+    ],
+    "schpos": [
+      203.2,
+      154.94
+    ],
+    "rotation": 0,
+    "manufacturer": "Cree LED",
+    "mpn": "XPGDWT-U1-0000-00J3E",
+    "source": "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf",
+    "note": "Plain white XP-G3. Qty eight provisional. Shared XP-G footprint and package STEP are candidates, not an exact manufacturer XP-G3 model. Thermal pad electrically isolated from LED; heat-spreading copper required.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "d75efb5f-45d6-5c39-95a4-5249fee7f365"
+  },
+  {
+    "ref": "D7",
+    "symbol": "LED_XPG3_thermal",
+    "value": "White 5000 K / CRI90",
+    "footprint": "LED_Cree-XP-G",
+    "sheet": "lighting",
+    "pos": [
+      145,
+      190
+    ],
+    "schpos": [
+      246.38,
+      154.94
+    ],
+    "rotation": 0,
+    "manufacturer": "Cree LED",
+    "mpn": "XPGDWT-U1-0000-00J3E",
+    "source": "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf",
+    "note": "Plain white XP-G3. Qty eight provisional. Shared XP-G footprint and package STEP are candidates, not an exact manufacturer XP-G3 model. Thermal pad electrically isolated from LED; heat-spreading copper required.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "96d2b55c-8c1b-5733-a387-4175d3e4b748"
+  },
+  {
+    "ref": "D8",
+    "symbol": "LED_XPG3_thermal",
+    "value": "White 5000 K / CRI90",
+    "footprint": "LED_Cree-XP-G",
+    "sheet": "lighting",
+    "pos": [
+      110,
+      160
+    ],
+    "schpos": [
+      289.56,
+      154.94
+    ],
+    "rotation": 0,
+    "manufacturer": "Cree LED",
+    "mpn": "XPGDWT-U1-0000-00J3E",
+    "source": "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf",
+    "note": "Plain white XP-G3. Qty eight provisional. Shared XP-G footprint and package STEP are candidates, not an exact manufacturer XP-G3 model. Thermal pad electrically isolated from LED; heat-spreading copper required.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "f2af9cfc-1344-581c-95af-7a09a6a674e8"
+  },
+  {
+    "ref": "D9",
+    "symbol": "LED_XPG3_thermal",
+    "value": "White 5000 K / CRI90",
+    "footprint": "LED_Cree-XP-G",
+    "sheet": "lighting",
+    "pos": [
+      110,
+      130
+    ],
+    "schpos": [
+      332.74,
+      154.94
+    ],
+    "rotation": 0,
+    "manufacturer": "Cree LED",
+    "mpn": "XPGDWT-U1-0000-00J3E",
+    "source": "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf",
+    "note": "Plain white XP-G3. Qty eight provisional. Shared XP-G footprint and package STEP are candidates, not an exact manufacturer XP-G3 model. Thermal pad electrically isolated from LED; heat-spreading copper required.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "8086f662-b337-589b-9094-2c50c08bd540"
+  },
+  {
+    "ref": "L1",
+    "symbol": "L",
+    "value": "2.2 uH",
+    "footprint": "L_Coilcraft_XAL4020-XXX",
+    "sheet": "power",
+    "pos": [
+      120,
+      173
+    ],
+    "schpos": [
+      111.76,
+      114.3
+    ],
+    "rotation": 0,
+    "manufacturer": "Coilcraft",
+    "mpn": "XAL4020-222MEC",
+    "source": "https://www.coilcraft.com/en-us/products/power/shielded-inductors/molded-inductor/xal/xal40xx/xal4020-222/",
+    "note": "Electrical value and current/temperature margin provisional; package imported from KiCad.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "f9e92c51-4fba-5cb4-8d90-323ed972b3e6"
+  },
+  {
+    "ref": "L2",
+    "symbol": "L",
+    "value": "2.2 uH",
+    "footprint": "L_Coilcraft_XAL4020-XXX",
+    "sheet": "power",
+    "pos": [
+      134,
+      193
+    ],
+    "schpos": [
+      200.66,
+      114.3
+    ],
+    "rotation": 0,
+    "manufacturer": "Coilcraft",
+    "mpn": "XAL4020-222MEC",
+    "source": "https://www.coilcraft.com/en-us/products/power/shielded-inductors/molded-inductor/xal/xal40xx/xal4020-222/",
+    "note": "Electrical value and current/temperature margin provisional; package imported from KiCad.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "f4fafb7a-d728-5261-b0e9-79adb8c6375b"
+  },
+  {
+    "ref": "L3",
+    "symbol": "L",
+    "value": "10 uH",
+    "footprint": "L_Coilcraft_XAL4040-XXX",
+    "sheet": "lighting",
+    "pos": [
+      182,
+      145
+    ],
+    "schpos": [
+      101.6,
+      73.66
+    ],
+    "rotation": 0,
+    "manufacturer": "Coilcraft",
+    "mpn": "XAL4040-103MEC",
+    "source": "https://www.coilcraft.com/en-us/products/power/shielded-inductors/molded-inductor/xal/xal40xx/xal4040-103/",
+    "note": "Electrical value and current/temperature margin provisional; package imported from KiCad.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "ae6216a9-dedc-5ca3-b1e9-cf2e0086fd75"
+  },
+  {
+    "ref": "C2",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      137,
+      165
+    ],
+    "schpos": [
+      30.48,
+      60.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "15b515a7-9682-592f-a97e-fd2bd6558c55"
+  },
+  {
+    "ref": "C3",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      140,
+      165
+    ],
+    "schpos": [
+      73.66,
+      60.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "5354e6ca-f6d8-5652-ba95-a8ee288134ff"
+  },
+  {
+    "ref": "C4",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      143,
+      165
+    ],
+    "schpos": [
+      116.84,
+      60.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "8f3560ea-e643-57c6-9bbe-4ca1ba38b7f1"
+  },
+  {
+    "ref": "C5",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      146,
+      165
+    ],
+    "schpos": [
+      160.01999999999998,
+      60.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "5310ca03-9390-5773-a897-dd366ce78e2d"
+  },
+  {
+    "ref": "C6",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      149,
+      165
+    ],
+    "schpos": [
+      203.2,
+      60.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "97ac9c60-3023-59cb-bad7-c4a29fdafa87"
+  },
+  {
+    "ref": "C7",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      152,
+      165
+    ],
+    "schpos": [
+      246.38,
+      60.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "4030c3bb-03e1-5995-a432-79cf760d8edf"
+  },
+  {
+    "ref": "C8",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      137,
+      181
+    ],
+    "schpos": [
+      289.56,
+      60.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "bb34ac06-52e4-5e4b-b9b4-2b84d1eee3dd"
+  },
+  {
+    "ref": "C9",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      140,
+      181
+    ],
+    "schpos": [
+      332.74,
+      60.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "4c75a94d-4962-5ca5-86c9-f6b5db925af3"
+  },
+  {
+    "ref": "C10",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      143,
+      181
+    ],
+    "schpos": [
+      30.48,
+      101.6
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "2230d84c-330c-52d1-b30f-f0370d6b8c66"
+  },
+  {
+    "ref": "C11",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      146,
+      181
+    ],
+    "schpos": [
+      73.66,
+      101.6
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "ba6bb84c-69be-53dd-bfb7-2eb5fcaa7625"
+  },
+  {
+    "ref": "C12",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      149,
+      181
+    ],
+    "schpos": [
+      116.84,
+      101.6
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "90b268cf-cf87-58ba-9aea-d4aadbfa6916"
+  },
+  {
+    "ref": "C13",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      152,
+      181
+    ],
+    "schpos": [
+      160.01999999999998,
+      101.6
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "28e14209-c1b0-5a88-a483-a0ffb5461c05"
+  },
+  {
+    "ref": "C14",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      137,
+      168
+    ],
+    "schpos": [
+      203.2,
+      101.6
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "bbe1c4dc-7b30-575f-83ed-99090f2511d7"
+  },
+  {
+    "ref": "C15",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      137,
+      177
+    ],
+    "schpos": [
+      246.38,
+      101.6
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "1eb4866c-8638-5b81-87fc-60489c14383e"
+  },
+  {
+    "ref": "C16",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      153,
+      170
+    ],
+    "schpos": [
+      289.56,
+      101.6
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "1e229f43-f1a7-58e0-8e37-8bc73ffdfe1a"
+  },
+  {
+    "ref": "C17",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      153,
+      176
+    ],
+    "schpos": [
+      332.74,
+      101.6
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "798d02e9-3e4e-52a6-a5c7-2cb94ead5fd9"
+  },
+  {
+    "ref": "C18",
+    "symbol": "C",
+    "value": "10uF",
+    "footprint": "C_0805_2012Metric",
+    "sheet": "support",
+    "pos": [
+      174,
+      113
+    ],
+    "schpos": [
+      30.48,
+      142.24
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM21BR61A106KE19L",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "10 V X5R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "1f6c0c3e-4e72-5141-ac67-e5fd0a0722ae"
+  },
+  {
+    "ref": "C19",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      174,
+      117
+    ],
+    "schpos": [
+      73.66,
+      142.24
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "648630a2-7fe9-59c3-a3db-68761208627a"
+  },
+  {
+    "ref": "C20",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      165,
+      169
+    ],
+    "schpos": [
+      116.84,
+      142.24
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "d3aaff92-f97a-5e4d-bf38-525c7909a662"
+  },
+  {
+    "ref": "C21",
+    "symbol": "C",
+    "value": "10uF",
+    "footprint": "C_0805_2012Metric",
+    "sheet": "support",
+    "pos": [
+      125,
+      173
+    ],
+    "schpos": [
+      160.01999999999998,
+      142.24
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM21BR61A106KE19L",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "10 V X5R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "301554ca-727c-5c94-9583-6a5039ff286b"
+  },
+  {
+    "ref": "C22",
+    "symbol": "C",
+    "value": "10uF",
+    "footprint": "C_0805_2012Metric",
+    "sheet": "support",
+    "pos": [
+      125,
+      180
+    ],
+    "schpos": [
+      203.2,
+      142.24
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM21BR61A106KE19L",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "10 V X5R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "83bdac7b-e64e-5f4c-9dce-1679c9fa7d85"
+  },
+  {
+    "ref": "C23",
+    "symbol": "C",
+    "value": "10uF",
+    "footprint": "C_0805_2012Metric",
+    "sheet": "support",
+    "pos": [
+      126,
+      188
+    ],
+    "schpos": [
+      246.38,
+      142.24
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM21BR61A106KE19L",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "10 V X5R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "58e7c5c7-f826-5fb8-ab78-b91a006c984e"
+  },
+  {
+    "ref": "C24",
+    "symbol": "C",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      177,
+      137
+    ],
+    "schpos": [
+      289.56,
+      142.24
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM188R71C104KA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "16 V X7R; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "c2bf8239-9d09-51ea-a56c-a2289347017f"
+  },
+  {
+    "ref": "C25",
+    "symbol": "C",
+    "value": "1uF",
+    "footprint": "C_0805_2012Metric",
+    "sheet": "support",
+    "pos": [
+      187,
+      144
+    ],
+    "schpos": [
+      332.74,
+      142.24
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM21BR71H105KA12L",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "50 V X7R; LED boost output candidate; quantities/value/rail assignments provisional, DC-bias derating pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "d6a5c81b-7ef2-50e7-8ba9-c4daaaa96120"
+  },
+  {
+    "ref": "R8",
+    "symbol": "R",
+    "value": "499k",
+    "footprint": "R_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      134,
+      180
+    ],
+    "schpos": [
+      30.48,
+      187.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0603FR-07499KL",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0603FR-07499KL",
+    "note": "P4 rev3 core control network; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "90eb0651-6493-5cf7-b2c3-4391a694a6a9"
+  },
+  {
+    "ref": "R9",
+    "symbol": "R",
+    "value": "499k",
+    "footprint": "R_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      137,
+      188
+    ],
+    "schpos": [
+      73.66,
+      187.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0603FR-07499KL",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0603FR-07499KL",
+    "note": "P4 rev3 core control network; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "17c0199f-a024-5860-8e91-fa11d653b4f9"
+  },
+  {
+    "ref": "R10",
+    "symbol": "R",
+    "value": "4.02k",
+    "footprint": "R_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      155,
+      165
+    ],
+    "schpos": [
+      116.84,
+      187.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0603FR-074K02L",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0603FR-074K02L",
+    "note": "CSI REXT; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "c483ca98-8e6e-531c-8617-4b6f5669f410"
+  },
+  {
+    "ref": "R11",
+    "symbol": "R",
+    "value": "4.02k",
+    "footprint": "R_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      158,
+      165
+    ],
+    "schpos": [
+      160.01999999999998,
+      187.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0603FR-074K02L",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0603FR-074K02L",
+    "note": "DSI REXT if DSI used; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "926d7dc3-ca94-58a2-9fd3-78aa842e7334"
+  },
+  {
+    "ref": "R12",
+    "symbol": "R",
+    "value": "10k",
+    "footprint": "R_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      176,
+      173
+    ],
+    "schpos": [
+      203.2,
+      187.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0603FR-0710KL",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0603FR-0710KL",
+    "note": "Reset pull-up candidate; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "0ac86370-f16f-5ed2-b503-3aec12b62233"
+  },
+  {
+    "ref": "R13",
+    "symbol": "R",
+    "value": "10k",
+    "footprint": "R_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      189,
+      173
+    ],
+    "schpos": [
+      246.38,
+      187.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0603FR-0710KL",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0603FR-0710KL",
+    "note": "Boot pull-up candidate; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "fa6e632e-d25c-55a7-8265-fd69f74d6e1a"
+  },
+  {
+    "ref": "R14",
+    "symbol": "R",
+    "value": "100k",
+    "footprint": "R_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      177,
+      141
+    ],
+    "schpos": [
+      289.56,
+      187.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0603FR-07100KL",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0603FR-07100KL",
+    "note": "LED enable default-off candidate; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "802e07de-48b1-5cc2-be6d-a573e8072d8e"
+  },
+  {
+    "ref": "R15",
+    "symbol": "R",
+    "value": "2 ohm",
+    "footprint": "R_0805_2012Metric",
+    "sheet": "support",
+    "pos": [
+      182,
+      141
+    ],
+    "schpos": [
+      332.74,
+      187.96
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0805FR-072RL",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0805FR-072RL",
+    "note": "LED current sense: 0.2 V / 2 ohm = 100 mA initial study; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "d3c64a85-a331-5a13-8423-6ab122f93be2"
+  },
+  {
+    "ref": "R16",
+    "symbol": "R",
+    "value": "2.2k",
+    "footprint": "R_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      176,
+      157
+    ],
+    "schpos": [
+      30.48,
+      220.98000000000002
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0603FR-072K2L",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0603FR-072K2L",
+    "note": "Camera I2C pull-up candidate; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "47adf4c8-33d5-5151-b3b8-db2c4b037d4f"
+  },
+  {
+    "ref": "R17",
+    "symbol": "R",
+    "value": "2.2k",
+    "footprint": "R_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      179,
+      157
+    ],
+    "schpos": [
+      73.66,
+      220.98000000000002
+    ],
+    "rotation": 0,
+    "manufacturer": "Yageo",
+    "mpn": "RC0603FR-072K2L",
+    "source": "https://www.yageogroup.com/component-documentation/download/specsheet/RC0603FR-072K2L",
+    "note": "Camera I2C pull-up candidate; not wired; value and MPN ordering check pending.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "9e689df3-7c79-5fa1-bcad-5753fa904cc7"
+  },
+  {
+    "ref": "C26",
+    "symbol": "C",
+    "value": "22pF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      137,
+      185
+    ],
+    "schpos": [
+      162.56,
+      220.98
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "GRM1885C1H220JA01D",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "Core compensation; crystal capacitors require load/stray calculation and measurement.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "87ca5b31-25ec-5b50-b2d8-9e0ad56b9245"
+  },
+  {
+    "ref": "C27",
+    "symbol": "C",
+    "value": "TUNE pF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      128,
+      170
+    ],
+    "schpos": [
+      205.74,
+      220.98
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "TBD C0G 0603",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "Crystal load; crystal capacitors require load/stray calculation and measurement.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "e6bf703b-287b-5cbb-bae3-20688b678d7c"
+  },
+  {
+    "ref": "C28",
+    "symbol": "C",
+    "value": "TUNE pF",
+    "footprint": "C_0603_1608Metric",
+    "sheet": "support",
+    "pos": [
+      128,
+      176
+    ],
+    "schpos": [
+      248.92,
+      220.98
+    ],
+    "rotation": 0,
+    "manufacturer": "Murata",
+    "mpn": "TBD C0G 0603",
+    "source": "https://www.murata.com/en-us/products/capacitor/ceramiccapacitor",
+    "note": "Crystal load; crystal capacitors require load/stray calculation and measurement.",
+    "status": "Candidate; wiring and qualification pending",
+    "uuid": "90b58909-53b4-5bfb-830b-e4d9efb694f5"
+  }
+]

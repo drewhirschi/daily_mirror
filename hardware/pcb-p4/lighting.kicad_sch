@@ -1,0 +1,797 @@
+(kicad_sch (version 20250114) (generator "daily_mirror_part_import") (uuid 1c806336-5234-52c6-a2e7-7757667c6d1d) (paper "A3")
+          (title_block (title "White illumination - candidate parts") (rev "A1 - CANDIDATES") (comment 1 "NOT FOR FABRICATION"))
+          (lib_symbols (symbol "DailyMirrorParts:TPS61165DBV"
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "U"
+			(at 0 11.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "TPS61165DBV"
+			(at 0 8.89 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "DailyMirror:SOT-23-6" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" "https://www.ti.com/lit/ds/symlink/tps61165.pdf"
+			(at 0 -22.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "High-Brightness, White LED Driver, 3V to 18V input voltage range, internal switch, constant current, up to 38V/1.2A output, SOT-23-6"
+			(at 0 -20.574 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "LED-backlight-display-driver PWM EasyScale-protocol"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "SOT?23*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "TPS61165DBV_1_1"
+			(rectangle
+				(start -5.08 7.62)
+				(end 5.08 -7.62)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+			(pin power_in line
+				(at -7.62 5.08 0)
+				(length 2.54)
+				(name "VIN"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at -7.62 2.54 0)
+				(length 2.54)
+				(name "CTRL"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_out line
+				(at 7.62 5.08 180)
+				(length 2.54)
+				(name "SW"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_in line
+				(at 0 -10.16 90)
+				(length 2.54)
+				(name "GND"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "4"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin output line
+				(at -7.62 0 0)
+				(length 2.54)
+				(name "COMP"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "5"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at 7.62 2.54 180)
+				(length 2.54)
+				(name "FB"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "6"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)(symbol "DailyMirrorParts:D_Schottky"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 1.016)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "D"
+			(at 0 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "D_Schottky"
+			(at 0 -2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "DailyMirror:D_SMA" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Schottky diode"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "diode Schottky"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "TO-???* *_Diode_* *SingleDiode* D_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "D_Schottky_0_1"
+			(polyline
+				(pts
+					(xy -1.905 0.635) (xy -1.905 1.27) (xy -1.27 1.27) (xy -1.27 -1.27) (xy -0.635 -1.27) (xy -0.635 -0.635)
+				)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 1.27 1.27) (xy 1.27 -1.27) (xy -1.27 0) (xy 1.27 1.27)
+				)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 1.27 0) (xy -1.27 0)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "D_Schottky_1_1"
+			(pin passive line
+				(at -3.81 0 0)
+				(length 2.54)
+				(name "K"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 3.81 0 180)
+				(length 2.54)
+				(name "A"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)(symbol "DailyMirrorParts:LED_XPG3_thermal"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(offset 1.016)
+			(hide yes)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "D"
+			(at 0 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Value" "LED"
+			(at 0 -2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Footprint" "DailyMirror:LED_Cree-XP-G" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Light emitting diode"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Pins" "1=K 2=A"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "LED diode"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "LED* LED_SMD:* LED_THT:*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "LED_XPG3_thermal_0_1"
+			(polyline
+				(pts
+					(xy -3.048 -0.762) (xy -4.572 -2.286) (xy -3.81 -2.286) (xy -4.572 -2.286) (xy -4.572 -1.524)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -1.778 -0.762) (xy -3.302 -2.286) (xy -2.54 -2.286) (xy -3.302 -2.286) (xy -3.302 -1.524)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -1.27 0) (xy 1.27 0)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -1.27 -1.27) (xy -1.27 1.27)
+				)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 1.27 -1.27) (xy 1.27 1.27) (xy -1.27 0) (xy 1.27 -1.27)
+				)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+(embedded_fonts no)
+(symbol "LED_XPG3_thermal_1_1"
+(pin passive line
+				(at -3.81 0 0)
+				(length 2.54)
+				(name "K"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+(pin passive line
+				(at 3.81 0 180)
+				(length 2.54)
+				(name "A"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+(pin passive line (at 0 -7.62 90) (length 2.54)
+          (name "THERMAL" (effects (font (size 1 1))))
+          (number "3" (effects (font (size 1 1)))))))(symbol "DailyMirrorParts:L"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 1.016)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "L"
+			(at -1.27 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "L"
+			(at 1.905 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "DailyMirror:L_Coilcraft_XAL4040-XXX" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Inductor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "inductor choke coil reactor magnetic"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "Choke_* *Coil* Inductor_* L_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "L_0_1"
+			(arc
+				(start 0 2.54)
+				(mid 0.6323 1.905)
+				(end 0 1.27)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(arc
+				(start 0 1.27)
+				(mid 0.6323 0.635)
+				(end 0 0)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(arc
+				(start 0 0)
+				(mid 0.6323 -0.635)
+				(end 0 -1.27)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(arc
+				(start 0 -1.27)
+				(mid 0.6323 -1.905)
+				(end 0 -2.54)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "L_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 1.27)
+				(name "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 1.27)
+				(name "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)) (symbol (lib_id "DailyMirrorParts:TPS61165DBV") (at 63.5 78.74 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid 51803459-c916-5503-8bb4-f73ba247293a)
+              (property "Reference" "U7" (at 63.5 62.230000000000004 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "TPS61165DBVR" (at 63.5 64.77000000000001 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:SOT-23-6" (at 63.5 78.74 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "TPS61165DBVR" (at 63.5 78.74 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://www.ti.com/product/TPS61165" (at 63.5 78.74 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 63.5 78.74 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "U7") (unit 1)))))(symbol (lib_id "DailyMirrorParts:D_Schottky") (at 127 71.12 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid 5d0223b7-ee61-533c-a654-6c1554a7dd6c)
+              (property "Reference" "D10" (at 127 62.230000000000004 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "SS16-E3/61T" (at 127 64.77000000000001 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:D_SMA" (at 127 71.12 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "SS16-E3/61T" (at 127 71.12 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://www.vishay.com/en/product/88746/" (at 127 71.12 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 127 71.12 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "D10") (unit 1)))))(symbol (lib_id "DailyMirrorParts:LED_XPG3_thermal") (at 30.48 154.94 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid 05d75e30-b664-5d5e-9618-431c29191804)
+              (property "Reference" "D2" (at 30.48 146.04999999999998 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "White 5000 K / CRI90" (at 30.48 148.58999999999997 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:LED_Cree-XP-G" (at 30.48 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "XPGDWT-U1-0000-00J3E" (at 30.48 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf" (at 30.48 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 30.48 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "D2") (unit 1)))))(symbol (lib_id "DailyMirrorParts:LED_XPG3_thermal") (at 73.66 154.94 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid d812713f-b94f-51be-9dba-b67ff6d1837f)
+              (property "Reference" "D3" (at 73.66 146.04999999999998 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "White 5000 K / CRI90" (at 73.66 148.58999999999997 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:LED_Cree-XP-G" (at 73.66 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "XPGDWT-U1-0000-00J3E" (at 73.66 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf" (at 73.66 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 73.66 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "D3") (unit 1)))))(symbol (lib_id "DailyMirrorParts:LED_XPG3_thermal") (at 116.84 154.94 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid 713c97bc-ee79-5523-94d5-e778ece25f34)
+              (property "Reference" "D4" (at 116.84 146.04999999999998 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "White 5000 K / CRI90" (at 116.84 148.58999999999997 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:LED_Cree-XP-G" (at 116.84 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "XPGDWT-U1-0000-00J3E" (at 116.84 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf" (at 116.84 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 116.84 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "D4") (unit 1)))))(symbol (lib_id "DailyMirrorParts:LED_XPG3_thermal") (at 160.01999999999998 154.94 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid 7f9f1594-ea0b-5cc3-bcff-d1a2a5f54687)
+              (property "Reference" "D5" (at 160.01999999999998 146.04999999999998 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "White 5000 K / CRI90" (at 160.01999999999998 148.58999999999997 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:LED_Cree-XP-G" (at 160.01999999999998 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "XPGDWT-U1-0000-00J3E" (at 160.01999999999998 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf" (at 160.01999999999998 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 160.01999999999998 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "D5") (unit 1)))))(symbol (lib_id "DailyMirrorParts:LED_XPG3_thermal") (at 203.2 154.94 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid d75efb5f-45d6-5c39-95a4-5249fee7f365)
+              (property "Reference" "D6" (at 203.2 146.04999999999998 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "White 5000 K / CRI90" (at 203.2 148.58999999999997 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:LED_Cree-XP-G" (at 203.2 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "XPGDWT-U1-0000-00J3E" (at 203.2 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf" (at 203.2 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 203.2 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "D6") (unit 1)))))(symbol (lib_id "DailyMirrorParts:LED_XPG3_thermal") (at 246.38 154.94 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid 96d2b55c-8c1b-5733-a387-4175d3e4b748)
+              (property "Reference" "D7" (at 246.38 146.04999999999998 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "White 5000 K / CRI90" (at 246.38 148.58999999999997 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:LED_Cree-XP-G" (at 246.38 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "XPGDWT-U1-0000-00J3E" (at 246.38 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf" (at 246.38 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 246.38 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "D7") (unit 1)))))(symbol (lib_id "DailyMirrorParts:LED_XPG3_thermal") (at 289.56 154.94 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid f2af9cfc-1344-581c-95af-7a09a6a674e8)
+              (property "Reference" "D8" (at 289.56 146.04999999999998 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "White 5000 K / CRI90" (at 289.56 148.58999999999997 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:LED_Cree-XP-G" (at 289.56 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "XPGDWT-U1-0000-00J3E" (at 289.56 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf" (at 289.56 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 289.56 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "D8") (unit 1)))))(symbol (lib_id "DailyMirrorParts:LED_XPG3_thermal") (at 332.74 154.94 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid 8086f662-b337-589b-9094-2c50c08bd540)
+              (property "Reference" "D9" (at 332.74 146.04999999999998 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "White 5000 K / CRI90" (at 332.74 148.58999999999997 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:LED_Cree-XP-G" (at 332.74 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "XPGDWT-U1-0000-00J3E" (at 332.74 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://downloads.cree-led.com/files/ds/x/XLamp-XPG3.pdf" (at 332.74 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 332.74 154.94 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "D9") (unit 1)))))(symbol (lib_id "DailyMirrorParts:L") (at 101.6 73.66 0) (unit 1)
+              (in_bom yes) (on_board yes) (dnp no) (uuid ae6216a9-dedc-5ca3-b1e9-cf2e0086fd75)
+              (property "Reference" "L3" (at 101.6 64.77 0) (effects (font (size 1.27 1.27))))
+              (property "Value" "10 uH" (at 101.6 67.31 0) (effects (font (size 1.27 1.27))))
+              (property "Footprint" "DailyMirror:L_Coilcraft_XAL4040-XXX" (at 101.6 73.66 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "MPN" "XAL4040-103MEC" (at 101.6 73.66 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Datasheet" "https://www.coilcraft.com/en-us/products/power/shielded-inductors/molded-inductor/xal/xal40xx/xal4040-103/" (at 101.6 73.66 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (property "Design status" "Candidate; wiring and qualification pending" (at 101.6 73.66 0) (effects (font (size 1.27 1.27)) (hide yes)))
+              (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925/8829b2c2-e248-59e6-baf0-daad26aaa444" (reference "L3") (unit 1)))))(text "White illumination - candidate parts" (at 20 15 0) (effects (font (size 2.3 2.3)) (justify left top)) (uuid ceb3048e-203c-58e9-8997-9dc6432a10f3))(text "PART IMPORT / pins intentionally awaiting circuit design. This page is NOT a connected circuit." (at 20 23 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid b3fa7c60-0405-5b30-9849-60a487d51008))(text "Values, quantities and mechanical placement are provisional. See sourcing.md and candidate-parts.csv." (at 20 263 0) (effects (font (size 1.4 1.4)) (justify left top)) (uuid 69793c2c-fccf-545c-b97c-08182c654b2b)) (embedded_fonts no))

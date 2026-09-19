@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Mirror · enclosure prototype 02</title>
+<style>
+:root{color-scheme:light;font-family:system-ui,sans-serif;color:#223d48;background:#eeede7}*{box-sizing:border-box}body{margin:0}header{padding:24px 28px 8px}h1{font-size:26px;margin:5px 0}p{margin:8px 0;line-height:1.5}small{color:#50626a}.layout{display:grid;grid-template-columns:1fr 280px;gap:16px;padding:16px 28px 28px}canvas{width:100%;height:clamp(390px,calc(100vh - 185px),650px);display:block;touch-action:none;cursor:grab;background:#e7e7df;border-radius:12px}aside{padding:8px}label{display:block;margin:20px 0 8px;font-size:14px}input[type=range],select{width:100%}select,button{font:inherit;border:1px solid #afbab9;border-radius:6px;padding:8px;background:#fafaf6;color:inherit}button{cursor:pointer}input[type=checkbox]{margin-right:8px}.checks label{margin:12px 0}a{color:#185e73}.legend{margin-top:24px;font-size:13px;line-height:1.8}.swatch{display:inline-block;width:10px;height:10px;margin-right:8px}.note{font-size:13px;margin-top:22px}footer{padding:0 28px 24px;font-size:13px}.error{color:#933} @media(max-width:850px){.layout{grid-template-columns:1fr;padding:10px 16px}canvas{height:480px}aside{display:grid;grid-template-columns:1fr 1fr;gap:14px}.note,.legend{grid-column:1/-1}header{padding:20px 16px}}
+</style></head><body>
+<header><small>DAILY MIRROR / PROTOTYPE 02</small><h1>Enclosure + adjustable rail</h1><p>Drag to orbit. Scroll to zoom. Explore the actual CAD geometry without FreeCAD.</p></header>
+<div class="layout"><div><canvas id="view" aria-label="Interactive 3D model of the Raspberry Pi enclosure, camera mounts and rail">Your browser needs WebGL to display this model.</canvas><p id="status"><small id="viewCaption">140 × 170 × 55 mm enclosure (5.5 × 6.7 × 2.2 in) · 300 mm travel</small></p></div>
+<aside><div><label for="preset">View</label><select id="preset"><option value="front">Enclosure</option><option value="assembly">On the full rail</option><option value="inside">Inside the housing</option><option value="pimount">How the Pi screws in</option><option value="attachment">How the rail attaches</option><option value="panel">Camera screw posts</option><option value="rail">Rail and lock</option></select>
+<label for="travel">Height above lowest position: <output id="heightval">146 mm</output></label><input id="travel" type="range" min="0" max="300" value="146">
+<label for="explode"><span id="explodeLabel">Separate front panel</span>: <output id="explodeval">0 mm</output></label><input id="explode" type="range" min="0" max="120" value="0"></div>
+<div class="checks"><label><input id="electronics" type="checkbox" checked>Electronics envelopes</label><label><input id="flash" type="checkbox">Future flash space</label><button id="reset">Reset view</button></div>
+<div class="legend"><div><span class="swatch" style="background:#778b94"></span>Rail and housing</div><div><span class="swatch" style="background:#db7838"></span>Carriage, knob and end stops</div><div><span class="swatch" style="background:#358354"></span>Pi and camera references</div></div>
+<p class="note" id="viewNote">The front panel carries the camera, LED and button. The entire enclosure slides together, so only the external power cable needs a service loop. Tightening the knob presses a small brake pad against the rail.</p>
+<p class="note">CAD geometry checked. Camera lens, controls, printer fit, friction and holding load still need a physical trial. Amber flash space is a future allowance.</p></aside></div>
+<footer><a href="DailyMirror-v2-print-pack.zip">Download print pack</a> · <a href="../README.md">Assembly and printing guide</a> · <a href="DailyMirror-Rail-Enclosure-v2.FCStd">FreeCAD model</a> · <a href="Assembly.step">Assembly STEP</a></footer>
+<script>
+(()=>{'use strict';
+const scene=/*__SCENE__*/;
+const canvas=document.getElementById('view'),gl=canvas.getContext('webgl',{antialias:true,alpha:false});
+if(!gl){document.getElementById('status').innerHTML='<p class="error">WebGL is unavailable. Open enclosure-preview.png in the same folder for the still preview.</p>';return;}
+function shader(type,source){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
+const program=gl.createProgram();
+gl.attachShader(program,shader(gl.VERTEX_SHADER,`attribute vec3 aPos;attribute vec3 aNormal;uniform vec3 uCenter;uniform vec3 uOffset;uniform float uYaw;uniform float uPitch;uniform vec2 uScale;varying vec3 vNormal;varying float vOriginalY;void main(){vec3 p=aPos+uOffset-uCenter;float cy=cos(uYaw),sy=sin(uYaw),cp=cos(uPitch),sp=sin(uPitch);vec3 q=vec3(cy*p.x+sy*p.z,p.y,-sy*p.x+cy*p.z);vec3 r=vec3(q.x,cp*q.y-sp*q.z,sp*q.y+cp*q.z);gl_Position=vec4(r.x*uScale.x,r.y*uScale.y,-r.z/1600.0,1.0);vNormal=aNormal;vOriginalY=aPos.y;}`));
+gl.attachShader(program,shader(gl.FRAGMENT_SHADER,`precision mediump float;uniform vec3 uColor;uniform bool uShortRail;varying vec3 vNormal;varying float vOriginalY;void main(){if(uShortRail&&(vOriginalY < -24.0 || vOriginalY > 76.0))discard;vec3 n=normalize(vNormal);float light=.48+.52*max(dot(n,normalize(vec3(-.35,.65,1.0))),0.0);gl_FragColor=vec4(uColor*light,1.0);}`));
+gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);
+const loc={};['uCenter','uOffset','uYaw','uPitch','uScale','uColor','uShortRail'].forEach(n=>loc[n]=gl.getUniformLocation(program,n));
+const pos=gl.getAttribLocation(program,'aPos'),norm=gl.getAttribLocation(program,'aNormal');
+const meshes=scene.map(s=>{const data=[];for(const f of s.faces){const a=s.vertices[f[0]],b=s.vertices[f[1]],c=s.vertices[f[2]],u=b.map((x,i)=>x-a[i]),v=c.map((x,i)=>x-a[i]);const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],l=Math.hypot(...n)||1;for(const p of [a,b,c])data.push(...p,...n.map(x=>x/l));}const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);return {...s,buffer,count:data.length/6};});
+let yaw=-.42,pitch=.23,zoom=1,mode='front',height=146,explode=0;
+const fixed=new Set(['RailLower','RailUpper','StopLower','StopUpper']);
+const panel=new Set(['FrontPanel','CameraPCB','CameraLensAllowance','LEDAllowance','ButtonCap','ButtonAllowance','FutureFlashReserve']);
+const frontSet=new Set(['Housing','FrontPanel','CameraLensAllowance','LEDAllowance','ButtonCap','LockKnob']);
+const railSet=new Set([...fixed,'Carriage','LockKnob','LockNut','LockScrew','BrakePad']);
+function visible(s){
+ if(mode==='attachment')return ['Housing','Carriage','RailLower','RailUpper','LockKnob','LockScrew','LockNut','BrakePad'].includes(s.name)||s.name.startsWith('RearMountScrew');
+ if(mode==='pimount')return ['Housing','Pi4PCB'].includes(s.name)||s.name.startsWith('PiMountScrew');
+ if(s.kind==='reference'&&!document.getElementById('electronics').checked&&s.name!=='FutureFlashReserve')return false;
+ if(s.name==='FutureFlashReserve')return document.getElementById('flash').checked&&['front','inside','assembly','panel'].includes(mode);
+ if(mode==='rail')return railSet.has(s.name);
+ if(mode==='panel')return panel.has(s.name)&&!['ButtonCap','LEDAllowance','CameraLensAllowance','CameraPCB','ButtonAllowance'].includes(s.name);
+ if(mode==='front')return frontSet.has(s.name)||(explode>0&&['Pi4PCB','CameraPCB'].includes(s.name));
+ if(mode==='inside')return !fixed.has(s.name)&&!['FrontPanel','PiComponentAllowance','ButtonAllowance','CameraPCB','CameraLensAllowance','LEDAllowance','ButtonCap','LockKnob','LockNut','LockScrew','Carriage','BrakePad'].includes(s.name);
+ return s.name!=='PiComponentAllowance';
+}
+function draw(){const dpr=Math.min(devicePixelRatio||1,2),w=Math.round(canvas.clientWidth*dpr),h=Math.round(canvas.clientHeight*dpr);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);gl.clearColor(.905,.905,.875,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);let extent=mode==='assembly'?600:mode==='rail'?500:245;const dy=height-146;let center=mode==='assembly'?[70,73,20]:mode==='rail'?[70,30,20]:[70,78+dy,50];if(mode==='panel')center=[70,85+dy,75+explode];gl.uniform3fv(loc.uCenter,center);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uPitch,pitch);gl.uniform2f(loc.uScale,2*zoom/extent*h/w,2*zoom/extent);
+if(mode==='attachment'){
+ gl.uniform3fv(loc.uCenter,[70,70,45+explode*.15]);
+ gl.uniform2f(loc.uScale,2*zoom/300*h/w,2*zoom/300);
+}
+for(const s of meshes){
+ if(!visible(s))continue;
+ gl.bindBuffer(gl.ARRAY_BUFFER,s.buffer);gl.enableVertexAttribArray(pos);gl.vertexAttribPointer(pos,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(norm);gl.vertexAttribPointer(norm,3,gl.FLOAT,false,24,12);
+ gl.uniform3fv(loc.uColor,s.color);
+ let offset=[0,fixed.has(s.name)?0:dy,panel.has(s.name)?explode:0];
+ if(mode==='attachment')offset=[0,0,fixed.has(s.name)?-explode*.6:s.name==='Housing'?explode*.9:s.name.startsWith('RearMountScrew')?explode*1.2:0];
+ if(mode==='pimount')offset=[0,dy,s.name==='Pi4PCB'?explode*.35:s.name.startsWith('PiMountScrew')?explode*.65:0];
+ gl.uniform3fv(loc.uOffset,offset);
+ gl.uniform1i(loc.uShortRail,mode==='attachment'&&fixed.has(s.name)?1:0);
+ gl.drawArrays(gl.TRIANGLES,0,s.count);
+}}
+function reset(){zoom=1;const angles=mode==='attachment'?[1.0,.35]:mode==='pimount'?[-.28,.6]:mode==='panel'?[2.75,.28]:mode==='inside'?[-.35,.5]:[-.42,.23];[yaw,pitch]=angles;draw();}
+document.getElementById('preset').addEventListener('change',e=>{
+ mode=e.target.value;
+ const attachment=mode==='attachment',pi=mode==='pimount',explaining=attachment||pi;
+ explode=attachment?85:pi?60:0;
+ document.getElementById('explode').value=explode;
+ document.getElementById('explodeval').value=explode+(explaining?'%':' mm');
+ document.getElementById('explodeLabel').textContent=explaining?'Separate mounting parts':'Separate front panel';
+ document.getElementById('travel').disabled=attachment;
+ document.getElementById('electronics').disabled=explaining;
+ document.getElementById('flash').disabled=explaining;
+ document.getElementById('viewCaption').textContent=attachment?'Exploded attachment • rail shown shortened • move separation to 0 to assemble':pi?'Four existing Pi holes → four screws → four 8 mm printed posts':'140 × 170 × 55 mm enclosure (5.5 × 6.7 × 2.2 in) · 300 mm travel';
+ document.getElementById('viewNote').textContent=attachment?'Left: fixed wall rail. Middle: orange sliding block. Right: housing. Four M3 × 10 screws go from INSIDE the housing, through its back wall, into the sliding block. The dovetail captures the block on the rail; the knob holds its height.':pi?'The Pi 4 B already has four mounting holes on a 58 × 49 mm pattern. Four M2.5 × 8 screws pass through those holes into the printed posts, leaving 8 mm of clearance beneath the board. This mounting uses screws; retaining clips are unnecessary.':'The front panel carries the camera, LED and button. The entire enclosure slides together, so only the external power cable needs a service loop. Tightening the knob presses a small brake pad against the rail.';
+ reset();
+});
+document.getElementById('travel').addEventListener('input',e=>{height=+e.target.value;document.getElementById('heightval').value=height+' mm';draw();});
+document.getElementById('explode').addEventListener('input',e=>{explode=+e.target.value;document.getElementById('explodeval').value=explode+(['attachment','pimount'].includes(mode)?'%':' mm');draw();});
+['electronics','flash'].forEach(id=>document.getElementById(id).addEventListener('change',draw));
+document.getElementById('reset').addEventListener('click',reset);
+let drag=null;canvas.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);});canvas.addEventListener('pointermove',e=>{if(!drag)return;yaw+=(e.clientX-drag[0])*.007;pitch=Math.max(-1.45,Math.min(1.45,pitch+(e.clientY-drag[1])*.007));drag=[e.clientX,e.clientY];draw();});canvas.addEventListener('pointerup',()=>drag=null);canvas.addEventListener('pointercancel',()=>drag=null);canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.min(3,Math.max(.4,zoom*Math.exp(-e.deltaY*.001)));draw();},{passive:false});new ResizeObserver(draw).observe(canvas);draw();
+})();
+</script></body></html>

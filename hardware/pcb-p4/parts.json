@@ -1,0 +1,222 @@
+[
+  {
+    "ref": "D1",
+    "value": "RGB common anode",
+    "footprint": "LED_D5.0mm-4_RGB_Wide_Pins",
+    "nets": {
+      "1": "LED_B_K",
+      "2": "LED_G_K",
+      "3": "+3V3",
+      "4": "LED_R_K"
+    },
+    "pos": [
+      143,
+      120
+    ],
+    "uuid": "7afde90f-9525-5b7c-a3e8-730acb8f4ab6"
+  },
+  {
+    "ref": "R1",
+    "value": "1k (start)",
+    "footprint": "R_0603_1608Metric",
+    "nets": {
+      "1": "STATUS_B_N",
+      "2": "LED_B_K"
+    },
+    "pos": [
+      143,
+      126
+    ],
+    "uuid": "922d1bfb-650a-502e-9bbd-182390bd07a0"
+  },
+  {
+    "ref": "R2",
+    "value": "1k (start)",
+    "footprint": "R_0603_1608Metric",
+    "nets": {
+      "1": "STATUS_G_N",
+      "2": "LED_G_K"
+    },
+    "pos": [
+      146,
+      126
+    ],
+    "uuid": "ac8b5b83-7fe5-5b4f-831f-cb8ea586b124"
+  },
+  {
+    "ref": "R3",
+    "value": "1k (start)",
+    "footprint": "R_0603_1608Metric",
+    "nets": {
+      "1": "STATUS_R_N",
+      "2": "LED_R_K"
+    },
+    "pos": [
+      149,
+      126
+    ],
+    "uuid": "0470fbc1-edeb-5fc5-af13-8c3c1069b487"
+  },
+  {
+    "ref": "R5",
+    "value": "100k",
+    "footprint": "R_0603_1608Metric",
+    "nets": {
+      "1": "+3V3",
+      "2": "STATUS_B_N"
+    },
+    "pos": [
+      143,
+      130
+    ],
+    "uuid": "416ad610-f0b9-5726-8df0-cb794e16fe48"
+  },
+  {
+    "ref": "R6",
+    "value": "100k",
+    "footprint": "R_0603_1608Metric",
+    "nets": {
+      "1": "+3V3",
+      "2": "STATUS_G_N"
+    },
+    "pos": [
+      146,
+      130
+    ],
+    "uuid": "9bfcde8b-d246-5870-b8ea-6dce86f45117"
+  },
+  {
+    "ref": "R7",
+    "value": "100k",
+    "footprint": "R_0603_1608Metric",
+    "nets": {
+      "1": "+3V3",
+      "2": "STATUS_R_N"
+    },
+    "pos": [
+      149,
+      130
+    ],
+    "uuid": "fdddcd1e-c2dc-5dca-bad8-c99b1a7ceb59"
+  },
+  {
+    "ref": "SW1",
+    "value": "Momentary NO",
+    "footprint": "SW_PUSH_6mm_H4.3mm",
+    "nets": {
+      "1": "USER_BUTTON_N",
+      "2": "GND"
+    },
+    "pos": [
+      158,
+      117
+    ],
+    "uuid": "ab8c487a-49e6-5ccc-83be-14ec6a476b3b"
+  },
+  {
+    "ref": "R4",
+    "value": "10k",
+    "footprint": "R_0603_1608Metric",
+    "nets": {
+      "1": "+3V3",
+      "2": "USER_BUTTON_N"
+    },
+    "pos": [
+      157,
+      126
+    ],
+    "uuid": "5592e545-9813-5c75-94e8-e02c22365983"
+  },
+  {
+    "ref": "C1",
+    "value": "100nF",
+    "footprint": "C_0603_1608Metric",
+    "nets": {
+      "1": "USER_BUTTON_N",
+      "2": "GND"
+    },
+    "pos": [
+      160,
+      126
+    ],
+    "uuid": "d012d5d0-c5ee-5305-9d43-e701b2088773"
+  },
+  {
+    "ref": "TP1",
+    "value": "+3V3",
+    "footprint": "TestPoint_Pad_D1.5mm",
+    "nets": {
+      "1": "+3V3"
+    },
+    "pos": [
+      137,
+      134
+    ],
+    "uuid": "bd704dfd-2d82-5a2f-b6b4-bf1b29f70bef"
+  },
+  {
+    "ref": "TP2",
+    "value": "GND",
+    "footprint": "TestPoint_Pad_D1.5mm",
+    "nets": {
+      "1": "GND"
+    },
+    "pos": [
+      142,
+      134
+    ],
+    "uuid": "2f34c8a3-337e-52df-bc71-70c2bded0e08"
+  },
+  {
+    "ref": "TP3",
+    "value": "STATUS_B_N",
+    "footprint": "TestPoint_Pad_D1.5mm",
+    "nets": {
+      "1": "STATUS_B_N"
+    },
+    "pos": [
+      147,
+      134
+    ],
+    "uuid": "a7c504ea-e70b-5906-933a-f978c17c3c9f"
+  },
+  {
+    "ref": "TP4",
+    "value": "STATUS_G_N",
+    "footprint": "TestPoint_Pad_D1.5mm",
+    "nets": {
+      "1": "STATUS_G_N"
+    },
+    "pos": [
+      152,
+      134
+    ],
+    "uuid": "4f789ff5-9b75-53de-b42b-c4ba90f49180"
+  },
+  {
+    "ref": "TP5",
+    "value": "STATUS_R_N",
+    "footprint": "TestPoint_Pad_D1.5mm",
+    "nets": {
+      "1": "STATUS_R_N"
+    },
+    "pos": [
+      157,
+      134
+    ],
+    "uuid": "3dce01b6-7673-50d1-9fd5-b9d5ff87a372"
+  },
+  {
+    "ref": "TP6",
+    "value": "USER_BUTTON_N",
+    "footprint": "TestPoint_Pad_D1.5mm",
+    "nets": {
+      "1": "USER_BUTTON_N"
+    },
+    "pos": [
+      162,
+      134
+    ],
+    "uuid": "6a188ced-fc37-5adb-a3b4-183532aaaaf2"
+  }
+]

@@ -20,3 +20,15 @@ processor/models/*.task
 
 __pycache__/
 firmware/host/data/
+
+# Hardware: keep design sources, ignore vendor references and generated output
+hardware/**/output/
+hardware/**/reference/
+hardware/**/revisions/
+hardware/**/quotes/
+hardware/pcb-p4/libraries/
+hardware/**/*-backups/
+hardware/**/*.kicad_prl
+hardware/**/fp-info-cache
+hardware/**/__pycache__/
+outputs/

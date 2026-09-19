@@ -1,0 +1,23 @@
+{
+  "width": 140.0,
+  "height": 170.0,
+  "body_depth": 52.0,
+  "wall": 3.0,
+  "corner_radius": 8.0,
+  "camera_lens_hole": 18.0,
+  "camera_standoff_height": 9.0,
+  "camera_pilot": 1.6,
+  "camera_hole_spacing_x": 21.0,
+  "camera_hole_spacing_y": 12.5,
+  "camera_lens_from_top_edge": 9.5,
+  "led_hole": 5.2,
+  "button_hole": 12.2,
+  "power_entry_hole": 14.0,
+  "pi_pilot": 2.0,
+  "case_pilot": 2.5,
+  "rail_segment_length": 208.0,
+  "rail_clearance": 0.4,
+  "rail_key_clearance": 0.25,
+  "brake_pad_diameter": 8.0,
+  "brake_pad_thickness": 1.5
+}

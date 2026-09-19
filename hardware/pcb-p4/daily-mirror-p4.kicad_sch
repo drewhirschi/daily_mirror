@@ -1,0 +1,696 @@
+(kicad_sch (version 20250114) (generator "daily_mirror_starter")
+      (uuid 1605f4a9-80dd-587e-b506-6411e527a925) (paper "A3")
+      (title_block (title "Daily Mirror - architecture and controls") (date "2026-09-14") (rev "A1 - PARTS STUDY")
+        (company "Daily Mirror") (comment 1 "NOT FOR FABRICATION - main circuits and routing incomplete"))
+      (lib_symbols (symbol "DailyMirror:R"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "R"
+			(at 2.032 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "R"
+			(at 0 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at -1.778 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "R res resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "R_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "R_0_1"
+			(rectangle
+				(start -1.016 -2.54)
+				(end 1.016 2.54)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "R_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)(symbol "DailyMirror:C"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0.254)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "C"
+			(at 0.635 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "C"
+			(at 0.635 -2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 0.9652 -3.81 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Unpolarized capacitor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "cap capacitor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "C_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "C_0_1"
+			(polyline
+				(pts
+					(xy -2.032 0.762) (xy 2.032 0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -2.032 -0.762) (xy 2.032 -0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "C_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 2.794)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 2.794)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)(symbol "DailyMirror:SW_Push"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 1.016)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "SW"
+			(at 1.27 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "SW_Push"
+			(at 0 -1.524 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 0 5.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 5.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Push button switch, generic, two pins"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "switch normally-open pushbutton push-button"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "SW_Push_0_1"
+			(circle
+				(center -2.032 0)
+				(radius 0.508)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 0 1.27) (xy 0 3.048)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(circle
+				(center 2.032 0)
+				(radius 0.508)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 2.54 1.27) (xy -2.54 1.27)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(pin passive line
+				(at -5.08 0 0)
+				(length 2.54)
+				(name "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 5.08 0 180)
+				(length 2.54)
+				(name "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)(symbol "DailyMirror:TestPoint"
+		(pin_numbers
+			(hide yes)
+		)
+		(pin_names
+			(offset 0.762)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "TP"
+			(at 0 6.858 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "TestPoint"
+			(at 0 5.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 5.08 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 5.08 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "test point"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "test point tp"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "Pin* Test*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "TestPoint_0_1"
+			(circle
+				(center 0 3.302)
+				(radius 0.762)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+		(symbol "TestPoint_1_1"
+			(pin passive line
+				(at 0 0 90)
+				(length 2.54)
+				(name "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)(symbol "DailyMirror:RGB_B_G_A_R" (pin_names (offset 0.7)) (in_bom yes) (on_board yes)
+(property "Reference" "D" (at 0 15.24 0) (effects (font (size 1.27 1.27))))
+(property "Value" "RGB_B_G_A_R" (at 0 -15.24 0) (effects (font (size 1.27 1.27))))
+(property "Footprint" "DailyMirror:LED_D5.0mm-4_RGB_Wide_Pins" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+(property "Description" "Provisional common-anode RGB; pin numbering documented in device/README.md. Confirm physical orientation." (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+(symbol "RGB_B_G_A_R_0_1"
+(rectangle (start -7.62 13.97) (end 7.62 -13.97) (stroke (width 0) (type default)) (fill (type background))))
+(symbol "RGB_B_G_A_R_1_1"
+(pin passive line (at -10.16 10.16 0) (length 2.54) (name "BLUE_K" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+(pin passive line (at -10.16 0 0) (length 2.54) (name "GREEN_K" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+(pin passive line (at 10.16 0 180) (length 2.54) (name "A" (effects (font (size 1.27 1.27)))) (number "3" (effects (font (size 1.27 1.27)))))
+(pin passive line (at -10.16 -10.16 0) (length 2.54) (name "RED_K" (effects (font (size 1.27 1.27)))) (number "4" (effects (font (size 1.27 1.27)))))))) (text "DAILY MIRROR / CUSTOM CAMERA BOARD" (at 20 16 0) (effects (font (size 3 3)) (justify left top)) (uuid ab267326-8a1b-51c6-a94f-3420a895cece))(text "Rev A1: component assets imported on sheets 2-5; controls connected below. Main circuits not yet connected." (at 20 23 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid afc6fc3c-3c98-598e-a2c8-07fd3beda98f))(text "Requirements: existing 16 MP IMX519, USB-C wall power, Wi-Fi + phone pairing, new enclosure." (at 20 29 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid d520794b-bc99-569f-bcbc-8c5667eb8229))(rectangle (start 20 42) (end 96 81) (stroke (width 0.254) (type default)) (fill (type none)) (uuid 8b1a3158-d04b-587e-80b6-a7d0db2f4a33))(text "USB-C / POWER" (at 23 45 0) (effects (font (size 1.8 1.8)) (justify left top)) (uuid 34af1715-8bc9-5927-aaa1-716e5f8113e9))(text "CC current detection or PD\nProtection + 3.3 V regulator\nP4 core / PHY / camera rails\nPower budget depends on lights" (at 23 53 0) (effects (font (size 1.4 1.4)) (justify left top)) (uuid 5288b8bd-f19a-5ef1-8bcb-c389b336928f))(rectangle (start 116 42) (end 207 81) (stroke (width 0.254) (type default)) (fill (type none)) (uuid ad7dcbb9-12e6-5cba-b595-d9ff081cd07e))(text "PROCESSOR / P4 UNRESOLVED" (at 119 45 0) (effects (font (size 1.8 1.8)) (justify left top)) (uuid 0c2680b0-4301-5dc3-b1bb-62938768f5ac))(text "Current P4 ISP: 1920 px max width\nIMX519 full frame: 4656 px wide\nRaw bypass needs proof\nSelect processor after camera test" (at 119 53 0) (effects (font (size 1.4 1.4)) (justify left top)) (uuid 98a7ed0a-d541-5384-b533-f54ce76515e2))(rectangle (start 227 42) (end 312 81) (stroke (width 0.254) (type default)) (fill (type none)) (uuid 368f9192-0904-501c-b1e2-fae9310ee904))(text "ESP32-C6 / RADIO" (at 230 45 0) (effects (font (size 1.8 1.8)) (justify left top)) (uuid 1585b5d7-a6d3-537e-a36b-599fc9f59dd9))(text "Wi-Fi + Bluetooth LE\nSDIO link to P4 / ESP-Hosted\nBLE provisioning on phone\nAntenna clearance + test access" (at 230 53 0) (effects (font (size 1.4 1.4)) (justify left top)) (uuid 2242db7a-4715-5916-b9ee-c1fadba5f21c))(rectangle (start 20 97) (end 96 136) (stroke (width 0.254) (type default)) (fill (type none)) (uuid 9489543d-50b9-500f-833e-958e4743d69d))(text "WHITE PHOTO LIGHTING" (at 23 100 0) (effects (font (size 1.8 1.8)) (justify left top)) (uuid 9b935c94-50af-56cd-9763-efde53e4bd40))(text "White-only emitters / parts TBD\nDriver + current regulation TBD\nSnap-in diffuser + thermal path\nDimensions / pulse rating TBD" (at 23 108 0) (effects (font (size 1.4 1.4)) (justify left top)) (uuid 68b730ae-4882-52e7-a761-fb5036a3c36e))(rectangle (start 116 97) (end 207 136) (stroke (width 0.254) (type default)) (fill (type none)) (uuid 36cd17e9-76a2-56a1-b04e-e7cce414532b))(text "IMX519 CAMERA / REQUIRED" (at 119 100 0) (effects (font (size 1.8 1.8)) (justify left top)) (uuid 9e92c60e-2696-5708-98a9-992a9bf6a342))(text "MIPI CSI-2, two data lanes\nI2C / autofocus / power control\nFFC pinout + contact side TBD\nFull-resolution driver work needed" (at 119 108 0) (effects (font (size 1.4 1.4)) (justify left top)) (uuid 2eda604e-fa3f-5387-9119-6cc620008678))(rectangle (start 227 97) (end 312 136) (stroke (width 0.254) (type default)) (fill (type none)) (uuid 260921a4-5e46-5bc7-b631-5f2c6d4e6d1d))(text "CONTROLS / DRAWN BELOW" (at 230 100 0) (effects (font (size 1.8 1.8)) (justify left top)) (uuid f966275a-947f-5dd8-a10e-5c606f89ad57))(text "4-pin common-anode RGB LED\nOne resistor per color (three)\nCapture / pairing button\nTest pads for future processor" (at 230 108 0) (effects (font (size 1.4 1.4)) (justify left top)) (uuid 7555e794-c80f-5d5b-8161-87f836ebd877))(text "Power" (at 99 57 0) (effects (font (size 1.2 1.2)) (justify left top)) (uuid 8240d61a-99b8-5c50-b7a4-0fd2107db635))(text "SDIO" (at 209 57 0) (effects (font (size 1.2 1.2)) (justify left top)) (uuid d595b3c0-ba14-5fde-a9e1-642be384507b))(text "CSI-2 + control" (at 138 86 0) (effects (font (size 1.2 1.2)) (justify left top)) (uuid 0c3affc1-e247-5859-83ba-640fdbaa8070))(text "Boxes above describe planned functions; they are not connected component symbols." (at 20 143 0) (effects (font (size 1.3 1.3)) (justify left top)) (uuid 02fa87c7-dadc-57ab-bc6d-e9df6f7fcabc))(text "RGB STATUS / ACTIVE LOW" (at 20 158 0) (effects (font (size 2 2)) (justify left top)) (uuid 8983ec9c-f6d5-5290-bcfc-6b0a223d306c))(text "Documented rpi2 mapping: pin 1 blue, 2 green, 3 common +, 4 red. Physical orientation still needs confirmation." (at 20 165 0) (effects (font (size 1.2 1.2)) (justify left top)) (uuid 26e57428-df05-5716-9696-81837c49ff72))(symbol (lib_id "DailyMirror:RGB_B_G_A_R") (at 116.84 198.12 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 7afde90f-9525-5b7c-a3e8-730acb8f4ab6)
+          (property "Reference" "D1" (at 109.22 180.34 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "RGB common anode" (at 109.22 215.9 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:LED_D5.0mm-4_RGB_Wide_Pins" (at 116.84 198.12 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "D1") (unit 1)))))(wire (pts (xy 106.68 187.96) (xy 97.79 187.96)) (stroke (width 0.254) (type solid)) (uuid 56e394be-3126-592e-8f59-978f8ffb63db))(label "LED_B_K" (at 99.06 187.96 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid d1f2d5ff-899b-57be-8737-4cef1a4c1552))(symbol (lib_id "DailyMirror:R") (at 93.98 187.96 90)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 922d1bfb-650a-502e-9bbd-182390bd07a0)
+          (property "Reference" "R1" (at 90.17 184.15 90) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "1k (start)" (at 90.17 191.77 90) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:R_0603_1608Metric" (at 93.98 187.96 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "R1") (unit 1)))))(wire (pts (xy 90.17 187.96) (xy 68.58 187.96)) (stroke (width 0.254) (type solid)) (uuid c8ed0eb7-fead-54b5-b277-3caf56ce33fd))(label "STATUS_B_N" (at 68.58 187.96 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 18a6f6d2-6b0d-5be3-a4dc-ad63acbe71ef))(wire (pts (xy 106.68 198.12) (xy 97.79 198.12)) (stroke (width 0.254) (type solid)) (uuid 01bdbc54-1cdc-5331-9052-db42c568fbe3))(label "LED_G_K" (at 99.06 198.12 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 701ed125-7969-5474-bd63-58646724ef5d))(symbol (lib_id "DailyMirror:R") (at 93.98 198.12 90)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid ac8b5b83-7fe5-5b4f-831f-cb8ea586b124)
+          (property "Reference" "R2" (at 90.17 194.31 90) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "1k (start)" (at 90.17 201.93 90) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:R_0603_1608Metric" (at 93.98 198.12 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "R2") (unit 1)))))(wire (pts (xy 90.17 198.12) (xy 68.58 198.12)) (stroke (width 0.254) (type solid)) (uuid 2c0f3adf-a355-5e83-9f3c-7816df33f19e))(label "STATUS_G_N" (at 68.58 198.12 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid fa8b44e7-3626-5c98-b540-8e26c1066a52))(wire (pts (xy 106.68 208.28) (xy 97.79 208.28)) (stroke (width 0.254) (type solid)) (uuid c6cfc21a-4417-5ce5-acc7-08e34b474939))(label "LED_R_K" (at 99.06 208.28 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid c4b8e223-30fc-5319-9213-81022e676c22))(symbol (lib_id "DailyMirror:R") (at 93.98 208.28 90)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 0470fbc1-edeb-5fc5-af13-8c3c1069b487)
+          (property "Reference" "R3" (at 90.17 204.47 90) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "1k (start)" (at 90.17 212.09 90) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:R_0603_1608Metric" (at 93.98 208.28 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "R3") (unit 1)))))(wire (pts (xy 90.17 208.28) (xy 68.58 208.28)) (stroke (width 0.254) (type solid)) (uuid a57ce32b-ceb7-58c8-868f-36900dc05872))(label "STATUS_R_N" (at 68.58 208.28 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid fb6fc4d2-2052-541c-ad31-e22d42986eb2))(wire (pts (xy 127 198.12) (xy 133.35 198.12)) (stroke (width 0.254) (type solid)) (uuid b2db59d9-f71a-50a7-8fdd-f800f3b3903e))(label "+3V3" (at 133.35 198.12 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 55677d90-7a44-58cd-bc9c-73062d7d560c))(text "GPIO low = color on. Resistors initially limit each channel to <=3.3 mA.\nTune brightness using actual forward voltages. No resistor on the common leg." (at 20 221 0) (effects (font (size 1.25 1.25)) (justify left top)) (uuid c2a8434f-064b-524d-882d-7c569944a7c0))(text "BOOT-OFF PULLUPS" (at 170 178 0) (effects (font (size 1.6 1.6)) (justify left top)) (uuid 256efe92-2b23-5349-83ab-29ee130f6149))(symbol (lib_id "DailyMirror:R") (at 175.26 198.12 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 416ad610-f0b9-5726-8df0-cb794e16fe48)
+          (property "Reference" "R5" (at 179.07 196.85 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "100k" (at 179.07 199.39000000000001 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:R_0603_1608Metric" (at 175.26 198.12 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "R5") (unit 1)))))(wire (pts (xy 175.26 194.31) (xy 175.26 190.5)) (stroke (width 0.254) (type solid)) (uuid 4356b451-eb55-5491-a170-6e320a1848d2))(label "+3V3" (at 175.26 190.5 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 54dcae4b-6c03-5465-9f16-4fc94b8b9e3c))(wire (pts (xy 175.26 201.93) (xy 175.26 208.28)) (stroke (width 0.254) (type solid)) (uuid 2fbaf366-2471-54fc-b744-23434383aed0))(label "STATUS_B_N" (at 175.26 208.28 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 0a08da93-8a8b-50e3-a9c2-e86a6f599bcf))(symbol (lib_id "DailyMirror:R") (at 198.12 198.12 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 9bfcde8b-d246-5870-b8ea-6dce86f45117)
+          (property "Reference" "R6" (at 201.93 196.85 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "100k" (at 201.93 199.39000000000001 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:R_0603_1608Metric" (at 198.12 198.12 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "R6") (unit 1)))))(wire (pts (xy 198.12 194.31) (xy 198.12 190.5)) (stroke (width 0.254) (type solid)) (uuid 36b19102-fac3-5c5a-80d3-9eefccb45a6e))(label "+3V3" (at 198.12 190.5 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 6b612dfe-170b-5b58-91e3-6cd90f76fab6))(wire (pts (xy 198.12 201.93) (xy 198.12 208.28)) (stroke (width 0.254) (type solid)) (uuid af20c2af-d7c3-5192-b70b-c44eefb3c509))(label "STATUS_G_N" (at 198.12 208.28 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid afea901f-c064-56de-b574-ae3eb98f415f))(symbol (lib_id "DailyMirror:R") (at 220.98 198.12 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid fdddcd1e-c2dc-5dca-bad8-c99b1a7ceb59)
+          (property "Reference" "R7" (at 224.79 196.85 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "100k" (at 224.79 199.39000000000001 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:R_0603_1608Metric" (at 220.98 198.12 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "R7") (unit 1)))))(wire (pts (xy 220.98 194.31) (xy 220.98 190.5)) (stroke (width 0.254) (type solid)) (uuid f65fc553-96be-55d4-837f-da3941ddcc85))(label "+3V3" (at 220.98 190.5 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 348f18d6-f96b-5473-a602-04001cc8329b))(wire (pts (xy 220.98 201.93) (xy 220.98 208.28)) (stroke (width 0.254) (type solid)) (uuid c50461cc-f51e-595c-b2da-1e85a79fea37))(label "STATUS_R_N" (at 220.98 208.28 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 110d7f6c-1dc1-59b9-a196-a168887fb630))(text "CAPTURE / PAIRING BUTTON" (at 258 158 0) (effects (font (size 2 2)) (justify left top)) (uuid 5b350253-eec9-53e8-a7f8-faa1790abc3e))(symbol (lib_id "DailyMirror:SW_Push") (at 281.94 203.2 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid ab8c487a-49e6-5ccc-83be-14ec6a476b3b)
+          (property "Reference" "SW1" (at 285.75 201.92999999999998 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "Momentary NO" (at 285.75 204.47 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:SW_PUSH_6mm_H4.3mm" (at 281.94 203.2 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "SW1") (unit 1)))))(wire (pts (xy 276.86 203.2) (xy 266.7 203.2)) (stroke (width 0.254) (type solid)) (uuid fe841401-6c05-5ddf-9254-8bf6f195199c))(label "USER_BUTTON_N" (at 246.38 203.2 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 36359586-92c7-58d3-88ab-ede9daf506dd))(wire (pts (xy 246.38 203.2) (xy 266.7 203.2)) (stroke (width 0.254) (type solid)) (uuid 49e3d6a6-b799-5066-af8b-e000a7d94131))(wire (pts (xy 287.02 203.2) (xy 297.18 203.2)) (stroke (width 0.254) (type solid)) (uuid fa519588-ae41-5b4e-9a16-ef4daea372fb))(label "GND" (at 297.18 203.2 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 724b1be6-3835-5956-a7ca-52fefae36eea))(symbol (lib_id "DailyMirror:R") (at 266.7 185.42 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 5592e545-9813-5c75-94e8-e02c22365983)
+          (property "Reference" "R4" (at 270.51 184.14999999999998 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "10k" (at 270.51 186.69 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:R_0603_1608Metric" (at 266.7 185.42 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "R4") (unit 1)))))(wire (pts (xy 266.7 181.61) (xy 266.7 175.26)) (stroke (width 0.254) (type solid)) (uuid 41cda64f-cbd3-5e0f-a9bc-4bcd86ad5bfb))(label "+3V3" (at 266.7 175.26 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 61b469c6-f68f-5d0b-8d79-f055e78ecdeb))(wire (pts (xy 266.7 189.23) (xy 266.7 203.2)) (stroke (width 0.254) (type solid)) (uuid f59a57e1-889d-599d-8024-b5a09564092c))(symbol (lib_id "DailyMirror:C") (at 266.7 215.9 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid d012d5d0-c5ee-5305-9d43-e701b2088773)
+          (property "Reference" "C1" (at 270.51 214.63 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "100nF" (at 270.51 217.17000000000002 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:C_0603_1608Metric" (at 266.7 215.9 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "C1") (unit 1)))))(wire (pts (xy 266.7 212.09) (xy 266.7 203.2)) (stroke (width 0.254) (type solid)) (uuid c35ff096-1399-50d5-b769-49439dba9fe8))(wire (pts (xy 266.7 219.71) (xy 266.7 226.06)) (stroke (width 0.254) (type solid)) (uuid 186b0d08-cf3e-5236-bc42-ccff40aa2aea))(label "GND" (at 266.7 226.06 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 02910fe5-dd41-504a-b27b-3d16e57bc590))(junction (at 266.7 203.2) (diameter 0) (color 0 0 0 0) (uuid 83df827a-0058-5617-ab8d-e40c8284f100))(text "Press pulls input low. R4/C1 = 1 ms RC.\nFirmware debounce ~20 ms; long press enters pairing.\nReset/BOOT service access belongs in the P4 circuit." (at 258 236 0) (effects (font (size 1.25 1.25)) (justify left top)) (uuid 92c87b36-faba-5e80-843f-7948170f8a0b))(text "INTEGRATION TEST PADS / NO PROCESSOR ASSIGNED YET" (at 20 242 0) (effects (font (size 1.6 1.6)) (justify left top)) (uuid e067005a-911a-564d-bb35-90bfcaf84a3d))(symbol (lib_id "DailyMirror:TestPoint") (at 25.4 256.54 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid bd704dfd-2d82-5a2f-b6b4-bf1b29f70bef)
+          (property "Reference" "TP1" (at 29.209999999999997 255.27 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "+3V3" (at 29.209999999999997 257.81 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:TestPoint_Pad_D1.5mm" (at 25.4 256.54 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "TP1") (unit 1)))))(wire (pts (xy 25.4 256.54) (xy 25.4 264.16)) (stroke (width 0.254) (type solid)) (uuid 77347e70-cd0e-50e1-99f5-a4038e05577c))(label "+3V3" (at 25.4 264.16 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 1126f1d8-055d-5816-9de5-c9adc6e4e071))(symbol (lib_id "DailyMirror:TestPoint") (at 60.96 256.54 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 2f34c8a3-337e-52df-bc71-70c2bded0e08)
+          (property "Reference" "TP2" (at 64.77 255.27 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "GND" (at 64.77 257.81 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:TestPoint_Pad_D1.5mm" (at 60.96 256.54 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "TP2") (unit 1)))))(wire (pts (xy 60.96 256.54) (xy 60.96 264.16)) (stroke (width 0.254) (type solid)) (uuid d9d0d661-e04d-5390-aceb-ed5128b1533c))(label "GND" (at 60.96 264.16 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 1c411be1-8b97-5638-9f7b-38e24e1cbf6e))(symbol (lib_id "DailyMirror:TestPoint") (at 96.52000000000001 256.54 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid a7c504ea-e70b-5906-933a-f978c17c3c9f)
+          (property "Reference" "TP3" (at 100.33000000000001 255.27 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "STATUS_B_N" (at 100.33000000000001 257.81 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:TestPoint_Pad_D1.5mm" (at 96.52000000000001 256.54 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "TP3") (unit 1)))))(wire (pts (xy 96.52000000000001 256.54) (xy 96.52000000000001 264.16)) (stroke (width 0.254) (type solid)) (uuid d4a916a9-1918-5d73-803d-f636e5cdfb8d))(label "STATUS_B_N" (at 96.52000000000001 264.16 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 57457ad7-4670-527b-8000-674144a2c5a6))(symbol (lib_id "DailyMirror:TestPoint") (at 132.08 256.54 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 4f789ff5-9b75-53de-b42b-c4ba90f49180)
+          (property "Reference" "TP4" (at 135.89000000000001 255.27 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "STATUS_G_N" (at 135.89000000000001 257.81 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:TestPoint_Pad_D1.5mm" (at 132.08 256.54 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "TP4") (unit 1)))))(wire (pts (xy 132.08 256.54) (xy 132.08 264.16)) (stroke (width 0.254) (type solid)) (uuid 46df2d06-ed13-5349-9294-a69efcf02018))(label "STATUS_G_N" (at 132.08 264.16 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 4b4a95ed-2779-5ecb-a713-9fea108f0204))(symbol (lib_id "DailyMirror:TestPoint") (at 167.64000000000001 256.54 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 3dce01b6-7673-50d1-9fd5-b9d5ff87a372)
+          (property "Reference" "TP5" (at 171.45000000000002 255.27 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "STATUS_R_N" (at 171.45000000000002 257.81 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:TestPoint_Pad_D1.5mm" (at 167.64000000000001 256.54 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "TP5") (unit 1)))))(wire (pts (xy 167.64000000000001 256.54) (xy 167.64000000000001 264.16)) (stroke (width 0.254) (type solid)) (uuid 8f3a6505-9f16-53a3-bdb8-6eda17634f50))(label "STATUS_R_N" (at 167.64000000000001 264.16 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid 7f34c059-1e17-50f8-b0f3-f99889b0f62e))(symbol (lib_id "DailyMirror:TestPoint") (at 203.20000000000002 256.54 0)
+          (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid 6a188ced-fc37-5adb-a3b4-183532aaaaf2)
+          (property "Reference" "TP6" (at 207.01000000000002 255.27 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Value" "USER_BUTTON_N" (at 207.01000000000002 257.81 0) (effects (font (size 1.27 1.27)) (justify left)))
+          (property "Footprint" "DailyMirror:TestPoint_Pad_D1.5mm" (at 203.20000000000002 256.54 0) (effects (font (size 1.27 1.27)) (hide yes)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (reference "TP6") (unit 1)))))(wire (pts (xy 203.20000000000002 256.54) (xy 203.20000000000002 264.16)) (stroke (width 0.254) (type solid)) (uuid 08f29779-4fb3-5a5e-b682-b9ad18f51ae7))(label "USER_BUTTON_N" (at 203.20000000000002 264.16 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid feb3c229-29f4-5bf6-b5bb-76bef2519442))
+      (sheet_instances (path "/" (page "1"))) (embedded_fonts no)
+(sheet (at 335.28 45.72) (size 63.5 17.78)
+          (stroke (width 0.254) (type solid)) (fill (color 0 0 0 0)) (uuid 6870f0aa-894b-5dcd-8144-4ac898684f02)
+          (property "Sheetname" "Processor candidates" (at 335.28 44.449999999999996 0) (effects (font (size 1.27 1.27)) (justify left bottom)))
+          (property "Sheetfile" "processor.kicad_sch" (at 335.28 64.77 0) (effects (font (size 1.27 1.27)) (justify left top)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (page "2")))))
+(sheet (at 335.28 76.2) (size 63.5 17.78)
+          (stroke (width 0.254) (type solid)) (fill (color 0 0 0 0)) (uuid 3d736b2e-c252-5279-ac89-ad1a44195792)
+          (property "Sheetname" "Power candidates" (at 335.28 74.93 0) (effects (font (size 1.27 1.27)) (justify left bottom)))
+          (property "Sheetfile" "power.kicad_sch" (at 335.28 95.25 0) (effects (font (size 1.27 1.27)) (justify left top)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (page "3")))))
+(sheet (at 335.28 106.68) (size 63.5 17.78)
+          (stroke (width 0.254) (type solid)) (fill (color 0 0 0 0)) (uuid 8829b2c2-e248-59e6-baf0-daad26aaa444)
+          (property "Sheetname" "Lighting candidates" (at 335.28 105.41000000000001 0) (effects (font (size 1.27 1.27)) (justify left bottom)))
+          (property "Sheetfile" "lighting.kicad_sch" (at 335.28 125.73 0) (effects (font (size 1.27 1.27)) (justify left top)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (page "4")))))
+(sheet (at 335.28 137.16) (size 63.5 17.78)
+          (stroke (width 0.254) (type solid)) (fill (color 0 0 0 0)) (uuid e51ee9aa-7b6b-57ec-897b-e83eed782058)
+          (property "Sheetname" "Support candidates" (at 335.28 135.89 0) (effects (font (size 1.27 1.27)) (justify left bottom)))
+          (property "Sheetfile" "support.kicad_sch" (at 335.28 156.21 0) (effects (font (size 1.27 1.27)) (justify left top)))
+          (instances (project "daily-mirror-p4" (path "/1605f4a9-80dd-587e-b506-6411e527a925" (page "5")))))
+)

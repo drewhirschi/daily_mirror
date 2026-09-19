@@ -25,6 +25,16 @@ struct Profile {
     sum: Vec<f64>,
     photos: HashSet<String>,
     days: HashSet<String>,
+    /// Guided onboarding photos. Five of them enrol a person on their own,
+    /// because the capture flow already spread them across five directions.
+    enrollment_photos: usize,
+}
+
+impl Profile {
+    fn enrolled(&self) -> bool {
+        self.enrollment_photos >= MIN_EXAMPLES
+            || (self.photos.len() >= MIN_EXAMPLES && self.days.len() >= MIN_DAYS)
+    }
 }
 
 fn normalize(mut values: Vec<f64>) -> Option<Vec<f64>> {
@@ -75,11 +85,7 @@ fn best_match(
     // Even unenrolled people compete, preventing their faces from being forced
     // into an enrolled person's bucket.
     let runner_up = scores.get(1).map_or(-1.0, |entry| entry.2);
-    if profile.photos.len() < MIN_EXAMPLES
-        || profile.days.len() < MIN_DAYS
-        || *score < MIN_SCORE
-        || score - runner_up < MIN_MARGIN
-    {
+    if !profile.enrolled() || *score < MIN_SCORE || score - runner_up < MIN_MARGIN {
         return None;
     }
     Some(((*person).clone(), score.clamp(-1.0, 1.0)))
@@ -94,10 +100,10 @@ pub(crate) async fn propose(
     let mut rows = connection
         .query(
             "SELECT f.person_id, f.embedding_model, f.embedding_dimension, f.embedding,
-                f.photo_id, substr(p.captured_at, 1, 10)
+                f.photo_id, substr(p.captured_at, 1, 10), f.identity_source
          FROM faces f JOIN photos p ON p.id = f.photo_id
          WHERE f.pipeline_version = ?1 AND f.identity_state = 'confirmed'
-           AND f.identity_source = 'manual' AND f.person_id IS NOT NULL
+           AND f.identity_source IN ('manual', 'enrollment') AND f.person_id IS NOT NULL
          ORDER BY f.id",
             params![pipeline],
         )
@@ -121,6 +127,9 @@ pub(crate) async fn propose(
             continue;
         }
         profile.days.insert(row.get(5).map_err(io::Error::other)?);
+        if row.get::<String>(6).map_err(io::Error::other)? == "enrollment" {
+            profile.enrollment_photos += 1;
+        }
         if profile.sum.is_empty() {
             profile.sum = vec![0.0; vector.len()];
         }
@@ -198,6 +207,7 @@ mod tests {
             sum: vector,
             photos: (0..count).map(|i| i.to_string()).collect(),
             days: (0..days).map(|i| i.to_string()).collect(),
+            enrollment_photos: 0,
         }
     }
 
@@ -290,5 +300,57 @@ mod tests {
             rows.next().await.unwrap().unwrap().get::<i64>(0).unwrap(),
             4
         );
+    }
+
+    /// Guided onboarding photos all land on one day, so enrollment must not be
+    /// held to the three-capture-day rule. Manual photos still are.
+    #[tokio::test]
+    async fn five_enrollment_photos_on_one_day_enrol_but_five_manual_photos_do_not() {
+        async fn propose_with(source: &str) -> u64 {
+            let db = libsql::Builder::new_local(":memory:")
+                .build()
+                .await
+                .unwrap();
+            let connection = db.connect().unwrap();
+            connection
+                .execute_batch(
+                    "CREATE TABLE photos (id TEXT PRIMARY KEY, captured_at TEXT);
+                    CREATE TABLE faces (id TEXT PRIMARY KEY, photo_id TEXT, pipeline_version TEXT,
+                    embedding_model TEXT, embedding_dimension INTEGER, embedding BLOB,
+                    person_id TEXT, identity_state TEXT, identity_source TEXT,
+                    identity_score REAL, updated_at TEXT);",
+                )
+                .await
+                .unwrap();
+            let embedding = [1.0_f32.to_le_bytes(), 0.0_f32.to_le_bytes()].concat();
+            for index in 0..MIN_EXAMPLES + 1 {
+                let id = index.to_string();
+                connection
+                    .execute(
+                        "INSERT INTO photos VALUES (?1, '2026-09-15T08:00:00Z')",
+                        params![id.clone()],
+                    )
+                    .await
+                    .unwrap();
+                let teaching = index < MIN_EXAMPLES;
+                connection
+                    .execute(
+                        "INSERT INTO faces VALUES (?1, ?1, 'v1', 'sface', 2, ?2, ?3, ?4, ?5, NULL, NULL)",
+                        params![
+                            id,
+                            embedding.clone(),
+                            teaching.then_some("alex"),
+                            if teaching { "confirmed" } else { "unknown" },
+                            teaching.then_some(source),
+                        ],
+                    )
+                    .await
+                    .unwrap();
+            }
+            propose(&connection, "v1", None).await.unwrap().proposed
+        }
+
+        assert_eq!(propose_with("enrollment").await, 1);
+        assert_eq!(propose_with("manual").await, 0);
     }
 }

@@ -40,6 +40,18 @@ dev:
 auth-create-user username:
     cd server && cargo run --locked --bin daily-mirror-auth -- create-user "{{username}}"
 
+# Create an account with its own household and person, prompting for the password.
+onboarding-signup username:
+    cd server && cargo run --locked --bin daily-mirror-onboarding -- signup "{{username}}"
+
+# Print a user's household and per-person enrollment progress as JSON.
+onboarding-household username:
+    cd server && cargo run --locked --bin daily-mirror-onboarding -- household "{{username}}"
+
+# Add a person to a user's household.
+onboarding-add-person username name:
+    cd server && cargo run --locked --bin daily-mirror-onboarding -- add-person "{{username}}" "{{name}}"
+
 # Regenerate the typed web client after changing a Rust API route.
 client:
     cd server && npm run client:generate

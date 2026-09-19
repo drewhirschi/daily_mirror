@@ -27,7 +27,32 @@ case "${1:-doctor}" in
       "$mac_host:work/daily-mirror-mobile/"
     ;;
   build)
-    ssh "${ssh_options[@]}" "$mac_host" "$remote_setup"'; cd "$HOME/work/daily-mirror-mobile"; npm ci; cd mobile; npx expo run:ios --no-bundler'
+    # React Native and Expo ship separate Debug and Release builds of their
+    # prebuilt binaries, and both projects' "pick the right one" script phases
+    # detect Debug only by looking for DEBUG=1 in GCC_PREPROCESSOR_DEFINITIONS.
+    # CocoaPods never defines that for pod targets, so a Debug build silently
+    # links the Release React/ExpoModulesCore frameworks. The app then fails to
+    # link (RCTPackagerConnection, react::Sealable, ShadowNode::getDebugName)
+    # or, once linked, segfaults in react::Props::Props() because debug and
+    # release Props have different layouts. Passing DEBUG=1 fixes the detection.
+    # The swap is also skipped outright when no marker file exists, because it
+    # assumes an unmarked checkout is already Debug -- pod install actually
+    # lays down the Release artifacts, so record that before building.
+    ssh "${ssh_options[@]}" "$mac_host" "$remote_setup"'
+      cd "$HOME/work/daily-mirror-mobile"
+      npm ci
+      cd mobile
+      npx pod-install
+      cd ios
+      printf Release > Pods/React-Core-prebuilt/.last_build_configuration
+      printf Release > Pods/ReactNativeDependencies/.last_build_configuration
+      for marker in Pods/*/artifacts/.last_build_configuration; do
+        [ -e "$marker" ] && printf release > "$marker"
+      done
+      xcodebuild -workspace DailyMirror.xcworkspace -scheme DailyMirror \
+        -configuration Debug -destination "generic/platform=iOS Simulator" \
+        -derivedDataPath ./build \
+        GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) DEBUG=1" build'
     ;;
   archive)
     # A standalone Release app embeds its JavaScript and does not need Metro.

@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::processing::{ProcessingQueue, active_pipeline_version};
 
 const RECENT_PHOTO_LIMIT: i64 = 60;
-const MAX_HOUSEHOLD_MEMBERS: usize = 6;
+pub(crate) const MAX_HOUSEHOLD_MEMBERS: usize = 6;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct AdminFaceDashboard {
@@ -854,7 +854,7 @@ async fn row_exists(
     Ok(rows.next().await.map_err(io::Error::other)?.is_some())
 }
 
-fn validate_person_name(value: &str) -> io::Result<String> {
+pub(crate) fn validate_person_name(value: &str) -> io::Result<String> {
     let value = value.trim();
     if value.is_empty() || value.len() > 80 || value.chars().any(char::is_control) {
         Err(io::Error::new(

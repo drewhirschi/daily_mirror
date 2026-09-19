@@ -1,5 +1,16 @@
 import type { components } from "./schema";
+import type {
+  CreatePersonRequest,
+  EnrollmentStatus,
+  HouseholdPerson,
+  HouseholdSummary,
+  SignupRequest,
+} from "./onboarding-types";
 
+export * from "./onboarding-types";
+
+export type UploadGrant = components["schemas"]["UploadGrant"];
+export type UploadRequest = components["schemas"]["UploadRequest"];
 export type PersonFlipbook = components["schemas"]["PersonFlipbook"];
 export type FlipbookFrame = components["schemas"]["FlipbookFrame"];
 export type Photo = components["schemas"]["Photo"];
@@ -132,6 +143,39 @@ export class MirrorApi {
     return this.request<NativeSession>(
       "/api/auth/login/native/passkey/finish",
       { method: "POST", body: JSON.stringify(input) },
+    );
+  }
+  signup(input: SignupRequest) {
+    return this.request<NativeSession>("/api/auth/signup", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+  household(signal?: AbortSignal) {
+    return this.request<HouseholdSummary>("/api/household", { signal });
+  }
+  addHouseholdPerson(input: CreatePersonRequest) {
+    return this.request<HouseholdPerson>("/api/household/people", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+  createEnrollmentUpload(personId: string, input: UploadRequest) {
+    return this.request<UploadGrant>(
+      `/api/household/people/${encodeURIComponent(personId)}/enrollment/uploads`,
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  }
+  finalizeEnrollmentUpload(personId: string, photoId: string) {
+    return this.request<void>(
+      `/api/household/people/${encodeURIComponent(personId)}/enrollment/uploads/${encodeURIComponent(photoId)}`,
+      { method: "POST" },
+    );
+  }
+  enrollmentStatus(personId: string, signal?: AbortSignal) {
+    return this.request<EnrollmentStatus>(
+      `/api/household/people/${encodeURIComponent(personId)}/enrollment`,
+      { signal },
     );
   }
   me(signal?: AbortSignal) {

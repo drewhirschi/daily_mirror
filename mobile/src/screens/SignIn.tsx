@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   Text,
@@ -12,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { passkeyErrorMessage } from "../passkey-login";
 import { useSession } from "../session";
+import { SignUp } from "./SignUp";
 import { Button, IconButton, styles, useColors } from "../ui";
 
 export function SignIn() {
@@ -27,6 +29,7 @@ export function SignIn() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [signUpOpen, setSignUpOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => setOrigin(lastServer), [lastServer]);
@@ -194,6 +197,21 @@ export function SignIn() {
               />
             ) : null}
             <Pressable
+              accessibilityRole="button"
+              onPress={() => setSignUpOpen(true)}
+              style={{ padding: 14 }}
+            >
+              <Text
+                style={{
+                  color: c.accent,
+                  textAlign: "center",
+                  fontWeight: "600",
+                }}
+              >
+                Create an account
+              </Text>
+            </Pressable>
+            <Pressable
               onPress={() => setSettings(!settings)}
               accessibilityRole="button"
               style={{ padding: 14 }}
@@ -219,6 +237,14 @@ export function SignIn() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <Modal
+        visible={signUpOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSignUpOpen(false)}
+      >
+        <SignUp origin={origin} onClose={() => setSignUpOpen(false)} />
+      </Modal>
     </SafeAreaView>
   );
 }

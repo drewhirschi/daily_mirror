@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, AppState, View } from "react-native";
+import { ActivityIndicator, AppState, Modal, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -24,6 +24,7 @@ import { Gallery } from "./screens/Gallery";
 import { Account } from "./screens/Account";
 import { Devices } from "./screens/Devices";
 import { AddMirror } from "./screens/AddMirror";
+import { Household } from "./screens/Household";
 import { SignIn } from "./screens/SignIn";
 import { useColors } from "./ui";
 
@@ -73,9 +74,11 @@ function Root() {
 }
 
 function SignedIn({ session }: { session: ActiveSession }) {
-  const { expire } = useSession();
+  const { expire, firstRun, acknowledgeFirstRun } = useSession();
   const c = useColors();
   const [cacheVersion, setCacheVersion] = useState(0);
+  // A brand new account lands on the household screen to add people.
+  const [householdOpen, setHouseholdOpen] = useState(firstRun);
   const [client] = useState(
     () =>
       new QueryClient({
@@ -170,6 +173,7 @@ function SignedIn({ session }: { session: ActiveSession }) {
                       session={session}
                       onClearCache={clearCache}
                       onOpenDevices={() => navigation.navigate("Devices")}
+                      onOpenHousehold={() => setHouseholdOpen(true)}
                     />
                   )}
                 </AccountStack.Screen>
@@ -199,6 +203,21 @@ function SignedIn({ session }: { session: ActiveSession }) {
             )}
           </Tab.Screen>
         </Tab.Navigator>
+        <Modal
+          visible={householdOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setHouseholdOpen(false)}
+        >
+          <Household
+            session={session}
+            firstRun={firstRun}
+            onClose={() => {
+              setHouseholdOpen(false);
+              acknowledgeFirstRun();
+            }}
+          />
+        </Modal>
       </NavigationContainer>
     </QueryClientProvider>
   );

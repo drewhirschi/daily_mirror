@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::catalog::PhotoCatalog;
-use crate::photos::Photo;
 #[cfg(feature = "image-processing")]
 use crate::photos::PhotoStore;
+use crate::photos::{Photo, UploadTarget};
 #[cfg(feature = "image-processing")]
 use crate::processing::ProcessingQueue;
 
@@ -51,6 +51,34 @@ impl FinalizeError {
             Self::Storage(_) => StatusCode::BAD_GATEWAY,
             Self::Catalog(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
+    }
+}
+
+/// The capture a client wants to upload. Shared by the device flow and
+/// guided enrollment so both grant the same contract.
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UploadRequest {
+    pub capture_id: String,
+    pub content_type: String,
+    pub content_length: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UploadGrant {
+    pub method: String,
+    pub url: String,
+    pub headers: std::collections::BTreeMap<String, String>,
+    pub expires_in_seconds: Option<u64>,
+    pub complete_url: String,
+}
+
+pub fn upload_grant(target: UploadTarget, complete_url: String) -> UploadGrant {
+    UploadGrant {
+        method: target.method,
+        url: target.url,
+        headers: target.headers,
+        expires_in_seconds: target.expires_in_seconds,
+        complete_url,
     }
 }
 

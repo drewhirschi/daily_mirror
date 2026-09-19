@@ -12,7 +12,7 @@ protocol and server contract; this file owns the device side.
 | Language | C on ESP-IDF. Every camera, ISP, provisioning and hosted-Wi-Fi API we depend on is C, and both boards work today in C. A Rust spike (esp-idf-svc HTTP server on the S3) built and ran, so Rust stays possible later for the platform-neutral core, but it is not on the path. | 2026-09-19 |
 | Boards | Two supported targets behind one app: ESP32-P4 + Arducam IMX519 (MIPI CSI, ISP on the P4, Wi-Fi via the ESP32-C6) and ESP32-S3 + OV5640 (DVP, on-sensor ISP and JPEG, native Wi-Fi and BLE). | 2026-09-19 |
 | Structure | One ESP-IDF project under `firmware/esp-idf/`, beside the Rust host simulator in `firmware/host/`. Shared app in `main/`, everything board-specific behind `components/mirror_board`. | 2026-09-19 |
-| First-run configuration | Settings live in NVS and are edited from the admin page. With no Wi-Fi the device raises its own access point on 10.10.0.1 and serves the same page. BLE onboarding replaces this for end users later and writes the same NVS keys. | 2026-09-19 |
+| First-run configuration | Bench: settings live in NVS and are edited from the admin page; with no Wi-Fi the device raises its own access point on 10.10.0.1 and serves the same page. Product: the Espressif provisioning protocol the mobile app already speaks (Milestone 3), writing the same NVS keys. | 2026-09-19 |
 | Discovery | mDNS hostname `mirror-<last 3 MAC bytes>.local` and a `_dailymirror._tcp` service with `id`, `board`, `fw`, `claimed` records. | 2026-09-19 |
 
 ## What works on the bench today
@@ -58,17 +58,33 @@ protocol and server contract; this file owns the device side.
 - [ ] Decide the product P4 silicon: rev 1.3 has no ISP black-level block
       (worked around with a gamma toe); rev 3.x has it.
 
-## Milestone 3: onboarding and fleet
+## Milestone 3: pairing with the app that already exists
 
-- [ ] BLE provisioning on the S3 (Espressif `wifi_provisioning`, security 2),
-      tested first with Espressif's stock phone app.
-- [ ] P4 onboarding path: BLE through the C6 once upstream supports it;
-      access-point provisioning until then.
-- [ ] iOS onboarding flow (separate PR): discover, provision, claim, confirm
-      with a button press.
-- [ ] Device claim against the server and the `claimed` mDNS flag.
+The mobile "Add a mirror" flow, the server's claim endpoints and the pairing
+state machine (`crates/mirror-core`, exercised by `firmware/host`) are merged.
+The C firmware does not speak their protocol yet: its `/config` page and
+fallback access point are bench conveniences. The app expects Espressif's
+standard provisioning service, so the device side is:
+
+- [ ] Run ESP-IDF's `wifi_provisioning` manager when unprovisioned: service
+      name `Mirror-XXXX` (the app searches for the `Mirror-` prefix), security
+      2, SoftAP transport first because that is what the app uses today.
+- [ ] Custom provisioning endpoint `daily-mirror`: accept the claim payload
+      (claim token and server URL), answer result reads, as defined in
+      `mobile/src/pairing/contract.ts` and `crates/mirror-core/src/contract.rs`.
+- [ ] After joining Wi-Fi, redeem the claim with the server, store the
+      per-device token in NVS, upload with it, and flip the mDNS `claimed`
+      record.
+- [ ] Button gestures from the plan: long-press to enter pairing, the confirm
+      press, the 20 s reset.
+- [ ] BLE transport on the S3 (a flag on the same manager) once SoftAP works
+      end to end; the P4 stays on SoftAP until BLE through the C6 is supported
+      upstream.
+- [ ] Decide what happens to `firmware/esp32p4`, the Rust skeleton from the
+      pairing work. With the firmware in C it is superseded; `firmware/host`
+      stays as the executable specification and CI test of the state machine.
 - [ ] OTA client: version check, download to the idle slot, verify, reboot,
-      roll back on failure. Signed images before anything leaves the house.
+      roll back on failure.
 - [ ] Update the P4's C6 radio firmware from the P4; it ships with an old
       image that Espressif warns will cause RPC timeouts.
 

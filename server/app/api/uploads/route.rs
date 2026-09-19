@@ -5,7 +5,7 @@ use axum::{
 
 use crate::catalog::PhotoCatalog;
 use crate::devices::DeviceRegistry;
-use crate::photos::{PhotoStore, UploadTarget};
+use crate::photos::PhotoStore;
 use crate::upload_auth;
 pub use crate::upload_flow::{UploadGrant, UploadRequest};
 use crate::upload_flow::upload_grant;

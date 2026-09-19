@@ -12,8 +12,7 @@ default:
 doctor:
     @command -v cargo >/dev/null || { echo "missing: cargo" >&2; exit 1; }
     @command -v nextrs >/dev/null || { echo "missing: cargo-nextrs" >&2; exit 1; }
-    @command -v cargo-zigbuild >/dev/null || { echo "missing: cargo-zigbuild" >&2; exit 1; }
-    @command -v zig >/dev/null || { echo "missing: zig" >&2; exit 1; }
+    @command -v docker >/dev/null || { echo "missing: docker (server bundles build in a container)" >&2; exit 1; }
     @command -v node >/dev/null || { echo "missing: node" >&2; exit 1; }
     @command -v npm >/dev/null || { echo "missing: npm" >&2; exit 1; }
     @command -v curl >/dev/null || { echo "missing: curl" >&2; exit 1; }
@@ -181,6 +180,8 @@ deploy-check: check
     cd server && test -x scripts/deploy-prebuilt.sh
     cd server && test ! -f vercel.json || { echo "server/vercel.json shadows the generated .nextrs/vercel.json; move settings into [vercel] in nextrs.toml" >&2; exit 1; }
     cd server && nextrs bundles plan > /dev/null
+    test -x scripts/native/build.sh
+    bash -n scripts/native/build.sh
     bash -n scripts/deploy-device.sh
     bash -n server/scripts/deploy-prebuilt.sh
 

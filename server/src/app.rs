@@ -11,6 +11,7 @@ pub mod auth_http;
 pub mod background;
 pub mod catalog;
 pub mod cron_auth;
+pub mod devices;
 pub mod face_admin;
 pub mod face_matching;
 pub mod passkeys;
@@ -34,6 +35,7 @@ pub fn app() -> axum::Router {
     let photo_catalog = catalog::PhotoCatalog::from_env()
         .unwrap_or_else(|error| panic!("invalid photo catalog configuration: {error}"));
     let processing_queue = processing::ProcessingQueue::new(photo_catalog.clone());
+    let device_registry = devices::DeviceRegistry::new(processing_queue.clone());
     let auth_store = auth::AuthStore::from_env()
         .unwrap_or_else(|error| panic!("invalid authentication storage configuration: {error}"));
     let passkey_service = passkeys::PasskeyService::from_env()
@@ -50,6 +52,7 @@ pub fn app() -> axum::Router {
         .layer(Extension(photo_store))
         .layer(Extension(photo_catalog))
         .layer(Extension(processing_queue))
+        .layer(Extension(device_registry))
         .layer(Extension(passkey_service))
         .layer(Extension(auth_store.clone()))
         .layer(middleware::from_fn(reject_unmatched_api))

@@ -12,6 +12,7 @@ pub mod button;
 pub mod contract;
 pub mod ports;
 pub mod ring;
+pub mod runtime;
 pub mod state;
 
 /// Milliseconds since an arbitrary monotonic origin. Adapters supply this from

@@ -2,6 +2,7 @@ use axum::{Extension, extract::Path, http::{HeaderMap, StatusCode}};
 
 use crate::{
     catalog::PhotoCatalog,
+    devices::DeviceRegistry,
     photos::PhotoStore,
     processing::ProcessingQueue,
     upload_auth,
@@ -12,11 +13,12 @@ pub async fn post(
     Extension(store): Extension<PhotoStore>,
     Extension(catalog): Extension<PhotoCatalog>,
     Extension(processing): Extension<ProcessingQueue>,
+    Extension(registry): Extension<DeviceRegistry>,
     Path(id): Path<String>,
     wait: nextrs::WaitUntil,
     headers: HeaderMap,
 ) -> StatusCode {
-    if let Err(status) = upload_auth::authorize(&headers) {
+    if let Err(status) = upload_auth::authorize(&registry, &headers).await {
         return status;
     }
     finalize_upload(&store, &catalog, &processing, &id)

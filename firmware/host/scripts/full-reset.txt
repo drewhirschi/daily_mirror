@@ -1,0 +1,12 @@
+# The only gesture that destroys data: hold 20 s, release, then three clicks
+# inside 3 s. The ring goes solid red at 20 s and flashes red on each click.
+#
+#   cargo run -- --script scripts/full-reset.txt --store /tmp/mirror-script
+
+0 hold 20200
+
+20400 click
+20700 click
+21000 click
+
+22000 stop

@@ -1,13 +1,17 @@
 #include <string.h>
 #include <inttypes.h>
+#include <time.h>
 
 #include "mirror_http.h"
 #include "mirror_board.h"
 #include "mirror_net.h"
+#include "mirror_pair.h"
 #include "mirror_press.h"
 #include "mirror_upload.h"
 #include "mirror_config.h"
 #include "mirror_mdns.h"
+#include "mirror_spool.h"
+#include "mirror_log.h"
 
 #include "esp_log.h"
 #include "esp_heap_caps.h"
@@ -82,7 +86,7 @@ static esp_err_t press_handler(httpd_req_t *req)
         return httpd_resp_sendstr(req, "busy");
     }
     uint32_t before = mirror_press_count();
-    mirror_press_run();
+    mirror_press_run(MIRROR_TRIGGER_DEBUG);
     return httpd_resp_sendstr(req, mirror_press_count() > before ? "captured" : "failed");
 }
 
@@ -92,6 +96,11 @@ static esp_err_t upload_handler(httpd_req_t *req)
         httpd_resp_set_status(req, "409 Conflict");
         return httpd_resp_sendstr(req, "set server_url and upload_token in /config first");
     }
+    /* Captures go through the spool now, so this queues one and reports where
+     * the queue stands; the drain task sends it. The old behaviour - upload
+     * inline, once, drop it on a failure - is the thing the spool exists to
+     * replace, and keeping a second path that still did it would defeat the
+     * point. */
     uint8_t *jpeg = NULL;
     size_t len = 0;
     if (board_camera_capture(true, &jpeg, &len) != ESP_OK || !jpeg) {
@@ -99,9 +108,14 @@ static esp_err_t upload_handler(httpd_req_t *req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "capture failed");
         return ESP_FAIL;
     }
-    mirror_upload_jpeg(jpeg, len);
+    esp_err_t err = mirror_spool_add(jpeg, len, MIRROR_TRIGGER_DEBUG);
     board_camera_release(jpeg);
-    return httpd_resp_sendstr(req, mirror_upload_last_result());
+
+    char msg[160];
+    snprintf(msg, sizeof(msg), "%s; %" PRIu32 " queued; last upload: %s",
+             err == ESP_OK ? "spooled" : esp_err_to_name(err),
+             mirror_spool_count(), mirror_upload_last_result());
+    return httpd_resp_sendstr(req, msg);
 }
 
 static esp_err_t stats_handler(httpd_req_t *req)
@@ -111,25 +125,71 @@ static esp_err_t stats_handler(httpd_req_t *req)
     uint32_t w = 0, h = 0;
     board_camera_last_size(&w, &h);
 
-    char body[512];
+    /* The wall clock, so a field report says whether SNTP answered: without it
+     * every photo is filed under 1970. */
+    time_t now = time(NULL);
+    struct tm utc_tm;
+    char utc[24];
+    gmtime_r(&now, &utc_tm);
+    strftime(utc, sizeof(utc), "%Y-%m-%dT%H:%M:%SZ", &utc_tm);
+
+    static const char *const pair_states[] = {
+        "idle", "pairing", "awaiting_confirm", "claiming",
+    };
+
+    char body[1280];
     int n = snprintf(body, sizeof(body),
         "board=%s\n" "board_id=%s\n" "device_id=%s\n" "fw=%s\n"
         "camera=%s\n" "frame=%" PRIu32 "x%" PRIu32 "\n"
         "ip=%s\n" "sta_connected=%d\n" "ap_active=%d\n" "ap_ssid=%s\n"
-        "hostname=%s\n" "presses=%" PRIu32 "\n" "last_upload=%s\n"
-        "uptime_s=%" PRIu64 "\n" "heap_internal=%u\n" "heap_psram=%u\n",
+        "hostname=%s\n" "claimed=%d\n" "pairing=%s\n"
+        "presses=%" PRIu32 "\n" "last_upload=%s\n"
+        "clock_synced=%d\n" "utc=%s\n"
+        "uptime_s=%" PRIu64 "\n" "heap_internal=%u\n" "heap_internal_min=%u\n"
+        "heap_psram=%u\n" "flash_gpio=%d\n" "flash_on=%d\n",
         board_name(), board_id(), device_id, CONFIG_MIRROR_FW_VERSION,
         board_camera_status(), w, h,
         mirror_net_ip(), mirror_net_sta_connected() ? 1 : 0,
         mirror_net_ap_active() ? 1 : 0, mirror_net_ap_ssid(),
         mirror_mdns_hostname() ? mirror_mdns_hostname() : "",
+        mirror_pair_claimed() ? 1 : 0, pair_states[mirror_pair_state()],
         mirror_press_count(), mirror_upload_last_result(),
+        mirror_net_clock_valid() ? 1 : 0, utc,
         (uint64_t)(esp_timer_get_time() / 1000000),
         (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-        (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+        (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+        board_flash_available() ? CONFIG_MIRROR_FLASH_GPIO : -1,
+        board_flash_on() ? 1 : 0);
+
+    n += mirror_spool_stats(body + n, sizeof(body) - n);
 
     httpd_resp_set_type(req, "text/plain");
     return httpd_resp_send(req, body, n);
+}
+
+/*
+ * Failure injection, for testing the spool without touching the stored claim.
+ *
+ *   curl -X POST 'http://<device>/debug/upload-block?on=1'
+ *
+ * Every upload then fails as though the server were unroutable, so photos can
+ * be watched accumulating and draining. It is RAM-only - a reboot clears it -
+ * and it can only make uploads fail, never succeed, so the worst it can do to
+ * a device left in this state is delay photos that are all still on flash.
+ */
+static esp_err_t upload_block_handler(httpd_req_t *req)
+{
+    char query[32] = "";
+    bool on = true;
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        char val[8] = "";
+        if (httpd_query_key_value(query, "on", val, sizeof(val)) == ESP_OK) {
+            on = !(val[0] == '0' || strcmp(val, "false") == 0);
+        }
+    }
+    mirror_upload_set_blocked(on);
+    return httpd_resp_sendstr(req, on ? "upload block ON" : "upload block off");
 }
 
 esp_err_t mirror_http_start(httpd_handle_t *out)
@@ -162,10 +222,13 @@ esp_err_t mirror_http_start(httpd_handle_t *out)
         { .uri = "/press",        .method = HTTP_POST, .handler = press_handler },
         { .uri = "/upload",       .method = HTTP_POST, .handler = upload_handler },
         { .uri = "/stats",        .method = HTTP_GET,  .handler = stats_handler },
+        { .uri = "/debug/upload-block", .method = HTTP_POST, .handler = upload_block_handler },
     };
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
         httpd_register_uri_handler(server, &uris[i]);
     }
+
+    mirror_log_register_http(server);
 
     /* The settings form lives in its own component and registers itself here,
      * so /config is served by the same server on both the station and the

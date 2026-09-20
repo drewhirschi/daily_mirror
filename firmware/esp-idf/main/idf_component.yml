@@ -1,0 +1,8 @@
+# The upload spool's filesystem.
+#
+# LittleFS rather than SPIFFS: the spool's whole job is to still be there after
+# the power went out mid-write, and LittleFS is copy-on-write with a real
+# directory tree, where SPIFFS has neither and is documented as leaving the
+# filesystem in an undefined state on a power loss.
+dependencies:
+  joltwallet/littlefs: "^1.16.4"

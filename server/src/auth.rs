@@ -700,6 +700,33 @@ impl AuthStore {
         }
     }
 
+    /// How many other accounts share a household, and how many of those are
+    /// administrators. `users` lives in this store's database, not the
+    /// catalog's, so account deletion has to ask here rather than joining.
+    pub async fn household_peers(
+        &self,
+        household_id: &str,
+        excluding_user_id: &str,
+    ) -> io::Result<(u32, u32)> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let mut rows = connection
+            .query(
+                "SELECT COUNT(*), COALESCE(SUM(household_role = 'admin'), 0)
+                 FROM users WHERE household_id = ?1 AND id <> ?2",
+                params![household_id, excluding_user_id],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let row = rows
+            .next()
+            .await
+            .map_err(io::Error::other)?
+            .ok_or_else(|| io::Error::other("household peer count is empty"))?;
+        let total: i64 = row.get(0).map_err(io::Error::other)?;
+        let admins: i64 = row.get(1).map_err(io::Error::other)?;
+        Ok((total as u32, admins as u32))
+    }
+
     /// Undo a partially completed signup so the username can be reused.
     pub async fn delete_user(&self, user_id: &str) -> io::Result<()> {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;

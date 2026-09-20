@@ -33,6 +33,7 @@ import {
 } from "../pairing/machine";
 import { espProvisioner, type Provisioner } from "../pairing/provisioning";
 import { Button, styles, useColors } from "../ui";
+import { STORE_BUILD } from "../store-build";
 
 const stageLabels: Record<SendingStage, string> = {
   token: "Getting a pairing code…",
@@ -326,9 +327,10 @@ function Problem({
   return (
     <View style={{ gap: 12 }}>
       <Text style={{ color: c.danger, lineHeight: 23 }}>{state.error}</Text>
-      {state.detail ? (
-        // Kept deliberately: on real hardware the wording above hides the one
-        // line that says what actually failed.
+      {state.detail && !STORE_BUILD ? (
+        // Kept deliberately in development: on real hardware the wording above
+        // hides the one line that says what actually failed. A shipped build
+        // shows only the plain-language message.
         <Text selectable style={{ color: c.secondary, fontSize: 12 }}>
           {state.detail}
         </Text>

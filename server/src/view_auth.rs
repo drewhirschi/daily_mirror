@@ -44,6 +44,9 @@ fn bypasses_authentication(method: &Method, path: &str) -> bool {
     path == "/healthz"
         || (method == Method::GET && path == "/.well-known/apple-app-site-association")
         || path == "/login"
+        // The App Store listing links to both of these, and Apple's reviewer
+        // reaches them with no account at all.
+        || matches!(path, "/privacy" | "/support")
         || matches!(
             path,
             "/style.css" | "/favicon.ico" | "/robots.txt" | "/manifest.webmanifest" | "/sw.js"
@@ -80,6 +83,10 @@ mod tests {
             "/manifest.webmanifest"
         ));
         assert!(bypasses_authentication(&Method::GET, "/sw.js"));
+        // The two pages the App Store listing points at.
+        assert!(bypasses_authentication(&Method::GET, "/privacy"));
+        assert!(bypasses_authentication(&Method::GET, "/support"));
+        assert!(!bypasses_authentication(&Method::GET, "/account"));
         assert!(bypasses_authentication(
             &Method::GET,
             "/icons/apple-touch-icon.png"

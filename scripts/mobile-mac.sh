@@ -59,8 +59,77 @@ case "${1:-doctor}" in
     # Automatic provisioning requires an Apple account in Xcode on this host.
     ssh "${ssh_options[@]}" "$mac_host" "$remote_setup"'; cd "$HOME/work/daily-mirror-mobile/mobile/ios"; xcodebuild -workspace DailyMirror.xcworkspace -scheme DailyMirror -configuration Release -destination "generic/platform=iOS" -archivePath ../../DailyMirror.xcarchive -derivedDataPath ../../build-jsn -allowProvisioningUpdates DEVELOPMENT_TEAM=C9P58ZP4AQ archive'
     ;;
+  store)
+    # The App Store build: prebuild, archive and export an .ipa signed for
+    # distribution, ready to hand to Xcode Organizer or Transporter. Nothing
+    # here uploads anything, and no credential is read or written.
+    #
+    # xcodebuild runs as a one-off LaunchAgent in the GUI domain because
+    # automatic signing talks to the Xcode account stored in the login
+    # keychain, which an ssh session cannot unlock. KeepAlive=false matters:
+    # `launchctl submit` respawns the job and two concurrent xcodebuilds
+    # deadlock on "build.db is locked".
+    ssh "${ssh_options[@]}" "$mac_host" "$remote_setup"'
+      set -e
+      cd "$HOME/work/daily-mirror-mobile"
+      npm ci
+      cd mobile
+      npx expo prebuild -p ios --clean
+      root="$HOME/work/daily-mirror-mobile"
+      rm -rf "$root/DailyMirror.xcarchive" "$root/export"
+      cat > "$root/ExportOptions.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key><string>app-store-connect</string>
+  <key>destination</key><string>export</string>
+  <key>teamID</key><string>C9P58ZP4AQ</string>
+  <key>signingStyle</key><string>automatic</string>
+  <key>uploadSymbols</key><true/>
+  <key>manageAppVersionAndBuildNumber</key><false/>
+</dict>
+</plist>
+PLIST
+      cat > "$root/store-build.sh" <<SCRIPT
+#!/bin/bash
+set -x
+export PATH="/opt/homebrew/opt/node@22/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export LANG=en_US.UTF-8
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+cd "$root/mobile/ios"
+xcodebuild -workspace DailyMirror.xcworkspace -scheme DailyMirror \
+  -configuration Release -destination "generic/platform=iOS" \
+  -archivePath "$root/DailyMirror.xcarchive" -derivedDataPath "$root/build-jsn" \
+  -allowProvisioningUpdates DEVELOPMENT_TEAM=C9P58ZP4AQ archive
+xcodebuild -exportArchive -archivePath "$root/DailyMirror.xcarchive" \
+  -exportOptionsPlist "$root/ExportOptions.plist" -exportPath "$root/export" \
+  -allowProvisioningUpdates
+SCRIPT
+      chmod +x "$root/store-build.sh"
+      cat > "$root/store-build.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>app.dailymirror.storebuild</string>
+  <key>ProgramArguments</key><array><string>$root/store-build.sh</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><false/>
+  <key>StandardOutPath</key><string>$root/store-build.log</string>
+  <key>StandardErrorPath</key><string>$root/store-build.log</string>
+</dict>
+</plist>
+PLIST
+      : > "$root/store-build.log"
+      launchctl bootout "gui/$(id -u)/app.dailymirror.storebuild" 2>/dev/null || true
+      launchctl bootstrap "gui/$(id -u)" "$root/store-build.plist"
+      while launchctl print "gui/$(id -u)/app.dailymirror.storebuild" >/dev/null 2>&1; do sleep 20; done
+      tail -40 "$root/store-build.log"
+      ls -l "$root/export" 2>/dev/null || echo "NO EXPORT DIRECTORY"'
+    ;;
   start)
     ssh -t -F /dev/null "$mac_host" "$remote_setup"'; cd "$HOME/work/daily-mirror-mobile"; npm run mobile'
     ;;
-  *) echo 'Usage: scripts/mobile-mac.sh {doctor|sync|build|archive|start}' >&2; exit 2 ;;
+  *) echo 'Usage: scripts/mobile-mac.sh {doctor|sync|build|archive|store|start}' >&2; exit 2 ;;
 esac

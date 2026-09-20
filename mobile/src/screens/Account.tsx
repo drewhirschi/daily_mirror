@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { ApiError } from "@daily-mirror/api";
 import { useSession, type ActiveSession } from "../session";
 import { IMAGE_CACHE_BUDGET } from "../cache/disk-cache";
 import { NATIVE_PASSKEYS_ENABLED } from "../auth-features";
@@ -69,6 +70,23 @@ export function Account({
             onPress: () => void logout(true),
           },
         ],
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  const deleteAccount = async () => {
+    setBusy(true);
+    try {
+      await session.api.deleteAccount();
+      // The session died with the account, so there is nothing left to revoke.
+      await signOut(true);
+    } catch (error) {
+      Alert.alert(
+        "Could not delete your account",
+        error instanceof ApiError && error.message
+          ? error.message
+          : "The server could not be reached. Please try again.",
       );
     } finally {
       setBusy(false);
@@ -253,6 +271,42 @@ export function Account({
           busy={busy}
           onPress={() => void logout()}
         />
+        {/*
+          App Review guideline 5.1.1(v): an app people can create an account in
+          must let them delete it in the app. Two taps, the second one saying
+          plainly what goes, and the server decides what happens to a shared
+          household.
+        */}
+        <View style={[styles.card, { backgroundColor: c.card }]}>
+          <Text style={[styles.subtitle, { color: c.text }]}>
+            Delete account
+          </Text>
+          <Text style={{ color: c.secondary, lineHeight: 23 }}>
+            Removes your sign-in, your password and your passkeys. If nobody
+            else shares your household, its photographs, the faces recognised in
+            them and its cameras are erased too. This cannot be undone.
+          </Text>
+          <Button
+            title="Delete account"
+            quiet
+            danger
+            busy={busy}
+            onPress={() =>
+              Alert.alert(
+                "Delete your account?",
+                "Your sign-in and passkeys are removed. If you are the only person in your household, every photograph in it and the faces recognised in them are permanently deleted. This cannot be undone.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => void deleteAccount(),
+                  },
+                ],
+              )
+            }
+          />
+        </View>
         <Text
           style={{
             color: c.secondary,

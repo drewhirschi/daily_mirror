@@ -20,9 +20,14 @@ import {
 import type { ActiveSession } from "../session";
 import { EnrollmentCapture } from "./EnrollmentCapture";
 import { Button, IconButton, styles, useColors, useInputStyle } from "../ui";
+import { STORE_BUILD } from "../store-build";
 
 /** The small pill used for "You", "Admin" and "Has account". */
-function Badge({ label, color, background }: {
+function Badge({
+  label,
+  color,
+  background,
+}: {
   label: string;
   color: string;
   background: string;
@@ -300,7 +305,11 @@ export function Household({
                         {person.display_name}
                       </Text>
                       {you ? (
-                        <Badge label="You" color={c.accent} background={c.tint} />
+                        <Badge
+                          label="You"
+                          color={c.accent}
+                          background={c.tint}
+                        />
                       ) : person.account === "linked" ? (
                         <Badge
                           label="Has account"
@@ -344,9 +353,15 @@ export function Household({
                     {/*
                       Someone without a login is perfectly normal here — young
                       children never get one. Invites are not built yet, so an
-                      admin is told plainly rather than shown a dead end.
+                      admin is told plainly rather than shown a dead end. A
+                      shipped build hides the button entirely: App Review reads
+                      an affordance whose only outcome is "coming soon" as an
+                      unfinished feature.
                     */}
-                    {isAdmin && !you && person.account !== "linked" ? (
+                    {!STORE_BUILD &&
+                    isAdmin &&
+                    !you &&
+                    person.account !== "linked" ? (
                       <Button
                         title="Invite to sign in"
                         quiet

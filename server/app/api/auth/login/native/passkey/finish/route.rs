@@ -81,6 +81,14 @@ async fn finish(
         ))
         .await
         .map_err(|_| auth_http::internal_error())?;
+    // A completed sign-in proves the challenges from this address were real.
+    store
+        .clear_login_failures(&auth_http::login_scope(
+            auth_http::DISCOVERABLE_SCOPE,
+            headers,
+        ))
+        .await
+        .map_err(|_| auth_http::internal_error())?;
     let token = store
         .create_session(&user.id)
         .await

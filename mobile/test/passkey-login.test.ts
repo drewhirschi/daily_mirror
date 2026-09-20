@@ -109,3 +109,56 @@ test("unassociated domains and invalid challenges never reach the native prompt"
     /not configured/,
   );
 });
+
+test("an empty username asks for a discoverable ceremony", async () => {
+  const original = globalThis.fetch;
+  const calls: { url: string; body: any }[] = [];
+  const session = {
+    token: "test-session",
+    expires_in_seconds: 3600,
+    user: { id: "user", username: "drew", display_name: "Drew" },
+  };
+  globalThis.fetch = (async (url, options) => {
+    calls.push({ url: String(url), body: JSON.parse(String(options?.body)) });
+    return Response.json(
+      calls.length === 1
+        ? {
+            ceremony_id: "discoverable",
+            // No allowCredentials: iOS picks the account itself.
+            options: {
+              publicKey: {
+                challenge: "Y2hhbGxlbmdl",
+                rpId: PASSKEY_DOMAIN,
+                allowCredentials: [],
+              },
+            },
+          }
+        : session,
+    );
+  }) as typeof fetch;
+  try {
+    const result = await loginWithPasskey(
+      new MirrorApi(`https://${PASSKEY_DOMAIN}`),
+      "   ",
+      async (request) => {
+        assert.deepEqual(request.allowCredentials, []);
+        return {
+          id: "picked",
+          response: {
+            authenticatorData: "auth",
+            clientDataJSON: "client",
+            signature: "sig",
+            userHandle: "handle",
+          },
+        };
+      },
+    );
+    assert.deepEqual(result, session);
+    // The username key is absent entirely, not sent as an empty string.
+    assert.deepEqual(calls[0].body, {});
+    assert.equal(calls[1].body.ceremony_id, "discoverable");
+    assert.equal(calls[1].body.credential.rawId, "picked");
+  } finally {
+    globalThis.fetch = original;
+  }
+});

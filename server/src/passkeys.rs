@@ -2,8 +2,9 @@ use std::io;
 
 use serde::Serialize;
 use webauthn_rs::prelude::{
-    CreationChallengeResponse, PasskeyAuthentication, PasskeyRegistration, PublicKeyCredential,
-    RegisterPublicKeyCredential, RequestChallengeResponse, Url, Webauthn, WebauthnBuilder,
+    AuthenticationResult, CreationChallengeResponse, DiscoverableAuthentication, DiscoverableKey,
+    PasskeyAuthentication, PasskeyRegistration, PublicKeyCredential, RegisterPublicKeyCredential,
+    RequestChallengeResponse, Url, Webauthn, WebauthnBuilder,
 };
 
 use crate::auth::{AuthStore, User};
@@ -132,35 +133,100 @@ impl PasskeyService {
         })
     }
 
+    /// Start a ceremony for a person who has not said who they are.
+    ///
+    /// `allowCredentials` is empty, so the authenticator offers whichever
+    /// discoverable passkeys it holds for this relying party and the platform
+    /// draws its own account picker. The ceremony state is stored without a
+    /// user; the account is identified from the assertion's user handle.
+    pub async fn start_discoverable_authentication(
+        &self,
+        store: &AuthStore,
+    ) -> io::Result<PasskeyStart<RequestChallengeResponse>> {
+        let (options, state) = self
+            .webauthn
+            .start_discoverable_authentication()
+            .map_err(authentication_failed)?;
+        let state_json = serde_json::to_string(&state).map_err(invalid_data)?;
+        let ceremony_id = store.store_discoverable_ceremony(&state_json).await?;
+        Ok(PasskeyStart {
+            ceremony_id,
+            options,
+        })
+    }
+
+    /// Finish either kind of ceremony. The ceremony id is opaque to clients,
+    /// so this consumes whichever table holds it; both are single use, which
+    /// is what makes a captured assertion unreplayable.
     pub async fn finish_authentication(
         &self,
         store: &AuthStore,
         ceremony_id: &str,
         credential: &PublicKeyCredential,
     ) -> io::Result<User> {
-        let ceremony = store
+        if let Some(ceremony) = store
             .take_ceremony(ceremony_id, AUTHENTICATION_KIND)
             .await?
+        {
+            let state: PasskeyAuthentication =
+                serde_json::from_str(&ceremony.state_json).map_err(invalid_data)?;
+            let result = self
+                .webauthn
+                .finish_passkey_authentication(credential, &state)
+                .map_err(authentication_failed)?;
+            return self.accept(store, &ceremony.user_id, &result).await;
+        }
+        let state_json = store
+            .take_discoverable_ceremony(ceremony_id)
+            .await?
             .ok_or_else(|| authentication_failed("authentication ceremony expired or was used"))?;
-        let state: PasskeyAuthentication =
-            serde_json::from_str(&ceremony.state_json).map_err(invalid_data)?;
+        let state: DiscoverableAuthentication =
+            serde_json::from_str(&state_json).map_err(invalid_data)?;
+        // Registration passes `user.uuid()` as the WebAuthn user handle, so the
+        // handle in this assertion *is* the account id. No lookup column is
+        // needed, and an unparseable or unknown handle simply fails the login.
+        let (user_uuid, _credential_id) = self
+            .webauthn
+            .identify_discoverable_authentication(credential)
+            .map_err(authentication_failed)?;
+        let user_id = user_uuid.to_string();
+        let keys = store
+            .passkeys(&user_id)
+            .await?
+            .iter()
+            .map(|stored| DiscoverableKey::from(&stored.passkey))
+            .collect::<Vec<_>>();
+        if keys.is_empty() {
+            return Err(authentication_failed("no passkey matches that user handle"));
+        }
         let result = self
             .webauthn
-            .finish_passkey_authentication(credential, &state)
+            .finish_discoverable_authentication(credential, state, &keys)
             .map_err(authentication_failed)?;
-        let mut passkeys = store.passkeys(&ceremony.user_id).await?;
+        self.accept(store, &user_id, &result).await
+    }
+
+    /// Roll the signature counter forward on the credential that was used and
+    /// return the account it belongs to.
+    async fn accept(
+        &self,
+        store: &AuthStore,
+        user_id: &str,
+        result: &AuthenticationResult,
+    ) -> io::Result<User> {
+        let mut passkeys = store.passkeys(user_id).await?;
         let mut authenticated = None;
         for stored in &mut passkeys {
-            if stored.passkey.update_credential(&result).is_some() {
+            if stored.passkey.update_credential(result).is_some() {
                 authenticated = Some(stored);
                 break;
             }
         }
         let stored = authenticated
             .ok_or_else(|| authentication_failed("authenticated passkey is not registered"))?;
-        store.update_passkey(&ceremony.user_id, stored).await?;
+        store.update_passkey(user_id, stored).await?;
         store
-            .user_by_id(&ceremony.user_id)
+            .user_by_id(user_id)
             .await?
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "account no longer exists"))
     }

@@ -8,19 +8,17 @@ import {
 import type { PairingDevice, WifiNetwork } from "./provisioning";
 
 /**
- * The "Add a mirror" flow as a pure state machine. Every screen is one step;
+ * The "Add a camera" flow as a pure state machine. Every screen is one step;
  * every asynchronous result arrives as an event. Keeping it free of React and
  * of the Espressif library is what makes it testable in `mobile/test`.
+ *
+ * Over BLE the flow opens straight on `discover` ("Select your camera"). The
+ * SoftAP fallback inserts `join` in front of it, because iOS needs the phone on
+ * the camera's own network before a scan can see anything.
  */
 
 export type Step =
-  | "instructions"
-  | "join"
-  | "discover"
-  | "wifi"
-  | "sending"
-  | "confirm"
-  | "success";
+  "join" | "discover" | "wifi" | "sending" | "confirm" | "success";
 
 export type SendingStage = "token" | "payload" | "credentials";
 
@@ -36,10 +34,16 @@ export type PairingState = {
   stage: SendingStage;
   /** Plain-language problem shown on the current step, if any. */
   error: string;
+  /**
+   * The raw text of whatever was thrown, kept beside the plain-language
+   * message. Shown small and grey under the error: this build is a debugging
+   * tool, and "could not reach the camera" hides the one line that says why.
+   */
+  detail: string;
   /** Which step "Try again" returns to. */
   retryStep: Step | null;
   deviceName: string;
-  /** Epoch ms when the mirror's 30 s confirmation window opened. */
+  /** Epoch ms when the camera's 30 s confirmation window opened. */
   confirmDeadline: number;
   attempt: number;
 };
@@ -57,12 +61,12 @@ export type PairingEvent =
   | { type: "awaiting"; now?: number }
   | { type: "result"; result: ProvisioningResult }
   | { type: "timeout" }
-  | { type: "failed"; message: string; retryStep: Step }
+  | { type: "failed"; message: string; detail?: string; retryStep: Step }
   | { type: "retry" }
   | { type: "back" };
 
 export const initialPairingState: PairingState = {
-  step: "instructions",
+  step: "discover",
   found: [],
   device: null,
   networks: [],
@@ -70,13 +74,14 @@ export const initialPairingState: PairingState = {
   busy: false,
   stage: "token",
   error: "",
+  detail: "",
   retryStep: null,
   deviceName: "",
   confirmDeadline: 0,
   attempt: 0,
 };
 
-const clear = { error: "", retryStep: null } as const;
+const clear = { error: "", detail: "", retryStep: null } as const;
 
 export function pairingReducer(
   state: PairingState,
@@ -149,6 +154,7 @@ export function pairingReducer(
           step: "confirm",
           busy: false,
           error: failureMessage(event.result.reason),
+          detail: event.result.reason,
           retryStep: "sending",
         };
       return state;
@@ -158,7 +164,7 @@ export function pairingReducer(
         step: "confirm",
         busy: false,
         error:
-          "The mirror did not get its button press in time. Try again and press the button once while the ring pulses amber.",
+          "The camera did not get its button press in time. Try again and press the button once while the ring pulses amber.",
         retryStep: "sending",
       };
     case "failed":
@@ -167,6 +173,7 @@ export function pairingReducer(
         busy: false,
         step: event.retryStep,
         error: event.message,
+        detail: event.detail ?? "",
         retryStep: event.retryStep,
       };
     case "retry":
@@ -185,36 +192,47 @@ export function pairingReducer(
     case "back":
       return state.step === "wifi"
         ? { ...state, ...clear, step: "discover", busy: false, device: null }
-        : state.step === "discover"
-          ? { ...state, ...clear, step: "instructions", busy: false, found: [] }
-          : state;
+        : state;
   }
 }
 
-/** A device-reported failure, in words a person can act on. */
+/** A camera-reported failure, in words a person can act on. */
 export function failureMessage(reason: string): string {
   if (/wifi|wi-fi|ssid|password|passphrase|auth/i.test(reason))
-    return "The mirror could not join that Wi-Fi network. Check the name and password and try again.";
+    return "The camera could not join that Wi-Fi network. Check the name and password and try again.";
   if (/expire/i.test(reason))
     return "The pairing code ran out. Try again and the app will get a fresh one.";
   if (/claim|household|server|http/i.test(reason))
-    return "The mirror reached your Wi-Fi but could not finish signing in to Daily Mirror. Try again.";
-  return "The mirror could not finish pairing. Try again.";
+    return "The camera reached your Wi-Fi but could not finish signing in to Daily Mirror. Try again.";
+  return "The camera could not finish pairing. Try again.";
+}
+
+/**
+ * The unedited text of whatever was thrown, for the debug line under the
+ * message. The plain-language wording above it deliberately loses detail; on
+ * real hardware that detail is the whole diagnosis.
+ */
+export function stepErrorDetail(error: unknown, step: Step): string {
+  const text = error instanceof Error ? error.message : String(error);
+  /* A server failure and a Bluetooth failure read almost the same once they
+   * have been turned into plain language, so say which one this was. */
+  const where = error instanceof ApiError ? `server ${error.status}` : step;
+  return text ? `${where}: ${text}` : "";
 }
 
 /** Anything thrown during the flow, in words a person can act on. */
 export function stepErrorMessage(error: unknown, step: Step): string {
   if (error instanceof ApiError)
     return error.status === 401
-      ? "Your session has expired. Sign in again, then add the mirror."
+      ? "Your session has expired. Sign in again, then add the camera."
       : error.message;
   const text = error instanceof Error ? error.message : String(error);
   if (/abort|timeout|timed out/i.test(text))
     return step === "discover"
-      ? "No mirror answered. Check that the ring is chasing amber, then scan again."
-      : "The mirror stopped answering. Check you are still on its Wi-Fi network and try again.";
+      ? "No camera answered. Check that the ring is chasing amber and that Bluetooth is on, then scan again."
+      : "The camera stopped answering. Move closer to it and try again.";
   if (/network|connect|reach|socket|session/i.test(text))
-    return "The app could not reach the mirror. Check you are joined to its Wi-Fi network, then try again.";
+    return "The app could not reach the camera. Move closer to it, check Bluetooth is on, then try again.";
   return text || "Something went wrong. Try again.";
 }
 
@@ -229,7 +247,7 @@ export type ProvisionDeps = {
 };
 
 /**
- * Hand a device its claim token and Wi-Fi credentials. The payload goes first:
+ * Hand a camera its claim token and Wi-Fi credentials. The payload goes first:
  * some firmware closes the provisioning session once Wi-Fi succeeds, and the
  * custom endpoint needs that session.
  */
@@ -259,7 +277,7 @@ export async function provisionDevice({
 
 export type ConfirmDeps = {
   device: PairingDevice;
-  /** Overall budget; the mirror's own window is 30 s. */
+  /** Overall budget; the camera's own window is 30 s. */
   timeoutMs?: number;
   intervalMs?: number;
   wait?: (ms: number) => Promise<void>;
@@ -268,7 +286,7 @@ export type ConfirmDeps = {
 };
 
 /**
- * Poll the custom endpoint while the mirror waits for its button press.
+ * Poll the custom endpoint while the camera waits for its button press.
  * Resolves with the terminal result, or `null` when the window closed.
  */
 export async function awaitConfirmation({
@@ -287,7 +305,7 @@ export async function awaitConfirmation({
       if (result.status !== "awaiting_confirm") return result;
       lastError = null;
     } catch (error) {
-      // A single dropped read is normal while the mirror switches networks.
+      // A single dropped read is normal while the camera switches networks.
       lastError = error;
     }
     if (now() + intervalMs >= deadline) break;

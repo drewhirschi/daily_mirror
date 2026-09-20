@@ -38,8 +38,19 @@ export type ProvisioningResult =
 /** Custom provisioning endpoint name agreed with the firmware. */
 export const PROVISIONING_ENDPOINT = "daily-mirror";
 
-/** Device SoftAP / advertisement prefix: devices appear as `Mirror-XXXX`. */
-export const DEVICE_PREFIX = "Mirror-";
+/**
+ * Device BLE / SoftAP name prefix. Cameras advertise as `mirror-<hex>`,
+ * always lowercase, matching what the firmware registers.
+ */
+export const DEVICE_PREFIX = "mirror-";
+
+/**
+ * Protocomm security 2 (SRP6a) identity, agreed with the firmware's
+ * CONFIG_MIRROR_PROV_USERNAME / CONFIG_MIRROR_PROV_POP. Neither is a secret,
+ * but both must match the device byte for byte or the handshake fails.
+ */
+export const PROVISIONING_USERNAME = "mirror";
+export const PROVISIONING_POP = "daily-mirror";
 
 /** The device waits this long for the confirming button press. */
 export const CONFIRM_WINDOW_MS = 30_000;

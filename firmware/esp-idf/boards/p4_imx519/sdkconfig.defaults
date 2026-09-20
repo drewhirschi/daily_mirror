@@ -93,3 +93,25 @@ CONFIG_ESP_HOSTED_SDIO_RX_Q_SIZE=10
 # largest multiple fitting a 16-bit window without LWIP_WND_SCALE.
 CONFIG_LWIP_TCP_SND_BUF_DEFAULT=64800
 CONFIG_LWIP_TCP_WND_DEFAULT=64800
+
+# ---------------------------------------------------------------------------
+# The board's four adapter pieces: camera, button, signal LED, capture flash.
+# See the same section in boards/s3_ov5640/sdkconfig.defaults - every pin and
+# polarity lives here, never in the shared Kconfig.
+# ---------------------------------------------------------------------------
+
+# Camera: IMX519 over MIPI-CSI; only the SCCB control pins are ours to name.
+CONFIG_MIRROR_CAM_SCCB_SDA_GPIO=7
+CONFIG_MIRROR_CAM_SCCB_SCL_GPIO=8
+
+# Button: momentary switch to GND, internal pull-up.
+CONFIG_MIRROR_BUTTON_GPIO=20
+
+# Signal LED: a four-leg common-anode RGB LED on three LEDC PWM channels.
+CONFIG_MIRROR_LED_R_GPIO=21
+CONFIG_MIRROR_LED_G_GPIO=22
+CONFIG_MIRROR_LED_B_GPIO=23
+CONFIG_MIRROR_LED_COMMON_ANODE=y
+
+# Capture flash: none on this rig. -1 compiles it away entirely.
+CONFIG_MIRROR_FLASH_GPIO=-1

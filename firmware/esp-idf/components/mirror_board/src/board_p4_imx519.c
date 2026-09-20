@@ -252,6 +252,26 @@ esp_err_t board_camera_capture(bool autofocus, uint8_t **jpeg, size_t *len)
     return ESP_OK;
 }
 
+void board_camera_prepare_focus(uint32_t budget_ms)
+{
+    /* Nothing to arrange. The capture task keeps the pipeline running between
+     * presses, so AE, AWB and the ISP's continuous autofocus are already
+     * converged - which is the state the S3 has to spend a countdown getting
+     * itself into. */
+    (void)budget_ms;
+}
+
+void board_camera_prepare_settle(uint32_t budget_ms)
+{
+    (void)budget_ms;
+}
+
+/* No flash on this board yet: MIRROR_FLASH_GPIO defaults to -1 for it. */
+bool board_flash_available(void)          { return false; }
+bool board_flash_on(void)                 { return false; }
+void board_flash_set(bool on)             { (void)on; }
+esp_err_t board_flash_init(void)          { return ESP_OK; }
+
 void board_camera_release(uint8_t *jpeg)
 {
     free(jpeg);
@@ -264,6 +284,40 @@ void board_camera_last_size(uint32_t *w, uint32_t *h)
 }
 
 const char *board_camera_status(void) { return s_status; }
+
+/*
+ * Capture provenance, P4 edition: the size and the firmware version, and
+ * honest "unknown"s for the rest.
+ *
+ * The readings the S3 gets by talking to the OV5640 directly are, here, inside
+ * the ISP and esp_ipa's closed-loop 3A - exposure and gain are chosen by the
+ * IPA and written to the IMX519 behind esp_video's back, and the AF state
+ * lives in the AK7375 control loop rather than in a sensor status register.
+ * Pulling them out means going through V4L2 controls and esp_ipa's stats
+ * structure, which is a piece of work of its own. Reporting zeros in the
+ * meantime would be worse than reporting nothing: the server cannot tell a
+ * real 0 lux reading from a field this board never filled in, and the upload
+ * omits anything left at these values.
+ */
+void board_camera_capture_info(board_camera_capture_info_t *out)
+{
+    if (!out) {
+        return;
+    }
+    *out = (board_camera_capture_info_t){
+        .valid = true,
+        .sensor = "imx519",
+        .width = s_w,
+        .height = s_h,
+        .jpeg_quality = CONFIG_MIRROR_JPEG_QUALITY,
+        .exposure_us = -1,
+        .analog_gain = -1.0f,
+        .mean_luma = -1,
+        .af_state = "unknown",
+        .focus_score = -1,
+        .flash = false,
+    };
+}
 
 /* ---- RGB LED on three LEDC PWM channels -------------------------------- */
 /*

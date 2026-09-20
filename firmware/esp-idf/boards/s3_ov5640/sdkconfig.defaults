@@ -15,8 +15,68 @@ CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_ESP_CONSOLE_UART_CUSTOM=y
 CONFIG_ESP_CONSOLE_UART_BAUDRATE=921600
 
+# ---------------------------------------------------------------------------
+# Pairing over BLE (mirror_pair).
+#
+# NimBLE rather than Bluedroid: it is roughly half the internal RAM, and this
+# board also has to hold two 5 MP camera frame buffers' worth of descriptors,
+# the Wi-Fi stack and an mbedTLS handshake. Nothing here needs classic
+# Bluetooth, and the controller's memory is handed back as soon as pairing
+# ends (WIFI_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM).
+# ---------------------------------------------------------------------------
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+# One connection: a phone pairing a camera. More only costs RAM.
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+
+# The app authenticates with protocomm security 2 (SRP6a), so the salt and
+# verifier maths has to be compiled in.
+CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2=y
+
 # FREERTOS_HZ is deliberately left at the 100 Hz default. The OV5640 autofocus
 # poll loops count in ticks - vTaskDelay(1), not pdMS_TO_TICKS(5), which rounds
 # to *zero* ticks at 100 Hz and turns the wait into a spin that starves the
 # very I2C traffic it is waiting on. Their iteration counts were tuned against
 # 10 ms ticks; raising HZ shortens every AF timeout by the same factor.
+
+# ---------------------------------------------------------------------------
+# The board's four adapter pieces: camera, button, signal LED, capture flash.
+#
+# Every pin and polarity this board has lives here, not in the shared Kconfig,
+# so "where is this set?" has one answer. components/mirror_board/Kconfig only
+# declares the options, all defaulting to -1 / n; anything this file forgets is
+# absent rather than wrong.
+# ---------------------------------------------------------------------------
+
+# Camera: OV5640 on the DVP bus.
+CONFIG_MIRROR_CAM_XCLK_GPIO=15
+CONFIG_MIRROR_CAM_SDA_GPIO=4
+CONFIG_MIRROR_CAM_SCL_GPIO=5
+CONFIG_MIRROR_CAM_D0_GPIO=11
+CONFIG_MIRROR_CAM_D1_GPIO=9
+CONFIG_MIRROR_CAM_D2_GPIO=8
+CONFIG_MIRROR_CAM_D3_GPIO=10
+CONFIG_MIRROR_CAM_D4_GPIO=12
+CONFIG_MIRROR_CAM_D5_GPIO=18
+CONFIG_MIRROR_CAM_D6_GPIO=17
+CONFIG_MIRROR_CAM_D7_GPIO=16
+CONFIG_MIRROR_CAM_VSYNC_GPIO=6
+CONFIG_MIRROR_CAM_HREF_GPIO=7
+CONFIG_MIRROR_CAM_PCLK_GPIO=13
+# The Freenove module is mounted upside down on the bench rig.
+CONFIG_MIRROR_CAM_VFLIP=y
+
+# Button: momentary switch to GND, internal pull-up.
+CONFIG_MIRROR_BUTTON_GPIO=1
+
+# Signal LED: the single WS2812 on the board, driven over RMT.
+CONFIG_MIRROR_LED_WS2812_GPIO=48
+
+# Capture flash: GPIO 47, a plain GPIO on this WROOM-1 N16R8 module and
+# claimed by nothing else here - the camera is on 4-18, the button on 1, the
+# WS2812 on 48, and the octal PSRAM on the module's internal 33-37. Driven
+# straight from the pin today; a MOSFET stage is coming.
+CONFIG_MIRROR_FLASH_GPIO=47
+CONFIG_MIRROR_FLASH_ACTIVE_HIGH=y

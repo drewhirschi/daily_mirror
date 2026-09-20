@@ -99,7 +99,8 @@ echo '<command>' | newgrp uucp
 
 ## What it does
 
-Start-up order is `settings → LED → camera → network → server → mDNS → button`.
+Start-up order is `log ring → settings → LED → camera → network → server →
+mDNS → upload spool → button`.
 The camera comes up before the network so the ISP's AE/AWB/AF convergence,
 which needs a few seconds of frames, overlaps the Wi-Fi association instead of
 following it. A camera that fails to initialise does **not** stop the rest:
@@ -113,8 +114,10 @@ following it. A camera that fails to initialise does **not** stop the rest:
 | `GET /snapshot.jpg` | focus, capture, send — the live scene |
 | `GET /last.jpg` | the last committed press photo |
 | `POST /press` | run the press flow |
-| `POST /upload` | capture and upload in one step |
-| `GET /stats` | plain text: board, camera, network, heap, last upload |
+| `POST /upload` | capture straight into the upload spool |
+| `GET /stats` | plain text: board, camera, network, heap, and the spool |
+| `GET /logs` | plain text: the last ~8 KB of the console log |
+| `POST /debug/upload-block?on=1` | make every upload fail, for testing retry |
 | `GET /config`, `POST /config` | the settings form, from `mirror_config` |
 
 ### The press flow
@@ -123,17 +126,45 @@ The Pi's, on this hardware (`device/src/main.rs`; pattern names from
 `crates/mirror-core/src/ring.rs`):
 
 ```
-countdown  AmberSlowPulse    3 × 650 ms on / 350 ms off
-capture    AmberRapidPulse   focus and grab
-committed  GreenFlash        700 ms — the JPEG is in PSRAM, /last.jpg serves it
-uploading  BlueSlowPulse     only when server_url and upload_token are set
+countdown  AmberSlowPulse       4 × 350 ms on / 650 ms off — focus, AE/AWB
+                                settle and the frame flush all run UNDER these
+shutter    WhiteFlash           160 ms, at the instant the frame is taken
+error      RedTriplePulse       then back to whatever is underneath
+
+uploading  GreenSlowPulse       the spool has work in hand
+sent       GreenTripleFlash     once, when the queue empties
 ready      SolidWhite
-error      RedTriplePulse    then back to ready
 ```
 
 Button: active low to GND with the internal pull-up, 60 ms debounce, 20 ms
-poll. The commit happens *before* the upload, so a failed upload never loses a
-photo.
+poll. The press ends when the photo is on flash; the upload is not part of it.
+
+**Deliberate divergences from `crates/mirror-core/src/ring.rs`**, both about
+making one glance answer one question:
+
+- Uploading is **green**, not `BlueSlowPulse`. Blue keeps its other meaning —
+  joining a network, claiming — so the ring distinguishes "talking to the
+  network to get set up" from "your photo is on its way".
+- There is no `GreenFlash` at commit. The white shutter flash is the cue that
+  the photo was taken, and a second flash a moment later read as noise.
+
+The old flow put `AmberRapidPulse` *after* the countdown while autofocus and
+the frame flush ran — about three seconds of fast blinking between "3, 2, 1"
+and the actual photograph, so the countdown counted down to nothing. That work
+now happens during the blinks, with `board_camera_prepare()` given the
+countdown as a budget: if focus has not locked by the last blink the shutter
+fires anyway and `af_state` records `searching`.
+
+**Layers.** `mirror_ring` renders the topmost active layer of BASE (idle,
+pairing, claiming), UPLOAD (the spool) and CAPTURE (a press), so a press
+pre-empts the upload pulse instantly and the pulse resumes by itself
+afterwards, with no caller having to know what to restore. Pairing patterns on
+BASE outrank UPLOAD — "press the button to confirm" must not be painted over
+by a photo going out — and do not need to outrank CAPTURE, because
+`mirror_pair_confirm()` swallows the press before a capture can start. A
+second press during a countdown is ignored (`mirror_press_busy()`); a press
+while an upload is in flight starts its countdown immediately, since the
+spool's lock is held only while a file is written, never across an upload.
 
 ### Networking
 
@@ -167,12 +198,122 @@ TLS verifies against the certificate bundle (`esp_crt_bundle_attach`). The
 bench firmware this came from used `CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY`;
 that is deliberately gone.
 
+The JPEG is streamed to the grant's URL from the spool file in 8 KB chunks out
+of PSRAM. That is not tuning: the internal-heap low-water mark across a TLS
+upload is around 50-70 KB, and a 386 KB JPEG held in internal RAM alongside
+mbedTLS' buffers does not fit.
+
+The grant body carries an optional `capture` object with the provenance of
+that frame — see **The upload spool** below.
+
+### The upload spool
+
+`mirror_spool.c`, on a 3.5 MB LittleFS partition in the flash tail. Every
+capture is written there first; a single drain task sends them oldest-first,
+one at a time.
+
+- **Retry.** 30 s doubling to 15 min, ±20% jitter, reset on
+  `IP_EVENT_STA_GOT_IP` — the failure is nearly always the network having been
+  away, and once it is back there is no reason to sit out the rest of a
+  fifteen-minute backoff.
+- **Power loss.** Entries are written to `tmp.dm` and renamed into `q/`, so a
+  file under `q/` was written all the way through. Start-up deletes a stale
+  `tmp.dm` and discards anything too short to hold a header.
+- **Full.** The *oldest* entry is dropped and counted in `drops`. Roughly a
+  dozen 1600×1200 JPEGs fit.
+- **No clock, no upload.** A capture taken before SNTP answered would be filed
+  under 1970, which the server rejects, so it is held and stamped with the
+  time the clock first becomes valid.
+- **4xx is not "retry forever".** `401`/`403` stops the drain entirely and
+  shows `token_bad=1` in `/stats` — every photo is kept, because retrying
+  cannot help and deleting would not be ours to do. `400`/`409`/`413` moves
+  that one photo to `r/` (at most 2 kept) so one bad file cannot wedge the
+  queue behind it. Everything else retries.
+
+`/stats` reports `spool_count`, `spool_bytes`, `spool_capacity`,
+`oldest_age_s`, `uploads_ok`, `uploads_failed`, `drops`, `rejected`,
+`next_retry_s`, `last_http_status`, `last_error`, `token_bad`, and the last
+capture's metadata.
+
+To test the retry path without touching the stored claim:
+
+```sh
+curl -X POST 'http://mirror-4a30e4.local/debug/upload-block?on=1'   # photos pile up
+curl -X POST 'http://mirror-4a30e4.local/debug/upload-block?on=0'   # they drain, in order
+```
+
+It is RAM-only, so a reboot clears it, and it can only make uploads fail.
+
+### Capture metadata
+
+The `capture` object on the grant request, all fields optional — anything the
+board cannot read is **omitted**, never guessed:
+
+```json
+{"firmware_version":"0d4bb7b","sensor":"ov5640","width":1600,"height":1200,
+ "jpeg_quality":89,"exposure_us":100682,"analog_gain":2.250,"mean_luma":34,
+ "af_state":"focused","trigger":"button","capture_source":"device",
+ "captured_at":"2026-09-20T03:16:03Z"}
+```
+
+The sensor registers are read in the board adapter immediately after the frame
+is grabbed, behind `board_camera_capture_info_t`, so they describe *that*
+frame — auto-exposure moves between frames. The S3 reads exposure
+(`0x3500-0x3502`), gain (`0x350A/0x350B`), mean luma (`0x56A1`) and the AF
+firmware status (`0x3029`); the P4 adapter returns "unknown" for all of them
+for now, because on that board they live inside the ISP's closed-loop 3A
+rather than in sensor status registers.
+
+**The exposure line time is measured, not derived.** The OV5640's exposure is
+in sixteenths of a row, and the row time is `HTS / (the sensor array clock)` —
+which is *not* the DVP PCLK, and the PLL formula in esp32-camera's
+`calc_sysclk()` gives an answer that is out by exactly 2×. So `board_s3_ov5640.c`
+times six frames at start-up and divides by VTS. On this bench, at
+1600×1200 JPEG:
+
+| | |
+| --- | --- |
+| HTS / VTS | 2844 / 1968 |
+| register-derived (`HTS/PCLK`, PCLK 12.5 MHz) | 227.52 µs |
+| **measured** (223.9 ms frame / 1968 rows) | **113.77 µs** |
+
+The measured figure implies a 25 MHz array clock, i.e. 2× the DVP PCLK, which
+is what the datasheet's 8-bit DVP output mode does. The measurement is used;
+the derived value is logged next to it so the two can be compared in the
+field. Both appear in `/logs` on every boot.
+
+### /logs
+
+`esp_log_set_vprintf` tees the last 8 KB of log text into a PSRAM ring, served
+as `text/plain` at `GET /logs`; serial output is unchanged. ISR context is
+skipped (PSRAM is unreachable with the cache off) and the ring is guarded by a
+spinlock rather than a mutex, because the log macros are reachable from an
+ISR. The boot banner carries the firmware version, the reset reason and the
+clock state.
+
+No credential is ever logged: presigned URLs are printed with their query
+string replaced by `?<redacted>`, and neither the device token, the Wi-Fi
+password nor a claim token appears in any log line.
+
 ## Configuration
 
 `idf.py -B build_p4 menuconfig`, under:
 
 - **Daily Mirror board** — the board choice, button GPIO, JPEG quality, LED
-  pins, camera pins. Every pin below is a Kconfig option with these defaults.
+  pins, camera pins, and the capture flash. Every pin below is a Kconfig
+  option with these defaults.
+
+The **capture flash** is `MIRROR_FLASH_GPIO`, **GPIO 47** on the S3 (`-1`, and
+so disabled, on the P4). It comes on for the last `MIRROR_FLASH_LEAD_MS`
+(1500 ms) of the press countdown and goes off the instant the frame is in
+hand. That lead is not padding: the frame flush that settles auto-exposure
+runs *after* the light is on, so AE meters the lit room rather than the dark
+one, and the light is held rather than strobed because a pulse shorter than a
+frame lights only part of a rolling-shutter readout — both written up in
+`docs/burst-processing-experiment.md`. The board layer arms a 6 s one-shot on
+every turn-on and the pin is driven off at start-up, so no error path, abort or
+reset can leave the light on. `board_flash_set_level()` already takes a 0–255
+level, so LEDC dimming drops in when the MOSFET stage arrives.
 - **Daily Mirror application** — firmware version, station timeout, AP
   password, `MIRROR_DEBUG_ISP_STATS`.
 - **Daily Mirror settings defaults** — the `MIRROR_DEFAULT_*` fallbacks.
@@ -216,11 +357,128 @@ The module is mounted upside down on the bench rig, hence `MIRROR_CAM_VFLIP=y`.
 
 ## Partitions
 
-`partitions.csv`, one table for both boards: `nvs`, `phy_init`, `otadata`, and
-two 6 MB OTA app slots. There is no OTA client yet; the layout is laid down now
-because changing a partition table later means erasing NVS and losing every
-deployed device's settings. 12.1 MB total, which fits the smaller board (16 MB
-on the S3, 32 MB on the P4).
+`partitions.csv`, one table for both boards: `nvs`, `phy_init`, `otadata`, two
+6 MB OTA app slots, and a 3.5 MB `spool` LittleFS partition. There is no OTA
+client yet; the layout is laid down now because changing a partition table
+later means erasing NVS and losing every deployed device's settings. 15.6 MB
+total, which fits the smaller board (16 MB on the S3, 32 MB on the P4).
+
+```
+nvs        data  nvs       0x009000    24K
+phy_init   data  phy       0x00f000     4K
+otadata    data  ota       0x010000     8K
+ota_0      app   ota_0     0x020000     6M
+ota_1      app   ota_1     0x620000     6M
+spool      data  littlefs  0xc20000  3584K
+```
+
+`spool` was **appended** into flash that was already unallocated, so every
+offset above it is byte for byte what it was. That matters: `nvs` holds the
+`device_token` a claim issued, and moving it by one byte un-claims every
+device in the field. Flashing the new table writes only the sector at
+`0x8000`, which ends exactly where `nvs` begins.
+
+## Adding a new board
+
+Everything hardware-specific is behind `mirror_board.h`. The app in `main/`
+never includes `esp_camera`, `esp_video`, `led_strip` or `ledc`, so a new board
+is one adapter file, one defaults file, and a checklist.
+
+### 1. The adapter: `components/mirror_board/src/board_<name>.c`
+
+Four pieces, and nothing else:
+
+| piece | functions |
+| --- | --- |
+| identity | `board_name`, `board_id` |
+| camera | `board_camera_init`, `board_camera_prepare_focus`, `board_camera_prepare_settle`, `board_camera_capture`, `board_camera_release`, `board_camera_last_size`, `board_camera_capture_info`, `board_camera_status` |
+| button | `board_button_gpio` |
+| signal LED | `board_led_init`, `board_led_set_rgb` |
+| capture flash | `board_flash_init`, `board_flash_available`, `board_flash_set`, `board_flash_on` |
+| radio | `board_net_init` |
+
+Every one must exist even when the hardware does not — a board with no flash
+returns `false` from `board_flash_available()` and makes the other three
+no-ops, which is exactly what `board_p4_imx519.c` does. Return "unknown"
+values from `board_camera_capture_info()` rather than zeros: a missing field is
+omitted from the upload, a fabricated one is a lie nothing downstream can see
+through.
+
+`board_camera_prepare_focus()` and `board_camera_prepare_settle()` are split
+because the flash comes on between them (see **The press flow**). A board whose
+pipeline runs continuously, like the P4's, can leave both empty.
+
+### 2. `boards/<name>/sdkconfig.defaults`
+
+The one file that carries values. `components/mirror_board/Kconfig` only
+*declares* options, all defaulting to `-1` or `n`, so anything this file
+forgets is absent rather than wrong. It sets:
+
+- `CONFIG_IDF_TARGET` and `CONFIG_MIRROR_BOARD_<NAME>=y`.
+- Every pin and polarity for the four pieces above.
+- Flash size, and **PSRAM type and speed** — quad or octal, and the clock. The
+  camera's frame buffers and the log ring live there; get this wrong and the
+  symptom is an allocation failure a long way from the cause.
+- Console UART baud, if the board's USB bridge will not take the default.
+- **BLE**, if the chip has it: NimBLE plus
+  `ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2`. Without a Bluetooth radio
+  `mirror_pair_start()` reports that the board cannot pair and the device has
+  to be set up through `/config` on the fallback access point — a working
+  path, but a different one, so decide it deliberately.
+
+### 3. Wiring the name up
+
+- `CMakeLists.txt`: add the name to `MIRROR_BOARDS` and map it to an
+  `IDF_TARGET`.
+- `components/mirror_board/CMakeLists.txt`: compile the new adapter under its
+  `CONFIG_MIRROR_BOARD_*`.
+- `justfile`: a `fw-build-<name>` / `fw-flash-<name>` pair, and a build
+  directory of its own (`build_<short>`), since `sdkconfig` is per board and
+  lives in the build directory.
+- `partitions.csv` is shared. Check the **total fits the new board's flash**
+  (15.6 MB today) and size the `spool` partition for it — it is the only
+  partition that is a judgement call rather than a requirement.
+
+### 4. Bring-up checklist
+
+In this order; each step depends on the one before.
+
+1. **Boots.** Serial shows the banner, the board name, and `boot: ... reset=`.
+2. **`/stats`** answers: board id, camera line, IP, heap. `camera=` must not
+   say "not started".
+3. **Capture.** `POST /press` returns `captured`; `/last.jpg` is a whole image.
+4. **Countdown and LED.** Four amber blinks, one white flash at the end, and
+   the shutter on the last blink — `shutter at ~4000 ms` in the log.
+5. **Flash**, if fitted: the light is on for the last 1.5 s and off straight
+   after. Compare `mean_luma` / `exposure_us` in `/stats` `last_capture`
+   against a capture with it disabled to confirm auto-exposure adapted.
+6. **Pairing**, if the board has BLE: a long press enters it, the app finds it,
+   and `/stats` ends at `claimed=1`.
+7. **Upload.** A capture drains: `uploads_ok` increments and
+   `last_http_status=204`.
+8. **Spool under failure.** `POST /debug/upload-block?on=1`, two presses,
+   watch `spool_count` rise with no attempts; reset the board and confirm the
+   count survives; `?on=0` and watch it drain oldest-first.
+
+### Standalone operation
+
+The device is meant to run from a wall supply with nothing attached, so:
+
+- **Nothing waits on the console.** Logging is plain UART with no flow control
+  and the USB-serial-JTAG console is secondary, so an absent host is an absent
+  reader, not a blocked writer. No code reads from stdin.
+- **Brownout detection is on** (`CONFIG_ESP_BROWNOUT_DET`, level 7, plus
+  `SPI_FLASH_BROWNOUT_RESET`) — a sagging USB supply resets the chip cleanly
+  rather than corrupting flash mid-write.
+- **Wi-Fi retries forever** (`mirror_net.c`): 1 s for the first five attempts,
+  then 10 s, with no attempt limit. An access point that goes away overnight is
+  rejoined on its own.
+- **The spool outlives the outage.** Photos taken while the network is down sit
+  on flash; `IP_EVENT_STA_GOT_IP` resets the retry backoff, so they start
+  draining as soon as the address comes back rather than waiting out the
+  remainder of a 15-minute timer.
+- **A power cut costs nothing.** The queue is on LittleFS and entries are
+  renamed into place, so start-up finds them and carries on.
 
 ## Traps
 

@@ -1,3 +1,58 @@
+## September 8: password-only Release update installed over Tailscale
+
+The user authorized disabling native passkeys for the free Personal Team.
+Associated Domains is commented out in `mobile/app.config.ts` and removed from
+JSN's generated `DailyMirror.entitlements`. `NATIVE_PASSKEYS_ENABLED = false`
+in `mobile/src/auth-features.ts` hides the native passkey sign-in button;
+Account explains that passkeys are website-only. Password login and secure
+session storage are unchanged. Restore both the config entitlement and UI flag
+when using an eligible team.
+
+The initial `No Accounts`/missing profile error concealed the unsupported
+Associated Domains capability shown in Xcode. After removal, Xcode generated
+a valid profile. The SSH build then hit `errSecInternalComponent` when signing
+ExpoFileSystem.framework. Running the same Release build as a one-off LaunchAgent
+in `gui/$(id -u)` succeeded (`DAILY_MIRROR_BUILD_EXIT=0`). The completed job was
+removed afterward. Do not reset accounts or pairing for that SSH-context error.
+
+Verified the complete app with `codesign --verify --deep --strict`; its signed
+entitlements contain the app/team identifiers and get-task-allow, with no
+Associated Domains. `devicectl device install app` successfully updated
+`app.dailymirror.ios` at 22:38 on JSN through the Tailscale relay, without
+uninstalling the old app. The Release includes bundled JavaScript, so Metro
+is not required. Mobile/shared type checks and tests passed, and resolved Expo
+config was checked for absence of Associated Domains.
+
+Build location: `/Users/drew/work/daily-mirror-mobile/build-jsn/Build/Products/Release-iphoneos/DailyMirror.app`.
+Successful desktop build log: `/tmp/daily-mirror-password-gui-build.log` on JSN.
+See [the bridge/build/install guide](tailscale-xcode-bridge.md).
+
+## September 8 late evening: Tailscale bridge verified; update blocked on signing
+
+The free relay in `scripts/coredevice-tailnet-bridge.py` is verified between
+JSN and drew-25 on different LANs over Tailscale. See
+[the bridge/build/install runbook](tailscale-xcode-bridge.md).
+Capturing the unlocked phone's `_remotepairing._tcp` advertisement on the Linux
+host and publishing it on JSN changed CoreDevice from `unavailable` to
+`available (paired)`. Apple authenticated the control channel. Forwarding the
+observed TCP tunnel range 54390-54490 allowed an installed-app query and launch
+of the existing `app.dailymirror.ios`. No pairing reset was needed.
+
+The user requested installation of the newer build. A fresh signed Release
+build targeted the connected phone with `-allowProvisioningUpdates`, but failed
+with `No Accounts` and `No profiles for 'app.dailymirror.ios'`. JSN has one valid
+Apple Development identity; its only installed provisioning profile is still
+for the other project. The existing Release `.app` is unsigned and has no
+embedded provisioning profile. No update was installed and no app was removed.
+The previously used Mac `terakar` timed out over SSH, so its signing setup was
+not available as a fallback. Fix the Daily Mirror signing/profile in Xcode
+before rerunning the documented build and install commands. The configured
+Associated Domains capability remains a separate Personal Team limitation.
+
+The relay is a temporary foreground process, not an installed startup service.
+Its Bonjour identity and tunnel ports may need refreshing after reconnecting.
+Older entries below record earlier states and do not supersede this result.
+
 ## September 8 evening: JSN build and remaining installation blocker
 
 Latest mobile source is synced to `/Users/drew/work/daily-mirror-mobile` on
@@ -436,3 +491,12 @@ respect whichever restrictions are active in the new session too.
 
 Read `server/AGENTS.md` before server edits. Do not hand-edit generated
 `.nextrs/` output or generated process/deployment adapters.
+
+## September 19: native passkeys re-enabled on the paid team
+
+The Apple Developer Program membership is active again under the same Team ID
+`C9P58ZP4AQ`, so Associated Domains is available and the September 8 entry
+above no longer describes the build. `associatedDomains` is restored in
+`mobile/app.config.ts`, `NATIVE_PASSKEYS_ENABLED` is true, and the provisioning
+profile is valid to 2027-09-19, so builds no longer expire after seven days.
+Sign-in also accepts an empty username, which runs a discoverable ceremony.

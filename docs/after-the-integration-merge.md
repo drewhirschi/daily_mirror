@@ -37,7 +37,7 @@ The app's "Add a mirror" flow and the server's claim endpoints are in this
 merge, but the C firmware does not speak their protocol yet. In order:
 
 1. Espressif's provisioning manager on the device when it has no Wi-Fi:
-   service name `Mirror-XXXX`, security 2, SoftAP transport (what the app uses
+   service name `mirror-<hex>`, security 2, BLE transport (what the app uses
    today).
 2. The custom `daily-mirror` provisioning endpoint that accepts the claim
    payload, per `mobile/src/pairing/contract.ts`.

@@ -1,5 +1,14 @@
 # Next enclosure: Pi 4 B and one LED
 
+**Latest CAD revision - September 10, 2026:** the user confirmed Pi 4 B and
+requested a whole-enclosure rail mount. [Prototype 02](../hardware/enclosure-v2/README.md)
+now includes camera screw posts, front camera/LED/button openings, a single
+power entry, two printable rail sections with 300 mm travel, a thumb-screw
+brake and removable end stops. Native FreeCAD, STEP, bed-oriented STLs, fit
+coupons and a browser viewer are included. Geometry and export checks pass;
+exact controls, sensor/lens clearance, printer and physical mounting tests
+remain to be confirmed. The older concept below is retained for context.
+
 Planning baseline: 2026-09-05. This supersedes the RGB-ring direction for the
 next prototype in the older hardware plan. This is a build plan, not a finished
 CAD model or verified wiring diagram.

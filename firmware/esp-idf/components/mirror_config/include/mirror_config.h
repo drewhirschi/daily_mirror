@@ -19,6 +19,16 @@ extern "C" {
 #define MIRROR_CFG_SERVER_URL    "server_url"
 #define MIRROR_CFG_UPLOAD_TOKEN  "upload_token"
 #define MIRROR_CFG_DEVICE_NAME   "device_name"
+/* Per-device bearer token minted by POST /api/devices/claim. Its presence is
+ * what "claimed" means: with one stored the device boots Ready, without one it
+ * boots into pairing. Written by mirror_pair, never by the /config form. */
+#define MIRROR_CFG_DEVICE_TOKEN  "device_token"
+/* Household the claim bound this device to; informational, for /stats. */
+#define MIRROR_CFG_HOUSEHOLD_ID  "household_id"
+/* One-shot: "1" means the next boot enters pairing even if a device token is
+ * stored. Set by the long-press, because the Bluetooth stack pairing needs is
+ * released once pairing ends and only a restart brings it back. */
+#define MIRROR_CFG_PAIR_ON_BOOT  "pair_on_boot"
 #define MIRROR_CONFIG_VALUE_MAX  256
 
 /** Initialise NVS (erasing and retrying on a version mismatch) and load settings. Call once, first. */

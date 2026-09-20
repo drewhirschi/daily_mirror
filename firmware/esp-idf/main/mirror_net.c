@@ -11,7 +11,9 @@
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
+#include "esp_netif_sntp.h"
 #include "esp_event.h"
+#include "esp_sntp.h"
 
 static const char *TAG = "mirror_net";
 
@@ -25,6 +27,46 @@ static char s_ap_ssid[24];
 static volatile bool s_sta_connected;
 static volatile bool s_ap_active;
 static volatile bool s_want_sta;
+static bool s_sntp_started;
+
+/*
+ * The clock. Nothing on this board keeps time across a reboot, so until SNTP
+ * answers, time() is 1970 plus the uptime.
+ *
+ * That matters more than it sounds: a capture ID is a UTC timestamp, and the
+ * server stores photos.captured_at by slicing that ID apart. A device with no
+ * clock therefore files every photo under 1970 - and, worse, two devices (or
+ * one device across two boots) that press the button at the same number of
+ * seconds since boot produce the same ID, which the catalog's
+ * ON CONFLICT(id) DO UPDATE treats as a re-upload of the same photo.
+ */
+static void start_sntp(void)
+{
+    if (s_sntp_started) {
+        return;
+    }
+    esp_sntp_config_t cfg = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    /* Re-resolve and re-sync after a router reboot hands us a new lease. */
+    /* A public pool server, not the one DHCP offers: taking the DHCP option
+     * needs CONFIG_LWIP_DHCP_GET_NTP_SRV, and asking for it without that
+     * fails esp_netif_sntp_init outright (ESP_ERR_INVALID_ARG). */
+    cfg.start = true;
+    cfg.smooth_sync = false;
+    esp_err_t err = esp_netif_sntp_init(&cfg);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "sntp init failed: %s", esp_err_to_name(err));
+        return;
+    }
+    s_sntp_started = true;
+    ESP_LOGI(TAG, "sntp started - photos are timestamped once it answers");
+}
+
+bool mirror_net_clock_valid(void)
+{
+    time_t now = time(NULL);
+    /* Any plausible wall clock is past 2024-01-01; 1970 + uptime is not. */
+    return now > 1704067200;
+}
 
 static const char *reason_hint(uint8_t reason)
 {
@@ -112,6 +154,7 @@ static void on_ip_event(void *arg, esp_event_base_t base, int32_t id, void *data
         snprintf(s_sta_ip, sizeof(s_sta_ip), IPSTR, IP2STR(&e->ip_info.ip));
         ESP_LOGI(TAG, "station has %s (gateway " IPSTR ")", s_sta_ip, IP2STR(&e->ip_info.gw));
         s_sta_connected = true;
+        start_sntp();
         xEventGroupSetBits(s_events, STA_GOT_IP_BIT);
     }
 }
@@ -240,6 +283,50 @@ esp_err_t mirror_net_start(void)
                   "the station keeps trying underneath",
              CONFIG_MIRROR_STA_TIMEOUT_S);
     return start_ap();
+}
+
+void mirror_net_restore_ap_mode(void)
+{
+    if (!s_ap_active) {
+        return;
+    }
+    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "could not restore the setup network: %s", esp_err_to_name(err));
+    }
+}
+
+esp_err_t mirror_net_adopt_sta_credentials(void)
+{
+    wifi_config_t sta = { 0 };
+    esp_err_t err = esp_wifi_get_config(WIFI_IF_STA, &sta);
+    if (err != ESP_OK) {
+        return err;
+    }
+    if (sta.sta.ssid[0] == '\0') {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* NUL-terminate: the driver's fields are fixed-width and need not be. */
+    char ssid[33] = { 0 };
+    char pass[65] = { 0 };
+    memcpy(ssid, sta.sta.ssid, sizeof(sta.sta.ssid));
+    memcpy(pass, sta.sta.password, sizeof(sta.sta.password));
+
+    err = mirror_config_set(MIRROR_CFG_WIFI_SSID, ssid);
+    if (err == ESP_OK) {
+        err = mirror_config_set(MIRROR_CFG_WIFI_PASS, pass);
+    }
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    /* From here on a disconnect is worth retrying: these are credentials the
+     * device is meant to keep, not something the provisioning manager is
+     * still trying out. */
+    s_want_sta = true;
+    ESP_LOGI(TAG, "adopted the paired network \"%s\"", ssid);
+    return ESP_OK;
 }
 
 bool mirror_net_sta_connected(void) { return s_sta_connected; }

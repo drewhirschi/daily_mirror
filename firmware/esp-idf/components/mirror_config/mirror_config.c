@@ -59,6 +59,11 @@ static mirror_setting_t s_settings[] = {
     { MIRROR_CFG_SERVER_URL,   CONFIG_MIRROR_DEFAULT_SERVER_URL,   {0}, false },
     { MIRROR_CFG_UPLOAD_TOKEN, CONFIG_MIRROR_DEFAULT_UPLOAD_TOKEN, {0}, false },
     { MIRROR_CFG_DEVICE_NAME,  "",                                 {0}, false },
+    /* Written by pairing, not by the form. It still lives here so one store
+     * owns every persistent setting and "Forget everything" really does. */
+    { MIRROR_CFG_DEVICE_TOKEN, "",                                 {0}, false },
+    { MIRROR_CFG_HOUSEHOLD_ID, "",                                 {0}, false },
+    { MIRROR_CFG_PAIR_ON_BOOT, "",                                 {0}, false },
 };
 
 #define MIRROR_SETTING_COUNT (sizeof(s_settings) / sizeof(s_settings[0]))
@@ -367,6 +372,15 @@ static esp_err_t get_config_handler(httpd_req_t *req)
     render_text_field(&sb, MIRROR_CFG_DEVICE_NAME, "Device name",
                       mirror_config_get(MIRROR_CFG_DEVICE_NAME),
                       "Shown in the app, e.g. \"Hall camera\".");
+
+    /* Pairing status, read-only: the device token is issued by the server over
+     * the pairing flow and there is nothing useful a person could type here. */
+    sb_printf(&sb,
+              "<p class=h>Pairing: %s. Hold the button for five seconds to pair "
+              "this camera with the app again.</p>",
+              mirror_config_get(MIRROR_CFG_DEVICE_TOKEN)[0] != '\0'
+                  ? "claimed by a household"
+                  : "not claimed yet");
 
     sb_printf(&sb,
               "<button class=save type=submit>Save and restart</button></form>"

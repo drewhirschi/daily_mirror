@@ -65,6 +65,15 @@ async fn pairing_mints_claims_lists_and_authenticates_uploads() {
         .create_user("pairer", "Pairer", "strong-test-password")
         .await
         .unwrap();
+    // Pairing is household-scoped and the server never guesses one, so the
+    // account is onboarded first, exactly as signup would leave it.
+    let queue = ProcessingQueue::new(catalog.clone());
+    let household = queue.create_household("Pairer's home", 4).await.unwrap();
+    let person = queue.create_person("Pairer").await.unwrap();
+    auth.link_household(&user.id, &household.id, &person.id)
+        .await
+        .unwrap();
+    let user = auth.user_by_id(&user.id).await.unwrap().unwrap();
     let session = auth.create_session(&user.id).await.unwrap().token;
 
     let app = nextrs::router::build_router(server::generated_registry())
@@ -172,7 +181,7 @@ async fn pairing_mints_claims_lists_and_authenticates_uploads() {
     assert!(listed["devices"][0]["last_seen_at"].is_null());
 
     // The per-device token authorizes an upload and stamps the photo row.
-    let device_capture = "20260915T120000Z-devicea1";
+    let device_capture = "20260915T120000Z-de71ce41";
     let upload = app
         .clone()
         .oneshot(bearer_json(
@@ -220,7 +229,7 @@ async fn pairing_mints_claims_lists_and_authenticates_uploads() {
     assert_ne!(completed.status(), StatusCode::UNAUTHORIZED);
 
     // TODO(pairing): drop with the shared token. The Pi rig still uses it.
-    let shared_capture = "20260915T120500Z-shared01";
+    let shared_capture = "20260915T120500Z-5ba2ed01";
     let shared = app
         .clone()
         .oneshot(bearer_json(
@@ -244,7 +253,7 @@ async fn pairing_mints_claims_lists_and_authenticates_uploads() {
                 "POST",
                 "/api/uploads",
                 &"n".repeat(43),
-                upload_body("20260915T121000Z-nobody01"),
+                upload_body("20260915T121000Z-40b0d401"),
             ))
             .await
             .unwrap()

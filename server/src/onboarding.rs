@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::auth::{AuthStore, User};
+use crate::auth::{AuthStore, ROLE_ADMIN, ROLE_MEMBER, User, validate_household_role};
 use crate::catalog::PhotoCatalog;
 use crate::face_admin::{MAX_HOUSEHOLD_MEMBERS, validate_person_name};
 use crate::photos::PhotoStore;
@@ -24,6 +24,10 @@ use crate::upload_flow::{UploadGrant, UploadRequest, upload_grant};
 pub const REQUIRED_ENROLLMENT_PHOTOS: u32 = 5;
 const ENROLLMENT_DAYS_EXEMPT: u32 = REQUIRED_ENROLLMENT_PHOTOS;
 const MANUAL_MIN_DAYS: u32 = 3;
+
+/// Whether a person in the grid has a login of their own.
+pub const ACCOUNT_LINKED: &str = "linked";
+pub const ACCOUNT_NONE: &str = "none";
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct SignupRequest {
@@ -39,6 +43,8 @@ pub struct HouseholdSummary {
     pub grid_size: u32,
     /// The member representing the signed-in user, when onboarding created one.
     pub self_person_id: Option<String>,
+    /// The signed-in account's standing here: `admin` or `member`.
+    pub role: String,
     pub people: Vec<HouseholdPerson>,
 }
 
@@ -46,6 +52,12 @@ pub struct HouseholdSummary {
 pub struct HouseholdPerson {
     pub id: String,
     pub display_name: String,
+    /// Set when this person is linked to an account; people in the grid who
+    /// have no login of their own have no role.
+    pub role: Option<String>,
+    /// `linked` when this person has a user account, `none` otherwise. The
+    /// invite flow hangs off this.
+    pub account: String,
     pub enrollment: EnrollmentSummary,
 }
 
@@ -54,6 +66,12 @@ pub struct EnrollmentSummary {
     pub enrolled: bool,
     pub enrolled_photos: u32,
     pub required_photos: u32,
+}
+
+/// Renaming a household is an administrator action.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct RenameHouseholdRequest {
+    pub display_name: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -81,6 +99,8 @@ pub enum OnboardingError {
     UsernameTaken,
     NoHousehold,
     HouseholdFull,
+    /// The action needs the `admin` role on the household.
+    Forbidden,
     PersonNotInHousehold,
     Invalid(String),
     #[cfg(feature = "image-processing")]
@@ -91,7 +111,7 @@ pub enum OnboardingError {
 impl OnboardingError {
     pub fn status_code(&self) -> StatusCode {
         match self {
-            Self::Disabled => StatusCode::FORBIDDEN,
+            Self::Disabled | Self::Forbidden => StatusCode::FORBIDDEN,
             Self::UsernameTaken | Self::NoHousehold | Self::HouseholdFull => StatusCode::CONFLICT,
             Self::PersonNotInHousehold => StatusCode::NOT_FOUND,
             Self::Invalid(_) => StatusCode::BAD_REQUEST,
@@ -110,6 +130,7 @@ impl OnboardingError {
                     .to_owned()
             }
             Self::HouseholdFull => "This household is already full".to_owned(),
+            Self::Forbidden => "Only a household administrator can do that".to_owned(),
             Self::PersonNotInHousehold => "That person is not in your household".to_owned(),
             Self::Invalid(message) => message.clone(),
             #[cfg(feature = "image-processing")]
@@ -177,11 +198,19 @@ pub async fn signup(
                 .link_household(&user.id, &household_id, &person_id)
                 .await
             {
-                Ok(()) => Ok(User {
-                    household_id: Some(household_id),
-                    person_id: Some(person_id),
-                    ..user
-                }),
+                // The account that creates a household administers it.
+                Ok(()) => match auth.set_household_role(&user.id, ROLE_ADMIN).await {
+                    Ok(()) => Ok(User {
+                        household_id: Some(household_id),
+                        person_id: Some(person_id),
+                        household_role: ROLE_ADMIN.to_owned(),
+                        ..user
+                    }),
+                    Err(error) => {
+                        let _ = auth.delete_user(&user.id).await;
+                        Err(storage(error))
+                    }
+                },
                 Err(error) => {
                     let _ = auth.delete_user(&user.id).await;
                     Err(storage(error))
@@ -264,6 +293,8 @@ async fn add_person(
     Ok(HouseholdPerson {
         id,
         display_name,
+        role: None,
+        account: ACCOUNT_NONE.to_owned(),
         enrollment: EnrollmentSummary {
             enrolled: false,
             enrolled_photos: 0,
@@ -284,6 +315,7 @@ fn household_of(user: &User) -> Result<&str, OnboardingError> {
 
 pub async fn household_for_user(
     queue: &ProcessingQueue,
+    auth: &AuthStore,
     user: &User,
 ) -> Result<HouseholdSummary, OnboardingError> {
     let household_id = household_of(user)?;
@@ -325,12 +357,30 @@ pub async fn household_for_user(
     }
     drop(rows);
 
+    // Roles live on the account, and accounts live in the auth database,
+    // which is a separate file in tests. Resolve them with their own query.
+    let roles = auth
+        .household_account_roles(household_id)
+        .await
+        .map_err(storage)?;
+
     let mut people = Vec::with_capacity(members.len());
     for (id, display_name) in members {
         let enrollment = enrollment_summary(&connection, &pipeline, &id).await?;
+        let role = roles
+            .iter()
+            .find(|(person_id, _)| *person_id == id)
+            .map(|(_, role)| role.clone());
         people.push(HouseholdPerson {
             id,
             display_name,
+            account: if role.is_some() {
+                ACCOUNT_LINKED
+            } else {
+                ACCOUNT_NONE
+            }
+            .to_owned(),
+            role,
             enrollment,
         });
     }
@@ -339,16 +389,759 @@ pub async fn household_for_user(
         display_name,
         grid_size,
         self_person_id: user.person_id.clone(),
+        role: user.household_role.clone(),
         people,
     })
 }
 
+/// Rename the household. Only an administrator may do this; the validation
+/// matches every other 1-80 character display name on this server.
+pub async fn rename_household(
+    queue: &ProcessingQueue,
+    auth: &AuthStore,
+    user: &User,
+    display_name: &str,
+) -> Result<HouseholdSummary, OnboardingError> {
+    let household_id = household_of(user)?.to_owned();
+    if user.household_role != ROLE_ADMIN {
+        return Err(OnboardingError::Forbidden);
+    }
+    queue
+        .rename_household(&household_id, display_name)
+        .await
+        .map_err(|error| match error.kind() {
+            io::ErrorKind::NotFound => OnboardingError::NoHousehold,
+            _ => storage(error),
+        })?;
+    household_for_user(queue, auth, user).await
+}
+
+// --- Administrator linkage -------------------------------------------------
+//
+// Accounts created before onboarding existed have a NULL `users.household_id`
+// and therefore no household at all, even though the deployment already has
+// households and people created by the face tooling. `link-household` surveys
+// that state and, on request, joins the two together.
+
+/// One household as the linking survey sees it.
+#[derive(Clone, Debug, Serialize)]
+pub struct HouseholdListing {
+    pub id: String,
+    pub display_name: String,
+    pub grid_size: u32,
+    /// People seated in the grid, in position order.
+    pub members: Vec<String>,
+    /// Usernames of the accounts linked to this household.
+    pub accounts: Vec<String>,
+    /// Cameras paired into this household.
+    pub devices: u32,
+    /// Accounts bound by the legacy `household_users` pairing table.
+    pub legacy_users: u32,
+}
+
+/// A person row that could stand for this account.
+#[derive(Clone, Debug, Serialize)]
+pub struct PersonCandidate {
+    pub id: String,
+    pub display_name: String,
+    /// Whether the person is already seated in a household.
+    pub household_id: Option<String>,
+}
+
+/// The account's current linkage, before anything is changed.
+#[derive(Clone, Debug, Serialize)]
+pub struct AccountLinkage {
+    pub user_id: String,
+    pub username: String,
+    pub display_name: String,
+    pub household_id: Option<String>,
+    pub person_id: Option<String>,
+    pub role: String,
+    /// The household the legacy pairing table binds this account to.
+    pub legacy_household_id: Option<String>,
+}
+
+/// What `link-household` was asked to do.
+#[derive(Clone, Debug, Default)]
+pub struct LinkRequest {
+    pub household_id: Option<String>,
+    pub person_id: Option<String>,
+    pub role: Option<String>,
+    pub name: Option<String>,
+    pub new_person: bool,
+    /// Other people who should be seated in this household, by display name.
+    pub members: Vec<String>,
+    /// Create any of `members` that has no `people` row yet.
+    pub create_missing: bool,
+}
+
+/// The household and person the request resolves to, plus the steps that
+/// applying it would take. Producing this changes nothing.
+#[derive(Clone, Debug, Serialize)]
+pub struct LinkPlan {
+    pub household_id: String,
+    pub household_name: String,
+    pub person: PlannedPerson,
+    pub role: String,
+    pub rename_to: Option<String>,
+    /// Extra people to seat, in the order they were requested.
+    pub members: Vec<PlannedPerson>,
+    /// Set when the grid must widen to fit everyone.
+    pub grid_size_to: Option<u32>,
+    pub steps: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub enum PlannedPerson {
+    Existing { id: String, display_name: String },
+    Create { display_name: String },
+}
+
+/// What actually changed, so a re-run can report "nothing to do".
+#[derive(Clone, Debug, Serialize)]
+pub struct LinkOutcome {
+    pub household_id: String,
+    pub person_id: String,
+    pub role: String,
+    pub changes: Vec<String>,
+}
+
+pub async fn survey_households(
+    queue: &ProcessingQueue,
+    auth: &AuthStore,
+) -> Result<Vec<HouseholdListing>, OnboardingError> {
+    queue.ensure_schema().await.map_err(storage)?;
+    let connection = queue.catalog.connection().await.map_err(storage)?;
+    // `devices` and `household_users` belong to the pairing schema, which may
+    // not exist yet on a deployment that has never paired a camera.
+    let paired = table_exists(&connection, "devices").await?;
+    let legacy = table_exists(&connection, "household_users").await?;
+    let mut rows = connection
+        .query(
+            "SELECT id, display_name, grid_size FROM households ORDER BY created_at, id",
+            (),
+        )
+        .await
+        .map_err(other)?;
+    let mut listings = Vec::new();
+    while let Some(row) = rows.next().await.map_err(other)? {
+        listings.push(HouseholdListing {
+            id: row.get(0).map_err(other)?,
+            display_name: row.get(1).map_err(other)?,
+            grid_size: u32::try_from(row.get::<i64>(2).map_err(other)?).unwrap_or(0),
+            members: Vec::new(),
+            accounts: Vec::new(),
+            devices: 0,
+            legacy_users: 0,
+        });
+    }
+    drop(rows);
+    for listing in &mut listings {
+        let mut rows = connection
+            .query(
+                "SELECT people.display_name
+                 FROM household_members
+                 JOIN people ON people.id = household_members.person_id
+                 WHERE household_members.household_id = ?1
+                 ORDER BY household_members.position",
+                params![listing.id.clone()],
+            )
+            .await
+            .map_err(other)?;
+        while let Some(row) = rows.next().await.map_err(other)? {
+            listing.members.push(row.get(0).map_err(other)?);
+        }
+        drop(rows);
+        listing.accounts = auth
+            .household_usernames(&listing.id)
+            .await
+            .map_err(storage)?;
+        if paired {
+            listing.devices = count_for_household(
+                &connection,
+                "SELECT COUNT(*) FROM devices
+                 WHERE household_id = ?1 AND released_at IS NULL",
+                &listing.id,
+            )
+            .await?;
+        }
+        if legacy {
+            listing.legacy_users = count_for_household(
+                &connection,
+                "SELECT COUNT(*) FROM household_users WHERE household_id = ?1",
+                &listing.id,
+            )
+            .await?;
+        }
+    }
+    Ok(listings)
+}
+
+/// Current linkage for one account, including the legacy pairing binding.
+pub async fn account_linkage(
+    queue: &ProcessingQueue,
+    user: &User,
+) -> Result<AccountLinkage, OnboardingError> {
+    queue.ensure_schema().await.map_err(storage)?;
+    let connection = queue.catalog.connection().await.map_err(storage)?;
+    let legacy_household_id = if table_exists(&connection, "household_users").await? {
+        let mut rows = connection
+            .query(
+                "SELECT household_id FROM household_users WHERE user_id = ?1",
+                params![user.id.clone()],
+            )
+            .await
+            .map_err(other)?;
+        match rows.next().await.map_err(other)? {
+            Some(row) => Some(row.get::<String>(0).map_err(other)?),
+            None => None,
+        }
+    } else {
+        None
+    };
+    Ok(AccountLinkage {
+        user_id: user.id.clone(),
+        username: user.username.clone(),
+        display_name: user.display_name.clone(),
+        household_id: user.household_id.clone(),
+        person_id: user.person_id.clone(),
+        role: user.household_role.clone(),
+        legacy_household_id,
+    })
+}
+
+/// People whose name matches the account's display name or username, ignoring
+/// case. These are the rows the face tooling is likely to have created.
+pub async fn person_candidates(
+    queue: &ProcessingQueue,
+    user: &User,
+) -> Result<Vec<PersonCandidate>, OnboardingError> {
+    queue.ensure_schema().await.map_err(storage)?;
+    let connection = queue.catalog.connection().await.map_err(storage)?;
+    let mut rows = connection
+        .query(
+            "SELECT people.id, people.display_name,
+                    (SELECT household_id FROM household_members
+                     WHERE household_members.person_id = people.id LIMIT 1)
+             FROM people
+             WHERE people.display_name = ?1 COLLATE NOCASE
+                OR people.display_name = ?2 COLLATE NOCASE
+             ORDER BY people.display_name COLLATE NOCASE, people.id",
+            params![user.display_name.clone(), user.username.clone()],
+        )
+        .await
+        .map_err(other)?;
+    let mut candidates = Vec::new();
+    while let Some(row) = rows.next().await.map_err(other)? {
+        candidates.push(PersonCandidate {
+            id: row.get(0).map_err(other)?,
+            display_name: row.get(1).map_err(other)?,
+            household_id: row.get(2).map_err(other)?,
+        });
+    }
+    Ok(candidates)
+}
+
+/// People whose display name matches exactly, ignoring case.
+pub async fn people_named(
+    queue: &ProcessingQueue,
+    name: &str,
+) -> Result<Vec<PersonCandidate>, OnboardingError> {
+    let connection = queue.catalog.connection().await.map_err(storage)?;
+    let mut rows = connection
+        .query(
+            "SELECT people.id, people.display_name,
+                    (SELECT household_id FROM household_members
+                     WHERE household_members.person_id = people.id LIMIT 1)
+             FROM people WHERE people.display_name = ?1 COLLATE NOCASE
+             ORDER BY people.id",
+            params![name],
+        )
+        .await
+        .map_err(other)?;
+    let mut candidates = Vec::new();
+    while let Some(row) = rows.next().await.map_err(other)? {
+        candidates.push(PersonCandidate {
+            id: row.get(0).map_err(other)?,
+            display_name: row.get(1).map_err(other)?,
+            household_id: row.get(2).map_err(other)?,
+        });
+    }
+    Ok(candidates)
+}
+
+/// Resolve one requested member name to exactly one person, or refuse.
+async fn resolve_member(
+    queue: &ProcessingQueue,
+    name: &str,
+    create_missing: bool,
+) -> Result<PlannedPerson, OnboardingError> {
+    let name = validate_person_name(name).map_err(storage)?;
+    match people_named(queue, &name).await?.as_slice() {
+        [only] => Ok(PlannedPerson::Existing {
+            id: only.id.clone(),
+            display_name: only.display_name.clone(),
+        }),
+        [] if create_missing => Ok(PlannedPerson::Create { display_name: name }),
+        [] => Err(OnboardingError::Invalid(format!(
+            "no person is named \"{name}\"; pass --create-missing to create them"
+        ))),
+        many => Err(OnboardingError::Invalid(format!(
+            "{} people are named \"{name}\"; resolve it by hand (ids: {})",
+            many.len(),
+            many.iter()
+                .map(|candidate| candidate.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))),
+    }
+}
+
+/// Resolve the request into an exact plan, refusing rather than guessing when
+/// the choice is ambiguous. This reads only.
+pub async fn plan_link_household(
+    queue: &ProcessingQueue,
+    auth: &AuthStore,
+    user: &User,
+    request: &LinkRequest,
+) -> Result<LinkPlan, OnboardingError> {
+    let households = survey_households(queue, auth).await?;
+    let household = match request.household_id.as_deref() {
+        Some(id) => households
+            .iter()
+            .find(|listing| listing.id == id)
+            .ok_or_else(|| OnboardingError::Invalid(format!("no household {id}")))?
+            .clone(),
+        None => match households.as_slice() {
+            [only] => only.clone(),
+            [] => {
+                return Err(OnboardingError::Invalid(
+                    "this deployment has no households; create one first".to_owned(),
+                ));
+            }
+            many => {
+                return Err(OnboardingError::Invalid(format!(
+                    "{} households exist; pass --household-id (one of: {})",
+                    many.len(),
+                    many.iter()
+                        .map(|listing| listing.id.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+        },
+    };
+
+    let candidates = person_candidates(queue, user).await?;
+    let person = match request.person_id.as_deref() {
+        Some(id) => {
+            let display_name = person_name(queue, id)
+                .await?
+                .ok_or_else(|| OnboardingError::Invalid(format!("no person {id}")))?;
+            PlannedPerson::Existing {
+                id: id.to_owned(),
+                display_name,
+            }
+        }
+        None if request.new_person => PlannedPerson::Create {
+            display_name: user.display_name.clone(),
+        },
+        None => match candidates.as_slice() {
+            [only] => PlannedPerson::Existing {
+                id: only.id.clone(),
+                display_name: only.display_name.clone(),
+            },
+            [] => {
+                return Err(OnboardingError::Invalid(format!(
+                    "no person matches \"{}\" or \"{}\"; pass --person-id or --new-person",
+                    user.display_name, user.username
+                )));
+            }
+            many => {
+                return Err(OnboardingError::Invalid(format!(
+                    "{} people match; pass --person-id (one of: {})",
+                    many.len(),
+                    many.iter()
+                        .map(|candidate| candidate.id.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+        },
+    };
+
+    let role = match request.role.as_deref() {
+        Some(role) => validate_household_role(role).map_err(storage)?,
+        None if user.household_role == ROLE_ADMIN => ROLE_ADMIN.to_owned(),
+        None => ROLE_MEMBER.to_owned(),
+    };
+    let rename_to = match request.name.as_deref() {
+        Some(name) => {
+            let name = validate_person_name(name).map_err(storage)?;
+            (name != household.display_name).then_some(name)
+        }
+        None => None,
+    };
+
+    // Other members of the house, resolved the same strict way.
+    let mut members = Vec::new();
+    for name in &request.members {
+        let planned = resolve_member(queue, name, request.create_missing).await?;
+        // The account's own person is already handled above.
+        let duplicate = match (&planned, &person) {
+            (PlannedPerson::Existing { id, .. }, PlannedPerson::Existing { id: own, .. }) => {
+                id == own
+            }
+            (
+                PlannedPerson::Create { display_name },
+                PlannedPerson::Create { display_name: own },
+            ) => display_name.eq_ignore_ascii_case(own),
+            _ => false,
+        };
+        if !duplicate
+            && !members
+                .iter()
+                .any(|existing| same_person(existing, &planned))
+        {
+            members.push(planned);
+        }
+    }
+
+    let linkage = account_linkage(queue, user).await?;
+    let mut steps = Vec::new();
+    let mut seats = household.members.len();
+    match &person {
+        PlannedPerson::Create { display_name } => {
+            steps.push(format!(
+                "create person \"{display_name}\" and seat them in {}",
+                household.id
+            ));
+            seats += 1;
+        }
+        PlannedPerson::Existing { id, .. } => {
+            if !is_seated(queue, &household.id, id).await? {
+                steps.push(format!("seat person {id} in {}", household.id));
+                seats += 1;
+            }
+        }
+    }
+    for planned in &members {
+        match planned {
+            PlannedPerson::Create { display_name } => {
+                steps.push(format!("create person \"{display_name}\" and seat them"));
+                seats += 1;
+            }
+            PlannedPerson::Existing { id, display_name } => {
+                if !is_seated(queue, &household.id, id).await? {
+                    steps.push(format!("seat \"{display_name}\" ({id})"));
+                    seats += 1;
+                }
+            }
+        }
+    }
+    // The grid column only accepts 4 or 6, and six is the hard ceiling.
+    let grid_size_to = if seats > household.grid_size as usize {
+        if seats > MAX_HOUSEHOLD_MEMBERS {
+            return Err(OnboardingError::HouseholdFull);
+        }
+        steps.push(format!(
+            "widen the grid from {} to 6 to fit {seats} people",
+            household.grid_size
+        ));
+        Some(6)
+    } else {
+        if seats == household.grid_size as usize {
+            steps.push(format!(
+                "note: {seats} people exactly fill this {}-person grid",
+                household.grid_size
+            ));
+        }
+        None
+    };
+    if linkage.household_id.as_deref() != Some(household.id.as_str()) {
+        steps.push(format!("set users.household_id = {}", household.id));
+    }
+    if let PlannedPerson::Existing { id, .. } = &person
+        && linkage.person_id.as_deref() != Some(id.as_str())
+    {
+        steps.push(format!("set users.person_id = {id}"));
+    }
+    if linkage.role != role {
+        steps.push(format!("set users.household_role = {role}"));
+    }
+    if linkage.legacy_household_id.as_deref() != Some(household.id.as_str()) {
+        steps.push(format!(
+            "point household_users at {} (was {})",
+            household.id,
+            linkage.legacy_household_id.as_deref().unwrap_or("none")
+        ));
+    }
+    if let Some(name) = &rename_to {
+        steps.push(format!(
+            "rename household to \"{name}\" (was \"{}\")",
+            household.display_name
+        ));
+    }
+    if steps.is_empty() {
+        steps.push("nothing to do; this account is already linked".to_owned());
+    }
+    Ok(LinkPlan {
+        household_id: household.id,
+        household_name: household.display_name,
+        person,
+        role,
+        rename_to,
+        members,
+        grid_size_to,
+        steps,
+    })
+}
+
+fn same_person(left: &PlannedPerson, right: &PlannedPerson) -> bool {
+    match (left, right) {
+        (PlannedPerson::Existing { id, .. }, PlannedPerson::Existing { id: other, .. }) => {
+            id == other
+        }
+        (
+            PlannedPerson::Create { display_name },
+            PlannedPerson::Create {
+                display_name: other,
+            },
+        ) => display_name.eq_ignore_ascii_case(other),
+        _ => false,
+    }
+}
+
+/// Execute the plan. Every step is idempotent, so a re-run is a no-op.
+///
+/// The catalog and the auth store are two databases, so this cannot be one
+/// transaction; the catalog seat is written transactionally and the account
+/// columns follow, which is the order a partial failure can be re-run from.
+pub async fn apply_link_household(
+    queue: &ProcessingQueue,
+    auth: &AuthStore,
+    devices: &crate::devices::DeviceRegistry,
+    user: &User,
+    request: &LinkRequest,
+) -> Result<LinkOutcome, OnboardingError> {
+    let plan = plan_link_household(queue, auth, user, request).await?;
+    let linkage = account_linkage(queue, user).await?;
+    let mut changes = Vec::new();
+
+    // Widen the grid before seating anyone, so the seat inserts cannot hit the
+    // household-full check on the way in.
+    if let Some(grid_size) = plan.grid_size_to {
+        queue
+            .set_grid_size(&plan.household_id, grid_size)
+            .await
+            .map_err(storage)?;
+        changes.push(format!("widened the grid to {grid_size}"));
+    }
+
+    let person_id = match &plan.person {
+        PlannedPerson::Create { display_name } => {
+            let person = add_person(queue, &plan.household_id, display_name).await?;
+            changes.push(format!(
+                "created person {} (\"{}\")",
+                person.id, person.display_name
+            ));
+            person.id
+        }
+        PlannedPerson::Existing { id, .. } => {
+            if seat_person(queue, &plan.household_id, id).await? {
+                changes.push(format!("seated person {id} in {}", plan.household_id));
+            }
+            id.clone()
+        }
+    };
+
+    if linkage.household_id.as_deref() != Some(plan.household_id.as_str())
+        || linkage.person_id.as_deref() != Some(person_id.as_str())
+    {
+        auth.link_household(&user.id, &plan.household_id, &person_id)
+            .await
+            .map_err(storage)?;
+        changes.push(format!(
+            "linked account to household {} and person {person_id}",
+            plan.household_id
+        ));
+    }
+    if linkage.role != plan.role {
+        auth.set_household_role(&user.id, &plan.role)
+            .await
+            .map_err(storage)?;
+        changes.push(format!("set role to {}", plan.role));
+    }
+    if linkage.legacy_household_id.as_deref() != Some(plan.household_id.as_str()) {
+        devices
+            .bind_user_to_household(&user.id, &plan.household_id)
+            .await
+            .map_err(storage)?;
+        changes.push(format!(
+            "moved the pairing binding to {}",
+            plan.household_id
+        ));
+    }
+    for planned in &plan.members {
+        match planned {
+            PlannedPerson::Create { display_name } => {
+                let person = add_person(queue, &plan.household_id, display_name).await?;
+                changes.push(format!(
+                    "created and seated \"{}\" ({})",
+                    person.display_name, person.id
+                ));
+            }
+            PlannedPerson::Existing { id, display_name } => {
+                if seat_person(queue, &plan.household_id, id).await? {
+                    changes.push(format!("seated \"{display_name}\" ({id})"));
+                }
+            }
+        }
+    }
+    if let Some(name) = &plan.rename_to {
+        queue
+            .rename_household(&plan.household_id, name)
+            .await
+            .map_err(storage)?;
+        changes.push(format!("renamed the household to \"{name}\""));
+    }
+    Ok(LinkOutcome {
+        household_id: plan.household_id,
+        person_id,
+        role: plan.role,
+        changes,
+    })
+}
+
+/// Seat an existing person in a household. Returns whether a seat was added.
+async fn seat_person(
+    queue: &ProcessingQueue,
+    household_id: &str,
+    person_id: &str,
+) -> Result<bool, OnboardingError> {
+    queue.ensure_schema().await.map_err(storage)?;
+    let connection = queue.catalog.connection().await.map_err(storage)?;
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .await
+        .map_err(other)?;
+    let mut rows = transaction
+        .query(
+            "SELECT COUNT(*), COALESCE(MAX(position), -1),
+                    (SELECT grid_size FROM households WHERE id = ?1),
+                    (SELECT COUNT(*) FROM household_members
+                     WHERE household_id = ?1 AND person_id = ?2)
+             FROM household_members WHERE household_id = ?1",
+            params![household_id, person_id],
+        )
+        .await
+        .map_err(other)?;
+    let row =
+        rows.next().await.map_err(other)?.ok_or_else(|| {
+            OnboardingError::Storage(io::Error::other("household count is empty"))
+        })?;
+    let members: i64 = row.get(0).map_err(other)?;
+    let next_position: i64 = row.get::<i64>(1).map_err(other)? + 1;
+    let grid_size: Option<i64> = row.get(2).map_err(other)?;
+    let seated: i64 = row.get(3).map_err(other)?;
+    drop(rows);
+    if grid_size.is_none() {
+        return Err(OnboardingError::NoHousehold);
+    }
+    if seated > 0 {
+        return Ok(false);
+    }
+    let grid_size = grid_size.unwrap_or_default();
+    if members >= grid_size || members >= MAX_HOUSEHOLD_MEMBERS as i64 {
+        return Err(OnboardingError::HouseholdFull);
+    }
+    transaction
+        .execute(
+            "INSERT INTO household_members (household_id, person_id, position)
+             VALUES (?1, ?2, ?3)",
+            params![household_id, person_id, next_position],
+        )
+        .await
+        .map_err(other)?;
+    transaction.commit().await.map_err(other)?;
+    Ok(true)
+}
+
+async fn is_seated(
+    queue: &ProcessingQueue,
+    household_id: &str,
+    person_id: &str,
+) -> Result<bool, OnboardingError> {
+    let connection = queue.catalog.connection().await.map_err(storage)?;
+    let mut rows = connection
+        .query(
+            "SELECT 1 FROM household_members WHERE household_id = ?1 AND person_id = ?2",
+            params![household_id, person_id],
+        )
+        .await
+        .map_err(other)?;
+    Ok(rows.next().await.map_err(other)?.is_some())
+}
+
+async fn person_name(
+    queue: &ProcessingQueue,
+    person_id: &str,
+) -> Result<Option<String>, OnboardingError> {
+    let connection = queue.catalog.connection().await.map_err(storage)?;
+    let mut rows = connection
+        .query(
+            "SELECT display_name FROM people WHERE id = ?1",
+            params![person_id],
+        )
+        .await
+        .map_err(other)?;
+    match rows.next().await.map_err(other)? {
+        Some(row) => Ok(Some(row.get(0).map_err(other)?)),
+        None => Ok(None),
+    }
+}
+
+async fn table_exists(
+    connection: &libsql::Connection,
+    name: &str,
+) -> Result<bool, OnboardingError> {
+    let mut rows = connection
+        .query(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1",
+            params![name],
+        )
+        .await
+        .map_err(other)?;
+    Ok(rows.next().await.map_err(other)?.is_some())
+}
+
+async fn count_for_household(
+    connection: &libsql::Connection,
+    statement: &str,
+    household_id: &str,
+) -> Result<u32, OnboardingError> {
+    let mut rows = connection
+        .query(statement, params![household_id])
+        .await
+        .map_err(other)?;
+    let Some(row) = rows.next().await.map_err(other)? else {
+        return Ok(0);
+    };
+    Ok(u32::try_from(row.get::<i64>(0).map_err(other)?).unwrap_or(0))
+}
+
+/// Adding a person changes who the cameras recognise, so it is an
+/// administrator action, like renaming. Signup makes the account that creates
+/// a household its administrator, so first-run onboarding is unaffected.
 pub async fn add_household_person(
     queue: &ProcessingQueue,
     user: &User,
     display_name: &str,
 ) -> Result<HouseholdPerson, OnboardingError> {
     let household_id = household_of(user)?.to_owned();
+    if user.household_role != ROLE_ADMIN {
+        return Err(OnboardingError::Forbidden);
+    }
     add_person(queue, &household_id, display_name).await
 }
 
@@ -385,6 +1178,11 @@ pub async fn create_enrollment_upload(
     request: &UploadRequest,
 ) -> Result<UploadGrant, OnboardingError> {
     require_membership(queue, user, person_id).await?;
+    // Enrollment captures come from the phone in the owner's hand, so that is
+    // the default source when the app does not say otherwise.
+    let capture = request
+        .validated_capture("phone")
+        .map_err(|error| OnboardingError::Invalid(error.to_string()))?;
     let storage_key = store
         .storage_key(&request.capture_id)
         .map_err(|error| OnboardingError::Invalid(error.to_string()))?;
@@ -394,6 +1192,7 @@ pub async fn create_enrollment_upload(
             &storage_key,
             request.content_length,
             person_id,
+            &capture,
         )
         .await
         .map_err(storage)?;
@@ -650,6 +1449,7 @@ mod tests {
                 capture_id: id.to_owned(),
                 content_type: "image/jpeg".to_owned(),
                 content_length: 4,
+                ..Default::default()
             },
         )
         .await
@@ -675,6 +1475,363 @@ mod tests {
             .unwrap();
     }
 
+    /// A pre-onboarding account: it exists, but nothing points it at the
+    /// households and people the face tooling already created.
+    async fn legacy_setup(fixture: &Fixture, name: &str) -> (User, String, String) {
+        let user = fixture
+            .auth
+            .create_user("drew", name, "a-good-test-password")
+            .await
+            .unwrap();
+        let household = fixture.queue.create_household("Home", 4).await.unwrap();
+        let person = fixture.queue.create_person(name).await.unwrap();
+        (user, household.id, person.id)
+    }
+
+    #[tokio::test]
+    async fn signup_makes_the_creating_account_an_administrator() {
+        let fixture = Fixture::new("role").await;
+        let user = fixture.signup("drew").await;
+        assert_eq!(user.household_role, ROLE_ADMIN);
+        let stored = fixture
+            .auth
+            .user_by_username("drew")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.household_role, ROLE_ADMIN);
+
+        let summary = household_for_user(&fixture.queue, &fixture.auth, &stored)
+            .await
+            .unwrap();
+        assert_eq!(summary.role, ROLE_ADMIN);
+        // The person representing the account carries the account's role; a
+        // person added to the grid without a login carries none.
+        assert_eq!(summary.people[0].role.as_deref(), Some(ROLE_ADMIN));
+        add_household_person(&fixture.queue, &stored, "Sam")
+            .await
+            .unwrap();
+        let summary = household_for_user(&fixture.queue, &fixture.auth, &stored)
+            .await
+            .unwrap();
+        assert_eq!(summary.people[1].role, None);
+        fixture.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn only_an_administrator_can_rename_the_household() {
+        let fixture = Fixture::new("rename").await;
+        let admin = fixture.signup("drew").await;
+        let summary = rename_household(&fixture.queue, &fixture.auth, &admin, "  Hirschi  ")
+            .await
+            .unwrap();
+        assert_eq!(summary.display_name, "Hirschi");
+
+        let member = User {
+            household_role: ROLE_MEMBER.to_owned(),
+            ..admin.clone()
+        };
+        let refused = rename_household(&fixture.queue, &fixture.auth, &member, "Nope")
+            .await
+            .unwrap_err();
+        assert!(matches!(refused, OnboardingError::Forbidden));
+        assert_eq!(refused.status_code(), StatusCode::FORBIDDEN);
+        assert!(matches!(
+            rename_household(&fixture.queue, &fixture.auth, &admin, "  ").await,
+            Err(OnboardingError::Invalid(_))
+        ));
+        assert_eq!(
+            household_for_user(&fixture.queue, &fixture.auth, &admin)
+                .await
+                .unwrap()
+                .display_name,
+            "Hirschi"
+        );
+        fixture.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn a_link_dry_run_reports_the_plan_and_changes_nothing() {
+        let fixture = Fixture::new("link-dry").await;
+        let (user, household_id, person_id) = legacy_setup(&fixture, "Drew").await;
+
+        let households = survey_households(&fixture.queue, &fixture.auth)
+            .await
+            .unwrap();
+        assert_eq!(households.len(), 1);
+        assert!(households[0].members.is_empty());
+        assert!(households[0].accounts.is_empty());
+        assert_eq!(households[0].devices, 0);
+
+        let candidates = person_candidates(&fixture.queue, &user).await.unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].id, person_id);
+        assert_eq!(candidates[0].household_id, None);
+
+        let plan = plan_link_household(
+            &fixture.queue,
+            &fixture.auth,
+            &user,
+            &LinkRequest {
+                role: Some("admin".to_owned()),
+                name: Some("Hirschi".to_owned()),
+                ..LinkRequest::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(plan.household_id, household_id);
+        assert_eq!(plan.role, ROLE_ADMIN);
+        assert_eq!(plan.rename_to.as_deref(), Some("Hirschi"));
+        assert!(matches!(&plan.person, PlannedPerson::Existing { id, .. } if *id == person_id));
+        assert_eq!(plan.steps.len(), 6, "{:?}", plan.steps);
+
+        // Nothing was written.
+        let stored = fixture
+            .auth
+            .user_by_username("drew")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.household_id, None);
+        assert_eq!(stored.household_role, ROLE_MEMBER);
+        assert_eq!(
+            survey_households(&fixture.queue, &fixture.auth)
+                .await
+                .unwrap()[0]
+                .members
+                .len(),
+            0
+        );
+        fixture.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn linking_a_pre_onboarding_account_is_idempotent() {
+        let fixture = Fixture::new("link-apply").await;
+        let (user, household_id, person_id) = legacy_setup(&fixture, "Drew").await;
+        let devices = crate::devices::DeviceRegistry::new(fixture.queue.clone());
+        let request = LinkRequest {
+            role: Some("admin".to_owned()),
+            name: Some("Hirschi".to_owned()),
+            ..LinkRequest::default()
+        };
+
+        let outcome =
+            apply_link_household(&fixture.queue, &fixture.auth, &devices, &user, &request)
+                .await
+                .unwrap();
+        assert_eq!(outcome.household_id, household_id);
+        assert_eq!(outcome.person_id, person_id);
+        assert_eq!(outcome.role, ROLE_ADMIN);
+        assert_eq!(outcome.changes.len(), 5, "{:?}", outcome.changes);
+
+        let linked = fixture
+            .auth
+            .user_by_username("drew")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(linked.household_id.as_deref(), Some(household_id.as_str()));
+        assert_eq!(linked.person_id.as_deref(), Some(person_id.as_str()));
+        assert_eq!(linked.household_role, ROLE_ADMIN);
+        // Device pairing now resolves to the very same household.
+        assert_eq!(
+            devices.household_for_user(&linked).await.unwrap(),
+            household_id
+        );
+        let summary = household_for_user(&fixture.queue, &fixture.auth, &linked)
+            .await
+            .unwrap();
+        assert_eq!(summary.display_name, "Hirschi");
+        assert_eq!(summary.role, ROLE_ADMIN);
+        assert_eq!(summary.self_person_id.as_deref(), Some(person_id.as_str()));
+        assert_eq!(summary.people.len(), 1);
+
+        // A second run finds everything already in place.
+        let again =
+            apply_link_household(&fixture.queue, &fixture.auth, &devices, &linked, &request)
+                .await
+                .unwrap();
+        assert!(again.changes.is_empty(), "{:?}", again.changes);
+        assert_eq!(
+            household_for_user(&fixture.queue, &fixture.auth, &linked)
+                .await
+                .unwrap()
+                .people
+                .len(),
+            1
+        );
+        fixture.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn linking_seats_the_named_members_and_widens_the_grid() {
+        let fixture = Fixture::new("link-members").await;
+        let (user, household_id, drew) = legacy_setup(&fixture, "Drew").await;
+        // The face tooling already knows these people.
+        for name in ["Carson", "Dean", "Hannah"] {
+            fixture.queue.create_person(name).await.unwrap();
+        }
+        let devices = crate::devices::DeviceRegistry::new(fixture.queue.clone());
+        let request = LinkRequest {
+            role: Some("admin".to_owned()),
+            name: Some("Hirschi".to_owned()),
+            // "Drew" is the account's own person and must not be seated twice.
+            members: ["Carson", "Dean", "Drew", "Hannah"]
+                .map(str::to_owned)
+                .to_vec(),
+            ..LinkRequest::default()
+        };
+
+        let plan = plan_link_household(&fixture.queue, &fixture.auth, &user, &request)
+            .await
+            .unwrap();
+        assert_eq!(plan.members.len(), 3, "{:?}", plan.members);
+        // Four people exactly fill the four-person grid, so no widening.
+        assert_eq!(plan.grid_size_to, None);
+        assert!(
+            plan.steps.iter().any(|step| step.contains("exactly fill")),
+            "{:?}",
+            plan.steps
+        );
+
+        apply_link_household(&fixture.queue, &fixture.auth, &devices, &user, &request)
+            .await
+            .unwrap();
+        let linked = fixture
+            .auth
+            .user_by_username("drew")
+            .await
+            .unwrap()
+            .unwrap();
+        let summary = household_for_user(&fixture.queue, &fixture.auth, &linked)
+            .await
+            .unwrap();
+        assert_eq!(summary.display_name, "Hirschi");
+        let seated = summary
+            .people
+            .iter()
+            .map(|person| person.display_name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(seated, ["Drew", "Carson", "Dean", "Hannah"]);
+        // Only the account holder has a login; the rest are the invite seam.
+        assert_eq!(summary.people[0].id, drew);
+        assert_eq!(summary.people[0].account, ACCOUNT_LINKED);
+        assert!(
+            summary.people[1..]
+                .iter()
+                .all(|person| person.account == ACCOUNT_NONE && person.role.is_none())
+        );
+        assert_eq!(
+            survey_households(&fixture.queue, &fixture.auth)
+                .await
+                .unwrap()[0]
+                .accounts,
+            ["drew"]
+        );
+
+        // A fifth person needs the six-person grid.
+        let widen = LinkRequest {
+            members: vec!["Robin".to_owned()],
+            create_missing: true,
+            ..request.clone()
+        };
+        let plan = plan_link_household(&fixture.queue, &fixture.auth, &linked, &widen)
+            .await
+            .unwrap();
+        assert_eq!(plan.grid_size_to, Some(6));
+        apply_link_household(&fixture.queue, &fixture.auth, &devices, &linked, &widen)
+            .await
+            .unwrap();
+        assert_eq!(
+            household_for_user(&fixture.queue, &fixture.auth, &linked)
+                .await
+                .unwrap()
+                .people
+                .len(),
+            5
+        );
+
+        // An unknown name is refused rather than invented.
+        assert!(matches!(
+            plan_link_household(
+                &fixture.queue,
+                &fixture.auth,
+                &linked,
+                &LinkRequest {
+                    members: vec!["Nobody".to_owned()],
+                    ..LinkRequest::default()
+                },
+            )
+            .await,
+            Err(OnboardingError::Invalid(_))
+        ));
+        assert_eq!(household_id, plan.household_id);
+        fixture.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn linking_refuses_to_guess_when_the_choice_is_ambiguous() {
+        let fixture = Fixture::new("link-ambiguous").await;
+        let (user, _household_id, _person_id) = legacy_setup(&fixture, "Drew").await;
+        // A second household, and a second person with the same name.
+        fixture.queue.create_household("Cabin", 4).await.unwrap();
+        fixture.queue.create_person("drew").await.unwrap();
+
+        let ambiguous = plan_link_household(
+            &fixture.queue,
+            &fixture.auth,
+            &user,
+            &LinkRequest::default(),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(&ambiguous, OnboardingError::Invalid(message)
+                if message.contains("households exist")),
+            "{ambiguous:?}"
+        );
+        assert_eq!(ambiguous.status_code(), StatusCode::BAD_REQUEST);
+
+        // Naming the household leaves the person ambiguous.
+        let households = survey_households(&fixture.queue, &fixture.auth)
+            .await
+            .unwrap();
+        let person_ambiguous = plan_link_household(
+            &fixture.queue,
+            &fixture.auth,
+            &user,
+            &LinkRequest {
+                household_id: Some(households[0].id.clone()),
+                ..LinkRequest::default()
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(&person_ambiguous, OnboardingError::Invalid(message)
+                if message.contains("people match")),
+            "{person_ambiguous:?}"
+        );
+
+        // An unknown id is refused rather than silently ignored.
+        assert!(matches!(
+            plan_link_household(
+                &fixture.queue,
+                &fixture.auth,
+                &user,
+                &LinkRequest {
+                    household_id: Some("not-a-household".to_owned()),
+                    ..LinkRequest::default()
+                },
+            )
+            .await,
+            Err(OnboardingError::Invalid(_))
+        ));
+        fixture.cleanup().await;
+    }
+
     #[tokio::test]
     async fn signup_creates_a_linked_household_and_person() {
         let fixture = Fixture::new("signup").await;
@@ -691,7 +1848,9 @@ mod tests {
         assert_eq!(stored.household_id, Some(household_id.clone()));
         assert_eq!(stored.person_id, Some(person_id.clone()));
 
-        let summary = household_for_user(&fixture.queue, &user).await.unwrap();
+        let summary = household_for_user(&fixture.queue, &fixture.auth, &user)
+            .await
+            .unwrap();
         assert_eq!(summary.id, household_id);
         assert_eq!(summary.self_person_id, Some(person_id.clone()));
         assert_eq!(summary.people.len(), 1);
@@ -725,7 +1884,7 @@ mod tests {
             .await
             .unwrap();
         assert!(matches!(
-            household_for_user(&fixture.queue, &user).await,
+            household_for_user(&fixture.queue, &fixture.auth, &user).await,
             Err(OnboardingError::NoHousehold)
         ));
         assert!(matches!(
@@ -749,7 +1908,9 @@ mod tests {
             add_household_person(&fixture.queue, &user, "Overflow").await,
             Err(OnboardingError::HouseholdFull)
         ));
-        let summary = household_for_user(&fixture.queue, &user).await.unwrap();
+        let summary = household_for_user(&fixture.queue, &fixture.auth, &user)
+            .await
+            .unwrap();
         assert_eq!(summary.people.len(), 4);
         assert!(
             !summary
@@ -766,9 +1927,10 @@ mod tests {
         let user = fixture.signup("drew").await;
         let outsider = fixture.queue.create_person("Stranger").await.unwrap();
         let request = UploadRequest {
-            capture_id: "20260915T120000Z-enrol001".to_owned(),
+            capture_id: "20260915T120000Z-e0001001".to_owned(),
             content_type: "image/jpeg".to_owned(),
             content_length: 4,
+            ..Default::default()
         };
         assert!(matches!(
             create_enrollment_upload(
@@ -803,8 +1965,8 @@ mod tests {
         let fixture = Fixture::new("faces").await;
         let user = fixture.signup("drew").await;
         let person = user.person_id.clone().unwrap();
-        enrol_photo(&fixture, &user, &person, "20260915T120000Z-enrol001", 1).await;
-        enrol_photo(&fixture, &user, &person, "20260915T120100Z-enrol002", 2).await;
+        enrol_photo(&fixture, &user, &person, "20260915T120000Z-e0001001", 1).await;
+        enrol_photo(&fixture, &user, &person, "20260915T120100Z-e0001002", 2).await;
 
         let status = enrollment_status(&fixture.queue, &user, &person)
             .await
@@ -824,7 +1986,7 @@ mod tests {
             .query(
                 "SELECT COUNT(*) FROM faces WHERE photo_id = ?1
                  AND identity_state = 'unknown' AND person_id IS NULL",
-                params!["20260915T120100Z-enrol002"],
+                params!["20260915T120100Z-e0001002"],
             )
             .await
             .unwrap();
@@ -845,7 +2007,7 @@ mod tests {
                 &fixture,
                 &user,
                 &person,
-                &format!("20260915T1200{index:02}Z-enrol00{index}"),
+                &format!("20260915T1200{index:02}Z-e000100{index}"),
                 1,
             )
             .await;
@@ -855,7 +2017,9 @@ mod tests {
             .unwrap();
         assert_eq!(status.enrolled_photos, 5);
         assert!(status.enrolled);
-        let summary = household_for_user(&fixture.queue, &user).await.unwrap();
+        let summary = household_for_user(&fixture.queue, &fixture.auth, &user)
+            .await
+            .unwrap();
         assert!(summary.people[0].enrollment.enrolled);
         fixture.cleanup().await;
     }

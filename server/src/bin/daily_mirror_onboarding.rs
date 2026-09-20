@@ -4,7 +4,8 @@ use std::io;
 
 use server::auth::{AuthStore, User};
 use server::catalog::PhotoCatalog;
-use server::onboarding::{self, SignupRequest};
+use server::devices::DeviceRegistry;
+use server::onboarding::{self, LinkRequest, PlannedPerson, SignupRequest};
 use server::processing::ProcessingQueue;
 
 #[tokio::main]
@@ -50,7 +51,7 @@ async fn main() -> io::Result<()> {
             if args.next().is_some() {
                 return usage();
             }
-            let summary = onboarding::household_for_user(&queue, &user).await?;
+            let summary = onboarding::household_for_user(&queue, &auth, &user).await?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&summary).map_err(io::Error::other)?
@@ -65,8 +66,164 @@ async fn main() -> io::Result<()> {
             let person = onboarding::add_household_person(&queue, &user, &display_name).await?;
             println!("Added {} ({})", person.display_name, person.id);
         }
+        "link-household" => {
+            let user = resolve(&auth, args.next()).await?;
+            let (request, apply) = link_options(args)?;
+            link_household(&auth, &queue, &user, &request, apply).await?;
+        }
         _ => return usage(),
     }
+    Ok(())
+}
+
+/// Parse the flags of `link-household`. Unknown flags are refused rather than
+/// ignored, so a typo never silently turns a dry run into a write.
+fn link_options(mut args: impl Iterator<Item = String>) -> io::Result<(LinkRequest, bool)> {
+    let mut request = LinkRequest::default();
+    let mut apply = false;
+    while let Some(flag) = args.next() {
+        let mut value = || {
+            args.next()
+                .ok_or_else(|| invalid(format!("{flag} needs a value")))
+        };
+        match flag.as_str() {
+            "--household-id" => request.household_id = Some(value()?),
+            "--person-id" => request.person_id = Some(value()?),
+            "--role" => request.role = Some(value()?),
+            "--name" => request.name = Some(value()?),
+            "--new-person" => request.new_person = true,
+            "--members" => {
+                request.members = value()?
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                    .map(str::to_owned)
+                    .collect();
+            }
+            "--create-missing" => request.create_missing = true,
+            "--apply" => apply = true,
+            other => return Err(invalid(format!("unknown option {other}"))),
+        }
+    }
+    Ok((request, apply))
+}
+
+/// Without `--apply` this prints the whole survey and the plan and writes
+/// nothing, so an operator can read it before touching production data.
+async fn link_household(
+    auth: &AuthStore,
+    queue: &ProcessingQueue,
+    user: &User,
+    request: &LinkRequest,
+    apply: bool,
+) -> io::Result<()> {
+    let linkage = onboarding::account_linkage(queue, user).await?;
+    println!("account {} ({})", linkage.username, linkage.user_id);
+    println!("  display name:   {}", linkage.display_name);
+    println!(
+        "  household_id:   {}",
+        linkage.household_id.as_deref().unwrap_or("(none)")
+    );
+    println!(
+        "  person_id:      {}",
+        linkage.person_id.as_deref().unwrap_or("(none)")
+    );
+    println!("  household_role: {}", linkage.role);
+    println!(
+        "  pairing table:  {}",
+        linkage.legacy_household_id.as_deref().unwrap_or("(none)")
+    );
+
+    println!("\nhouseholds:");
+    let households = onboarding::survey_households(queue, auth).await?;
+    if households.is_empty() {
+        println!("  (none)");
+    }
+    for listing in &households {
+        println!("  {}  \"{}\"", listing.id, listing.display_name);
+        println!(
+            "    grid {}  devices {}  legacy pairing rows {}",
+            listing.grid_size, listing.devices, listing.legacy_users
+        );
+        println!(
+            "    members ({}): {}",
+            listing.members.len(),
+            if listing.members.is_empty() {
+                "(none)".to_owned()
+            } else {
+                listing.members.join(", ")
+            }
+        );
+        println!(
+            "    accounts: {}",
+            if listing.accounts.is_empty() {
+                "(none)".to_owned()
+            } else {
+                listing.accounts.join(", ")
+            }
+        );
+    }
+
+    println!("\ncandidate people matching this account:");
+    let candidates = onboarding::person_candidates(queue, user).await?;
+    if candidates.is_empty() {
+        println!("  (none)");
+    }
+    for candidate in &candidates {
+        println!(
+            "  {}  \"{}\"  household {}",
+            candidate.id,
+            candidate.display_name,
+            candidate.household_id.as_deref().unwrap_or("(unseated)")
+        );
+    }
+
+    if !apply {
+        let plan = onboarding::plan_link_household(queue, auth, user, request).await?;
+        println!("\nplan (dry run; nothing was written):");
+        println!(
+            "  household {} \"{}\"",
+            plan.household_id, plan.household_name
+        );
+        match &plan.person {
+            PlannedPerson::Existing { id, display_name } => {
+                println!("  person {id} \"{display_name}\"");
+            }
+            PlannedPerson::Create { display_name } => {
+                println!("  person: create \"{display_name}\"");
+            }
+        }
+        println!("  role {}", plan.role);
+        for member in &plan.members {
+            match member {
+                PlannedPerson::Existing { id, display_name } => {
+                    println!("  member {id} \"{display_name}\"");
+                }
+                PlannedPerson::Create { display_name } => {
+                    println!("  member: create \"{display_name}\"");
+                }
+            }
+        }
+        for step in &plan.steps {
+            println!("  - {step}");
+        }
+        println!("\nre-run with --apply to execute this plan.");
+        return Ok(());
+    }
+
+    let devices = DeviceRegistry::new(queue.clone());
+    let outcome = onboarding::apply_link_household(queue, auth, &devices, user, request).await?;
+    println!("\napplied:");
+    if outcome.changes.is_empty() {
+        println!("  (already linked; nothing changed)");
+    }
+    for change in &outcome.changes {
+        println!("  - {change}");
+    }
+    println!(
+        "\n{} is now {} of household {} as person {}",
+        user.username, outcome.role, outcome.household_id, outcome.person_id
+    );
     Ok(())
 }
 
@@ -91,7 +248,10 @@ fn usage<T>() -> io::Result<T> {
     Err(invalid(concat!(
         "usage: daily-mirror-onboarding signup <username> [display-name]\n",
         "       daily-mirror-onboarding household <username>\n",
-        "       daily-mirror-onboarding add-person <username> <display-name>"
+        "       daily-mirror-onboarding add-person <username> <display-name>\n",
+        "       daily-mirror-onboarding link-household <username> [--household-id ID]\n",
+        "           [--person-id ID] [--new-person] [--role admin|member] [--name NAME]\n",
+        "           [--members \"A,B,C\"] [--create-missing] [--apply]"
     )))
 }
 

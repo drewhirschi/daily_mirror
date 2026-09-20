@@ -1,0 +1,513 @@
+{
+  "reference": {
+    "ColourCorrectionMatrix": [
+      1.57076,
+      -0.355474,
+      -0.215285,
+      -0.366751,
+      1.514863,
+      -0.148122,
+      -0.065177,
+      -0.792195,
+      1.857375
+    ],
+    "FocusFoM": 75042,
+    "SensorBlackLevels": [
+      4096,
+      4096,
+      4096,
+      4096
+    ],
+    "ColourTemperature": 3431,
+    "SensorTimestamp": 1026379179000,
+    "FrameWallClock": 1789097478961660416,
+    "ScalerCrop": "(0, 0)/4656x3496",
+    "LensPosition": 7.12837,
+    "AfPauseState": 0,
+    "FrameDuration": 111092,
+    "Lux": 186.53595,
+    "ExposureTime": 19983,
+    "ColourGains": [
+      1.575726,
+      2.225821
+    ],
+    "AnalogueGain": 4.697248,
+    "AeState": 2,
+    "DigitalGain": 1.002304,
+    "AfState": 2
+  },
+  "groups": [
+    {
+      "name": "original-timing",
+      "command": [
+        "rpicam-still",
+        "--tuning-file",
+        "/home/drew/daily-mirror-device/config/imx519-portrait.json",
+        "--nopreview",
+        "--width",
+        "4656",
+        "--height",
+        "3496",
+        "--encoding",
+        "jpg",
+        "--quality",
+        "95",
+        "--saturation",
+        "1.15",
+        "--sharpness",
+        "1.15",
+        "--denoise",
+        "auto",
+        "--metadata-format",
+        "json",
+        "--timeout",
+        "0",
+        "--zsl",
+        "--signal",
+        "--autofocus-mode",
+        "manual",
+        "--lens-position",
+        "7.12837",
+        "--shutter",
+        "19983",
+        "--gain",
+        "4.708070459392",
+        "--awbgains",
+        "1.575726,2.225821",
+        "--metadata",
+        "/home/drew/daily-mirror-device/data/experiments/burst-20260911-02/original-timing/latest.json",
+        "--output",
+        "/home/drew/daily-mirror-device/data/experiments/burst-20260911-02/original-timing/frame-%02d.jpg"
+      ],
+      "frames": [
+        {
+          "ExposureTime": 19953,
+          "AnalogueGain": 4.697248,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003791,
+          "Lux": 185.973984,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 73766,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097481253878528,
+          "SensorTimestamp": 1028671397000,
+          "request_to_saved_seconds": 0.7060112310000477
+        },
+        {
+          "ExposureTime": 19953,
+          "AnalogueGain": 4.697248,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003791,
+          "Lux": 185.998886,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 73729,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097481809234432,
+          "SensorTimestamp": 1029226753000,
+          "request_to_saved_seconds": 0.5613740220001091
+        },
+        {
+          "ExposureTime": 19953,
+          "AnalogueGain": 4.697248,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003791,
+          "Lux": 185.835114,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 73784,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097482697872384,
+          "SensorTimestamp": 1030115391000,
+          "request_to_saved_seconds": 0.56030938899994
+        },
+        {
+          "ExposureTime": 19953,
+          "AnalogueGain": 4.697248,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003791,
+          "Lux": 185.916611,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 73782,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097483253281536,
+          "SensorTimestamp": 1030670800000,
+          "request_to_saved_seconds": 0.5646388349998688
+        },
+        {
+          "ExposureTime": 19953,
+          "AnalogueGain": 4.697248,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003791,
+          "Lux": 186.008514,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 73734,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097483808690432,
+          "SensorTimestamp": 1031226209000,
+          "request_to_saved_seconds": 0.6135015190000104
+        }
+      ],
+      "capture_span_seconds": 2.554812
+    },
+    {
+      "name": "60hz-timing",
+      "command": [
+        "rpicam-still",
+        "--tuning-file",
+        "/home/drew/daily-mirror-device/config/imx519-portrait.json",
+        "--nopreview",
+        "--width",
+        "4656",
+        "--height",
+        "3496",
+        "--encoding",
+        "jpg",
+        "--quality",
+        "95",
+        "--saturation",
+        "1.15",
+        "--sharpness",
+        "1.15",
+        "--denoise",
+        "auto",
+        "--metadata-format",
+        "json",
+        "--timeout",
+        "0",
+        "--zsl",
+        "--signal",
+        "--autofocus-mode",
+        "manual",
+        "--lens-position",
+        "7.12837",
+        "--shutter",
+        "16667",
+        "--gain",
+        "5.64476942401334",
+        "--awbgains",
+        "1.575726,2.225821",
+        "--metadata",
+        "/home/drew/daily-mirror-device/data/experiments/burst-20260911-02/60hz-timing/latest.json",
+        "--output",
+        "/home/drew/daily-mirror-device/data/experiments/burst-20260911-02/60hz-timing/frame-%02d.jpg"
+      ],
+      "frames": [
+        {
+          "ExposureTime": 16662,
+          "AnalogueGain": 5.626374,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003545,
+          "Lux": 185.795517,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 74247,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097486626908416,
+          "SensorTimestamp": 1034044427000,
+          "request_to_saved_seconds": 0.716288072999987
+        },
+        {
+          "ExposureTime": 16662,
+          "AnalogueGain": 5.626374,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003545,
+          "Lux": 185.799194,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 74469,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097487182316544,
+          "SensorTimestamp": 1034599835000,
+          "request_to_saved_seconds": 0.5606970919998275
+        },
+        {
+          "ExposureTime": 16662,
+          "AnalogueGain": 5.626374,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003545,
+          "Lux": 185.729263,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 74413,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097488070971648,
+          "SensorTimestamp": 1035488490000,
+          "request_to_saved_seconds": 0.5498426469998776
+        },
+        {
+          "ExposureTime": 16662,
+          "AnalogueGain": 5.626374,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003545,
+          "Lux": 185.822983,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 74181,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097488626377472,
+          "SensorTimestamp": 1036043896000,
+          "request_to_saved_seconds": 0.570498323000038
+        },
+        {
+          "ExposureTime": 16662,
+          "AnalogueGain": 5.626374,
+          "FrameDuration": 111092,
+          "LensPosition": 7.12837,
+          "AeState": 0,
+          "DigitalGain": 1.003545,
+          "Lux": 185.941833,
+          "ColourGains": [
+            1.575726,
+            2.225821
+          ],
+          "ColourTemperature": 3427,
+          "SensorBlackLevels": [
+            4096,
+            4096,
+            4096,
+            4096
+          ],
+          "FocusFoM": 74393,
+          "ColourCorrectionMatrix": [
+            1.5698,
+            -0.35372,
+            -0.216079,
+            -0.366696,
+            1.514698,
+            -0.148012,
+            -0.065325,
+            -0.793926,
+            1.859254
+          ],
+          "AfState": 0,
+          "AfPauseState": 0,
+          "ScalerCrop": "(0, 0)/4656x3496",
+          "FrameWallClock": 1789097489181785600,
+          "SensorTimestamp": 1036599304000,
+          "request_to_saved_seconds": 0.7345108970000638
+        }
+      ],
+      "capture_span_seconds": 2.554877
+    }
+  ]
+}

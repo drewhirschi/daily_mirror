@@ -1,0 +1,132 @@
+{
+  "60hz-timing": {
+    "best_frame": "frame-00.jpg",
+    "frame_scores": [
+      150.17283630371094,
+      149.8318634033203,
+      149.2235107421875,
+      149.76919555664062,
+      149.86012268066406
+    ],
+    "alignments": [
+      {
+        "file": "frame-01.jpg",
+        "correlation": 0.9998508077689633,
+        "shift_pixels": [
+          -0.06210852786898613,
+          0.9766439199447632
+        ],
+        "motion_or_change_fraction": 0.039719178324565334
+      },
+      {
+        "file": "frame-02.jpg",
+        "correlation": 0.9998294374159055,
+        "shift_pixels": [
+          -0.040215715765953064,
+          1.2316919565200806
+        ],
+        "motion_or_change_fraction": 0.04208940065032595
+      },
+      {
+        "file": "frame-03.jpg",
+        "correlation": 0.9999079862455297,
+        "shift_pixels": [
+          -0.027617335319519043,
+          -0.10233813524246216
+        ],
+        "motion_or_change_fraction": 0.03207605451886102
+      },
+      {
+        "file": "frame-04.jpg",
+        "correlation": 0.999826004394643,
+        "shift_pixels": [
+          0.04336448013782501,
+          -1.4707810878753662
+        ],
+        "motion_or_change_fraction": 0.03723732867017387
+      }
+    ],
+    "metrics": {
+      "best-frame": {
+        "wall_highpass_std": 2.4887027740478516,
+        "wall_row_residual_std": 0.8684552907943726,
+        "target_sharpness": 150.17283630371094
+      },
+      "aligned-mean": {
+        "wall_highpass_std": 1.0958936214447021,
+        "wall_row_residual_std": 0.8500215411186218,
+        "target_sharpness": 133.81204223632812
+      },
+      "motion-gated-mean": {
+        "wall_highpass_std": 1.0969027280807495,
+        "wall_row_residual_std": 0.8500116467475891,
+        "target_sharpness": 137.2605743408203
+      }
+    }
+  },
+  "original-timing": {
+    "best_frame": "frame-00.jpg",
+    "frame_scores": [
+      148.5643768310547,
+      148.05569458007812,
+      148.35264587402344,
+      148.24273681640625,
+      147.26150512695312
+    ],
+    "alignments": [
+      {
+        "file": "frame-01.jpg",
+        "correlation": 0.9991313005656939,
+        "shift_pixels": [
+          0.038795530796051025,
+          0.008111551403999329
+        ],
+        "motion_or_change_fraction": 0.03671248977722208
+      },
+      {
+        "file": "frame-02.jpg",
+        "correlation": 0.9989651393291725,
+        "shift_pixels": [
+          0.012538484297692776,
+          -0.04166455566883087
+        ],
+        "motion_or_change_fraction": 0.04878077400190301
+      },
+      {
+        "file": "frame-03.jpg",
+        "correlation": 0.9999007716820136,
+        "shift_pixels": [
+          0.010302487760782242,
+          -0.06873220950365067
+        ],
+        "motion_or_change_fraction": 0.012313225424048693
+      },
+      {
+        "file": "frame-04.jpg",
+        "correlation": 0.9993105657838933,
+        "shift_pixels": [
+          0.02289491705596447,
+          -0.05621301010251045
+        ],
+        "motion_or_change_fraction": 0.027150813497212326
+      }
+    ],
+    "metrics": {
+      "best-frame": {
+        "wall_highpass_std": 2.2576663494110107,
+        "wall_row_residual_std": 1.7553070783615112,
+        "target_sharpness": 148.5643768310547
+      },
+      "aligned-mean": {
+        "wall_highpass_std": 1.09218430519104,
+        "wall_row_residual_std": 0.8600817322731018,
+        "target_sharpness": 141.59083557128906
+      },
+      "motion-gated-mean": {
+        "wall_highpass_std": 1.11210036277771,
+        "wall_row_residual_std": 0.8889741897583008,
+        "target_sharpness": 141.8330535888672
+      }
+    }
+  }
+}

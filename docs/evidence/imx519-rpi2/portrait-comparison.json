@@ -1,0 +1,47 @@
+[
+  {
+    "name": "neutral-auto",
+    "AfState": 2,
+    "LensPosition": 6.989524,
+    "ExposureTime": 29944,
+    "AnalogueGain": 3.084337,
+    "ColourTemperature": 3455,
+    "FocusFoM": 73431
+  },
+  {
+    "name": "vibrant-auto",
+    "AfState": 2,
+    "LensPosition": 7.015327,
+    "ExposureTime": 31397,
+    "AnalogueGain": 4.0,
+    "ColourTemperature": 3467,
+    "FocusFoM": 79015
+  },
+  {
+    "name": "vibrant-sport-auto",
+    "AfState": 2,
+    "LensPosition": 6.99973,
+    "ExposureTime": 20961,
+    "AnalogueGain": 5.988304,
+    "ColourTemperature": 3457,
+    "FocusFoM": 79778
+  },
+  {
+    "name": "tone-stock",
+    "AfState": 2,
+    "LensPosition": 6.909589,
+    "ExposureTime": 19983,
+    "AnalogueGain": 4.654545,
+    "ColourTemperature": 3448,
+    "FocusFoM": 74651
+  },
+  {
+    "name": "tone-lift",
+    "AfState": 2,
+    "LensPosition": 6.886081,
+    "ExposureTime": 19983,
+    "AnalogueGain": 4.633484,
+    "ColourTemperature": 3466,
+    "FocusFoM": 74509
+  }
+]

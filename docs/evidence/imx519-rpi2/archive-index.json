@@ -1,0 +1,485 @@
+{
+  "local_archive": "/home/drew/work/daily_mirror/captures/characterization/2026-09-10",
+  "files": [
+    {
+      "path": "burst-20260911-02/60hz-timing/aligned-mean.png",
+      "bytes": 18185810,
+      "sha256": "d032416be7f772467d5c25e935536bef55c6aad371366ed046e045e748ce98cb"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/best-frame.png",
+      "bytes": 23254074,
+      "sha256": "1fd25b88dc1fc66230e9f3dfc6ef6ed085154967f0cf53b6135f7afb61064931"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/camera.log",
+      "bytes": 1743,
+      "sha256": "3b58e052c9080d08dafe638fbd72467c66f7f7bed6d6b2983f59d57950d3fa56"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-00.jpg",
+      "bytes": 4574435,
+      "sha256": "a812943f1a2efd7d7662a0aeb03a809d0cee2ea014cc478711cdadab12fe2938"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-00.json",
+      "bytes": 705,
+      "sha256": "3b16cac52fe7042c2ea8b3fd7cac34f61bf4c15946700ac31f55ab0d106abd32"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-01.jpg",
+      "bytes": 4575707,
+      "sha256": "044d3d498dd5ca9323a7b4fb8c47c9569c664067daaa98b36e8e3c91bef02f13"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-01.json",
+      "bytes": 706,
+      "sha256": "902e8cbb48dbdd088c6bed19476fe0ad515e16c17ebcc5249ec1486fd1a0c9ec"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-02.jpg",
+      "bytes": 4574082,
+      "sha256": "6549fb61b66049d65900b68d03563ea8253e416211489c7d4802515ff8225551"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-02.json",
+      "bytes": 706,
+      "sha256": "996d7c6844ce7f440f850870bc52291579a0f8ec7c0e0d5ab54f0ead3524f960"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-03.jpg",
+      "bytes": 4571829,
+      "sha256": "c4edf66f9dea036e40c071157949bc51e00dacab8c38a7bbff11385c88c2665d"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-03.json",
+      "bytes": 705,
+      "sha256": "0d184af52087e367237244fb2bab6e27c2a26659c726078e8d09c2c6f08ff299"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-04.jpg",
+      "bytes": 4572260,
+      "sha256": "66e9fd059c1615b9cadd6c31f12ff9914eafe5e97fa88f605b9a5de588a38d03"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/frame-04.json",
+      "bytes": 706,
+      "sha256": "2fb8f061c108632945377bc8c86a39ad5ca59dd3ea42fe57d5cdbca41176154e"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/latest.json",
+      "bytes": 628,
+      "sha256": "a2dd998ae59f8a686be531fa0bfe8a40864266598dd3542e11ad19179238e3f2"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/motion-gated-mean.png",
+      "bytes": 18389151,
+      "sha256": "a46809f78805f7025e92e5f52f81e3ff6980d5a84f1284d83bb96d86e02016f2"
+    },
+    {
+      "path": "burst-20260911-02/60hz-timing/processing.json",
+      "bytes": 1655,
+      "sha256": "fe6502fc89ce81a25eada7ebff8912715ae8730a65c1e0a727b1d59ccdd82a7e"
+    },
+    {
+      "path": "burst-20260911-02/banding-measurements.json",
+      "bytes": 1861,
+      "sha256": "daf0f6ef2d969a53f5552f30edafcef813e5df40cfff82e603ee72699fa93de7"
+    },
+    {
+      "path": "burst-20260911-02/manifest.json",
+      "bytes": 13142,
+      "sha256": "7115f2774f527ae66de3878a9da1efe2a401fbac30d5fa1881953e127523f11c"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/aligned-mean.png",
+      "bytes": 18105243,
+      "sha256": "af8d779797a97dbed6672553a4c051a149f5983356a6f45684c2f9b65cda4583"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/best-frame.png",
+      "bytes": 22424777,
+      "sha256": "d3410a9b87cf95d4a7e9f3bd4bb2384bcab70e3c874aca7a1532f94debb890ad"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/camera.log",
+      "bytes": 1743,
+      "sha256": "c73d32a25c9ee7ae19766733607beac8b4d9ca5472a4516bb843b4235e454d03"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-00.jpg",
+      "bytes": 4355269,
+      "sha256": "928c5d03a689089558e6b09df41432f68455a60a30e1481f81be99966dd85ce4"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-00.json",
+      "bytes": 706,
+      "sha256": "806caa72e4ea0b3bc655e1a1a7368b63ace288c9fe946d47249da965882a2fd5"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-01.jpg",
+      "bytes": 4353492,
+      "sha256": "d4fb17bdd82a1d5972e52ef0ac27076f767464267e1103c9475ca9bed3c74a8f"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-01.json",
+      "bytes": 706,
+      "sha256": "6f0247236340bcdba5fcff1dc2813dc1ad982d0bb3f2938788c830bef057207d"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-02.jpg",
+      "bytes": 4350958,
+      "sha256": "b69abdb2d133186a1f63d3c13a7d44aee406fc21c0617d3d3d6b06f6ef9058e5"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-02.json",
+      "bytes": 704,
+      "sha256": "250405c6897b2a686c6e18abe558b274cb5cb34e5f22f408e15d0a7d99f30541"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-03.jpg",
+      "bytes": 4353959,
+      "sha256": "8c69eebfa74500453e64b049d1ade4ad265988cb51c913e979243e9fdd753b4f"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-03.json",
+      "bytes": 706,
+      "sha256": "328b8003d7d6c08b8bcc46dc480e91079cdb6186ca4720899c145081bdfe4b01"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-04.jpg",
+      "bytes": 4354269,
+      "sha256": "02a30d34c27de20226f7579fc14506512b2d5d0b1d49fc1ac3d3de815dcdb9e8"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/frame-04.json",
+      "bytes": 706,
+      "sha256": "3cffacfaaadbd37cfe1ec0550088efd38c7e8fedaa9f24f8efc31023a05a5a30"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/latest.json",
+      "bytes": 628,
+      "sha256": "1ba9ed587ff12e98bd71638e92662c584230443d9f288b3ce14111d811bb5bc3"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/motion-gated-mean.png",
+      "bytes": 18256517,
+      "sha256": "6fa171a202cd8ec5698b0883222d9e12def2caeb9dde47dc3b46e35c4a7032dd"
+    },
+    {
+      "path": "burst-20260911-02/original-timing/processing.json",
+      "bytes": 1656,
+      "sha256": "3ccf34c132e56e74c30f312cbc0ceb7495f7cd1941df4d56cea8ebafed1da1fe"
+    },
+    {
+      "path": "burst-20260911-02/processing-summary.json",
+      "bytes": 3611,
+      "sha256": "1fc4c34a5cfdadfc8c2f168eaa76c7e6c06ebc03a6d7a68e51dff682c0e922b1"
+    },
+    {
+      "path": "burst-20260911-02/reference.jpg",
+      "bytes": 4357384,
+      "sha256": "0d12c688d70cd054fd3aac7e7383e9d88ff16dc4012792b74afa57cafd28fbe6"
+    },
+    {
+      "path": "burst-20260911-02/reference.json",
+      "bytes": 628,
+      "sha256": "6a941e47caab348d5a88bfe698e8d12fb2949711b9e0ae1e896caff820c5fab9"
+    },
+    {
+      "path": "burst-20260911-02/reference.log",
+      "bytes": 2153,
+      "sha256": "d83722babcc28298dbfc7066030843d44389e46ba6e7ad5367e44571982a593a"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/aligned-mean.png",
+      "bytes": 3182574,
+      "sha256": "af9582219c73b4f7fa09ca9ae81195d016d5420f327abe7a55a775def787586b"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/best-frame.png",
+      "bytes": 3138454,
+      "sha256": "fb5cf96d12f4d16f67cb721f5775e0f88ae7d27ecccb327781eecce8c8021cb7"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/camera.log",
+      "bytes": 1743,
+      "sha256": "1fe46dd71e4e6c1632ad83cb0dff691ee47a566a935df84e9f8c83988d64b9a5"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-00.jpg",
+      "bytes": 592134,
+      "sha256": "b1b7c5b185835daf794837036714a34681d0d633ecfd5a37b2e5fb2ccad2b21d"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-00.json",
+      "bytes": 707,
+      "sha256": "35bd664c9f7616a0df651d8ef79c7fa24cac35ec288f1edc79fd4b4041c49f78"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-01.jpg",
+      "bytes": 591912,
+      "sha256": "b57c86ab82b6046e0d714da19ef0c87449274cfac17eb2045001a652f674fe48"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-01.json",
+      "bytes": 707,
+      "sha256": "8ee4004da89c62f32dffc02c492ba7363c8946d43398d8e295a044c55c89fe1a"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-02.jpg",
+      "bytes": 591734,
+      "sha256": "dfc55c588d28853cdfcd5a07be2613628db7b8d33720cf408d6d1a169e56299f"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-02.json",
+      "bytes": 708,
+      "sha256": "4570e795c7f3c78069220325cf14e13bda4a88412df1c45f3b700b202d2dd0c7"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-03.jpg",
+      "bytes": 592592,
+      "sha256": "13a8531f70f7767a1f8484d2589ec2a69f1e19ae979aecaea868b6088d7e4827"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-03.json",
+      "bytes": 708,
+      "sha256": "d784e0535dfee99b8a89be1529b53ef31beabf7e5a9c58dba346611cbfc1874b"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-04.jpg",
+      "bytes": 591501,
+      "sha256": "01c4c3f37fdd50a40156ba38b21173f9ee15c75d3befa351c19573492136d57b"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/frame-04.json",
+      "bytes": 708,
+      "sha256": "3056bf1631392a17290d733f22440840c60a299b1fc225bcbc80171b9766b3b8"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/latest.json",
+      "bytes": 627,
+      "sha256": "27b39a7a09c72cfe9605e2312942968125a85042000cae0d3cd8837fc350f341"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/motion-gated-mean.png",
+      "bytes": 3182607,
+      "sha256": "a03976eb435f70cdd71b9bfa2bf8ae53aad0aa89958b501a7fb273fd0ae1a416"
+    },
+    {
+      "path": "burst-20260911-03/60hz-timing/processing.json",
+      "bytes": 1669,
+      "sha256": "18f182ec6237b8da45ada6f4551c514f7ff7a2cbec795f637084366c91480b3a"
+    },
+    {
+      "path": "burst-20260911-03/banding-measurements.json",
+      "bytes": 1862,
+      "sha256": "31c4e28eea224ba98681d0838003670259d2d5e1b05bb94ec6a8ddd94aa14414"
+    },
+    {
+      "path": "burst-20260911-03/manifest.json",
+      "bytes": 13160,
+      "sha256": "b329615e3d76d71a65f96b1144a3382e07385905d5801cf9de0ef5b7bf3bbe02"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/aligned-mean.png",
+      "bytes": 3146129,
+      "sha256": "f574d9fbf964f53c3241caed921b042b09c2c66080b6418fe66dc5cac13ce6f6"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/best-frame.png",
+      "bytes": 3082423,
+      "sha256": "04d93991e0fb7f0184aad5946a265b0049e7c5f420ae687b43e374575afff358"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/camera.log",
+      "bytes": 1743,
+      "sha256": "d2c28f7105c8e340dadeec0624023015207a479f520e4423aad840fc6b132de8"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-00.jpg",
+      "bytes": 584792,
+      "sha256": "edda13e22ac9cde84119e129ec21d6defa667bef3ebc4ab21f9f4d7855f16429"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-00.json",
+      "bytes": 708,
+      "sha256": "ca611ad1326f42add99042e54265d1bf0457d2e869617082f1b78af7bd9db880"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-01.jpg",
+      "bytes": 584947,
+      "sha256": "2dbb393de60e2660199d82d34cb55e2b644ef582b96d0f8234e294443f1d81b5"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-01.json",
+      "bytes": 707,
+      "sha256": "a3f3062575cfd8c47a1b387048df639e3572402e0dfaa291426da9d4287fc84a"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-02.jpg",
+      "bytes": 584967,
+      "sha256": "3360f710a47f56e93808179229045d1db426c0dd0835027e4af0d472c3f85342"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-02.json",
+      "bytes": 708,
+      "sha256": "9601b9f57ac7ad3cf74b87ef9f034211ce4a17d4a4dd6c363f20d273cd1642a1"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-03.jpg",
+      "bytes": 584259,
+      "sha256": "a399782f37c7afb3a7bdf676ea6d56193c0bafdac081eb8662cff2c3f74ec71b"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-03.json",
+      "bytes": 707,
+      "sha256": "a4827c40299fd3537ad2f028e527a6d95746d923c9fe30f52bbf04fcde4dcdb3"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-04.jpg",
+      "bytes": 585127,
+      "sha256": "eb6f8c62d07f9820ebc575c9c4560cd0e9f915a170afbd4b003178ac3ccb1e73"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/frame-04.json",
+      "bytes": 707,
+      "sha256": "d4f9ae4709ce601945d14d96ad6a5793186102676832e22d0a67497e7e0548d0"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/latest.json",
+      "bytes": 627,
+      "sha256": "49bd54e4d41af91ea47f4d40054b90f2359839a6d35bec74af6f8eb674868b84"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/motion-gated-mean.png",
+      "bytes": 3146149,
+      "sha256": "0a7c4dccd21dc714ac429064e42a09ed22d5e765a35758cf0c00ed5fe5f40304"
+    },
+    {
+      "path": "burst-20260911-03/original-timing/processing.json",
+      "bytes": 1673,
+      "sha256": "a69882ef91fd9a55d9264248706fcfbe04f6984866dc2d71ae01d1d3eb79e9ae"
+    },
+    {
+      "path": "burst-20260911-03/processing-summary.json",
+      "bytes": 3642,
+      "sha256": "1c6ced99ca09119dfb3004fd4135ac16650d9a1006f9ccad4b927cc51587caa2"
+    },
+    {
+      "path": "burst-20260911-03/reference.jpg",
+      "bytes": 583616,
+      "sha256": "64c7dc4b891eaa5d3ca868eaa32bbf2d2136e70e98f1f8f5b7631a6acdca5e58"
+    },
+    {
+      "path": "burst-20260911-03/reference.json",
+      "bytes": 627,
+      "sha256": "14a9bdcbf5d15c004248d9acb4d9dc082304723134bc323bca7d0d9e5b82f085"
+    },
+    {
+      "path": "burst-20260911-03/reference.log",
+      "bytes": 2153,
+      "sha256": "fbfd2e92e44cdbffa150aff6a442863a9dae0ef0e371f2971c04599c732f1842"
+    },
+    {
+      "path": "mirror-portrait-tests/compare.py",
+      "bytes": 1272,
+      "sha256": "977d2a463830213231b8f0d8b159d95d46f76e86de4c0283069edb50ccbef15e"
+    },
+    {
+      "path": "mirror-portrait-tests/install-preset.py",
+      "bytes": 856,
+      "sha256": "34f81f7904dc6b437a83de57a00c1ad5738a901252fa7bedb8ca4020a9942c79"
+    },
+    {
+      "path": "mirror-portrait-tests/local-photos.json",
+      "bytes": 289,
+      "sha256": "9e5eecf5f756838e02d955d372fd58f47d28db93638e662eec813d333e66d1bd"
+    },
+    {
+      "path": "mirror-portrait-tests/neutral-auto.jpg",
+      "bytes": 3555300,
+      "sha256": "0f25143455f04df69345a0e5df35802085c720205e64aec3a293462a6297f10f"
+    },
+    {
+      "path": "mirror-portrait-tests/neutral-auto.json",
+      "bytes": 2246,
+      "sha256": "b2e025072abae340bd55b026144f7986cfe7d63ae4ae496359b782966b9d6bc5"
+    },
+    {
+      "path": "mirror-portrait-tests/neutral.jpg",
+      "bytes": 3554968,
+      "sha256": "3643cc8a7f74db631baf183d5ba2d0a72db233c166889263366dee516214564f"
+    },
+    {
+      "path": "mirror-portrait-tests/neutral.json",
+      "bytes": 2249,
+      "sha256": "9306828c4f773719afa2b833900135d7344f2f879deed8d605a4f82f0f38b8a7"
+    },
+    {
+      "path": "mirror-portrait-tests/tone-lift.jpg",
+      "bytes": 4319755,
+      "sha256": "64f096f36f379516112d730e3d847f971da80cdbb019c057541451b30a224c2b"
+    },
+    {
+      "path": "mirror-portrait-tests/tone-lift.json",
+      "bytes": 627,
+      "sha256": "e1ff54c86ae918b882bebc4c214c12852f2d9c284efdbb75f62682a6cb4d11d2"
+    },
+    {
+      "path": "mirror-portrait-tests/tone-stock.jpg",
+      "bytes": 3990634,
+      "sha256": "2788decf46123d207f73020fc2ca82ddb619df1a5fe58b8949ab42b43a09517f"
+    },
+    {
+      "path": "mirror-portrait-tests/tone-stock.json",
+      "bytes": 627,
+      "sha256": "580868540c8955545a56662eadeccc7d2ac14f087ea830d78711004ab8999983"
+    },
+    {
+      "path": "mirror-portrait-tests/tone-test.py",
+      "bytes": 1054,
+      "sha256": "24e7931710beb39e21dde0ee15e9afc495fc6fcd0424fecb7e90add0f38b140c"
+    },
+    {
+      "path": "mirror-portrait-tests/vibrant-auto.jpg",
+      "bytes": 3785961,
+      "sha256": "1ab4a09d23883eb9ea7e67760ad754b01d81f4be2b8f0a8a4594abda32977c8a"
+    },
+    {
+      "path": "mirror-portrait-tests/vibrant-auto.json",
+      "bytes": 2246,
+      "sha256": "06ec250b382a79138a4330c09d9b45f87a88274948871dd27cd831d79ceef5a8"
+    },
+    {
+      "path": "mirror-portrait-tests/vibrant-sport-auto.jpg",
+      "bytes": 4218923,
+      "sha256": "62f50045e12c60115a80aeb5af7180ff51d9f88d3c8bdaed8ce0ea7ac8a9b962"
+    },
+    {
+      "path": "mirror-portrait-tests/vibrant-sport-auto.json",
+      "bytes": 2252,
+      "sha256": "7b87dc65ec9f8c26a03fa887f45b20133da4a8e3345993a9201548d8ca6f7ee9"
+    },
+    {
+      "path": "mirror-portrait-tests/vibrant-sport.jpg",
+      "bytes": 3392170,
+      "sha256": "5179fb81e3cdeb741eb911b5fa6d03ec4f16ec918670d84841a36e8119197722"
+    },
+    {
+      "path": "mirror-portrait-tests/vibrant-sport.json",
+      "bytes": 2248,
+      "sha256": "85198e54e2c361fa41a6bed01747314b839e3d3193869bf8394a3be1b7d15bb9"
+    },
+    {
+      "path": "mirror-portrait-tests/vibrant.jpg",
+      "bytes": 3025578,
+      "sha256": "685239245f7e3968a52667f2084905615bfa8ce36dfdec2702dd424be0909c84"
+    },
+    {
+      "path": "mirror-portrait-tests/vibrant.json",
+      "bytes": 2243,
+      "sha256": "2fa49c6761f72b4719eff06b6d2f9842fb2011afa7c14f3ccfc627ca8f37cac2"
+    }
+  ]
+}

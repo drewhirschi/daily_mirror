@@ -27,6 +27,7 @@ import { selectedFrameIndex } from "../flipbook";
 import { ApiError, type PersonFlipbook } from "@daily-mirror/api";
 import { useSession, type ActiveSession } from "../session";
 import { Button, IconButton, styles, useColors } from "../ui";
+import { usePullToRefresh } from "../pull-to-refresh";
 
 const NativeSlider:
   typeof import("@react-native-community/slider").default | null =
@@ -68,6 +69,9 @@ export function Flipbooks({
     }, [refetch]),
   );
   const refresh = () => void refetch({ cancelRefetch: false });
+  const pull = usePullToRefresh(
+    useCallback(() => refetch({ cancelRefetch: false }), [refetch]),
+  );
   const selected =
     people.data?.people.find((person) => person.id === personId) ??
     people.data?.people[0];
@@ -80,8 +84,8 @@ export function Flipbooks({
         alwaysBounceVertical
         refreshControl={
           <RefreshControl
-            refreshing={people.isRefetching}
-            onRefresh={refresh}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={c.accent}
           />
         }

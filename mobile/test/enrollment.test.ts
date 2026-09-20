@@ -9,9 +9,23 @@ import {
 } from "../src/enrollment";
 
 const ORIGIN = "https://mirror.example";
+
+function jsonBody(body: unknown): unknown {
+  if (typeof body !== "string") return undefined;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+}
 const body = () => "photo-bytes";
 
-type Call = { url: string; method: string; headers: Record<string, string> };
+type Call = {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: unknown;
+};
 
 /**
  * Stub the three-step chain: grant, signed PUT, finalize. The grant and
@@ -34,6 +48,9 @@ function stubChain(
       url: target,
       method: init?.method ?? "GET",
       headers: (init?.headers ?? {}) as Record<string, string>,
+      // Only the JSON requests carry a body worth inspecting; the signed PUT
+      // sends the photo bytes.
+      body: jsonBody(init?.body),
     });
     if (target.endsWith("/enrollment/uploads"))
       return Response.json({
@@ -65,6 +82,28 @@ const uploader = (fetchImpl: typeof fetch) =>
     fetchImpl,
     openBody: body,
   });
+
+test("the grant tells the server a phone took the photograph", async (t) => {
+  const { calls, fetchImpl } = stubChain(t);
+  await uploader(fetchImpl).upload(
+    0,
+    "file:///tmp/pose.jpg",
+    4096,
+    "image/jpeg",
+    {
+      width: 3024,
+      height: 4032,
+      jpeg_quality: 85,
+    },
+  );
+  const capture = (calls[0].body as { capture: Record<string, unknown> })
+    .capture;
+  assert.equal(capture.capture_source, "phone");
+  assert.equal(capture.trigger, "app");
+  assert.equal(capture.width, 3024);
+  assert.equal(capture.height, 4032);
+  assert.equal(capture.jpeg_quality, 85);
+});
 
 test("capture ids match the Pi's YYYYMMDDTHHMMSSZ-<8 hex> convention", () => {
   assert.match(createCaptureId(), CAPTURE_ID_PATTERN);

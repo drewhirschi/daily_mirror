@@ -121,7 +121,13 @@ export function EnrollmentCapture({
       const next = uploader.nextSlotIndex(slotIndex + 1);
       setTarget(next === -1 ? slotIndex : next);
       void uploader
-        .upload(slotIndex, photo.uri, size, "image/jpeg")
+        .upload(slotIndex, photo.uri, size, "image/jpeg", {
+          // Cheap to know here, and it is what the tuning view wants first.
+          ...(photo.width && photo.height
+            ? { width: photo.width, height: photo.height }
+            : {}),
+          jpeg_quality: 85,
+        })
         .then(() => uploader.pollStatus());
     } catch (caught) {
       setError(
@@ -172,7 +178,7 @@ export function EnrollmentCapture({
         <Text
           style={{ color: c.secondary, textAlign: "center", lineHeight: 24 }}
         >
-          New mirror photos of {person.display_name} will be tagged
+          New camera photos of {person.display_name} will be tagged
           automatically.
         </Text>
         <Button title="Back to household" onPress={onDone} />

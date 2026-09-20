@@ -59,7 +59,18 @@ pub async fn post(
         .ensure_thumbnail(&saved.id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    catalog.register_ready_for_device(&saved.id, &storage_key, body.len() as u64, principal.device_id()).await
+    // The direct-body path predates the grant flow and carries no capture
+    // metadata, so only the provenance this server can see itself is recorded.
+    let capture = crate::capture::CaptureMetadata::default()
+        .with_source(if principal.device_id().is_some() { "device" } else { "legacy" })
+        .with_device_firmware(match principal.device_id() {
+            Some(device_id) => registry
+                .firmware_version(device_id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+            None => None,
+        }.as_deref());
+    catalog.register_ready_for_device(&saved.id, &storage_key, body.len() as u64, principal.device_id(), &capture).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     catalog.mark_thumbnail_ready(&saved.id).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

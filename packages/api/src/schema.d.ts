@@ -269,6 +269,9 @@ export interface paths {
          * @description The app hands the token to a device over the local provisioning link; the
          *     device redeems it at `POST /api/devices/claim` within
          *     `CLAIM_TOKEN_TTL_SECONDS`.
+         *
+         *     An account with no household is refused with 409 rather than having one
+         *     guessed for it, so a camera can never be paired into a stranger's home.
          */
         post: operations["postApiDevicesClaim-tokens"];
         delete?: never;
@@ -290,7 +293,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Renaming is an administrator action; members get 403. */
+        patch: operations["patchApiHousehold"];
         trace?: never;
     };
     "/api/household/people": {
@@ -594,6 +598,81 @@ export interface components {
         BatchAssignFacesResponse: {
             assignments: components["schemas"]["AssignFaceResponse"][];
         };
+        /**
+         * @description What a camera reports about one capture.
+         *
+         *     See `docs/capture-metadata.md` for units. In short: times are microseconds,
+         *     gains are dimensionless multipliers, `lens_position` is dioptres, and
+         *     `mean_luma` is the sensor's average luminance on a 0-255 scale.
+         */
+        CaptureMetadata: {
+            /** @description `unknown`, `searching`, `focused` or `failed`. */
+            af_state?: string | null;
+            /**
+             * Format: double
+             * @description Analogue sensor gain as a dimensionless multiplier (1.0 = unity).
+             */
+            analog_gain?: number | null;
+            /** @description `device`, `phone` or `legacy`. */
+            capture_source?: string | null;
+            /**
+             * @description When the shutter fired, RFC 3339 in UTC. Preferred over the timestamp
+             *     embedded in the capture ID when it is present and plausible.
+             */
+            captured_at?: string | null;
+            /**
+             * Format: int64
+             * @description Estimated scene colour temperature in kelvin. Pi only today.
+             */
+            colour_temperature_k?: number | null;
+            /**
+             * Format: double
+             * @description Digital gain as a dimensionless multiplier. Pi only today.
+             */
+            digital_gain?: number | null;
+            /**
+             * Format: int64
+             * @description Exposure time in microseconds (libcamera `ExposureTime`).
+             */
+            exposure_us?: number | null;
+            /**
+             * @description Software version of the camera that took this photograph. When a
+             *     paired device omits it, the server snapshots `devices.firmware_version`.
+             */
+            firmware_version?: string | null;
+            /**
+             * Format: int64
+             * @description Autofocus sharpness score, when the AF firmware reports one.
+             */
+            focus_score?: number | null;
+            /** Format: int64 */
+            height?: number | null;
+            /**
+             * Format: int64
+             * @description JPEG quality normalised to 0-100 on every platform.
+             */
+            jpeg_quality?: number | null;
+            /**
+             * Format: double
+             * @description Lens position in dioptres (reciprocal metres). Pi/IMX519 only today.
+             */
+            lens_position?: number | null;
+            /**
+             * Format: int64
+             * @description Sensor average luminance, 0-255. Low light is this project's known
+             *     cause of blur, so this is the field to sort a bad batch by.
+             */
+            mean_luma?: number | null;
+            /** @description Image sensor part, lowercase: `ov5640`, `imx519`, `imx708`. */
+            sensor?: string | null;
+            /** @description `button`, `debug`, `schedule` or `app`. */
+            trigger?: string | null;
+            /**
+             * Format: int64
+             * @description Encoded pixel dimensions, before any server-side rotation.
+             */
+            width?: number | null;
+        };
         /** @description Response of `POST /api/devices/claim-tokens`. Requires a user session. */
         ClaimTokenGrant: {
             /** @description Single-use, bound to the caller's household. */
@@ -702,6 +781,11 @@ export interface components {
             included: boolean;
         };
         Health: {
+            /**
+             * @description Applied schema version, the version this build expects, and how many
+             *     migrations are still pending. `status` is `degraded` when they differ.
+             */
+            schema: components["schemas"]["SchemaReport"];
             software_version: string;
             status: string;
             storage_backend: string;
@@ -714,9 +798,19 @@ export interface components {
             person_ids: string[];
         };
         HouseholdPerson: {
+            /**
+             * @description `linked` when this person has a user account, `none` otherwise. The
+             *     invite flow hangs off this.
+             */
+            account: string;
             display_name: string;
             enrollment: components["schemas"]["EnrollmentSummary"];
             id: string;
+            /**
+             * @description Set when this person is linked to an account; people in the grid who
+             *     have no login of their own have no role.
+             */
+            role?: string | null;
         };
         HouseholdSummary: {
             display_name: string;
@@ -724,6 +818,8 @@ export interface components {
             grid_size: number;
             id: string;
             people: components["schemas"]["HouseholdPerson"][];
+            /** @description The signed-in account's standing here: `admin` or `member`. */
+            role: string;
             /** @description The member representing the signed-in user, when onboarding created one. */
             self_person_id?: string | null;
         };
@@ -746,7 +842,8 @@ export interface components {
             credential: unknown;
         };
         NativePasskeyLoginStart: {
-            username: string;
+            /** @description Omit (or send an empty string) to let the platform pick the account. */
+            username?: string | null;
         };
         NativeSession: {
             /** Format: int64 */
@@ -784,11 +881,49 @@ export interface components {
             photo_ids: string[];
         };
         Photo: {
+            capture?: null | components["schemas"]["PhotoCapture"];
             /** @description Photographs the owner has excluded from every person's flipbook. */
             flipbook_excluded?: boolean;
             id: string;
             thumbnail_url?: string | null;
             url: string;
+        };
+        /**
+         * @description What the gallery shows about one photograph's provenance: the same fields
+         *     the camera reported, plus the paired camera's name so a bad photograph
+         *     names the mirror it came from.
+         *
+         *     Flat rather than nested so the response reads exactly like the request.
+         */
+        PhotoCapture: {
+            af_state?: string | null;
+            /** Format: double */
+            analog_gain?: number | null;
+            capture_source?: string | null;
+            /** Format: int64 */
+            colour_temperature_k?: number | null;
+            device_id?: string | null;
+            /** @description The name the household gave this camera when it was paired. */
+            device_name?: string | null;
+            /** Format: double */
+            digital_gain?: number | null;
+            /** Format: int64 */
+            exposure_us?: number | null;
+            firmware_version?: string | null;
+            /** Format: int64 */
+            focus_score?: number | null;
+            /** Format: int64 */
+            height?: number | null;
+            /** Format: int64 */
+            jpeg_quality?: number | null;
+            /** Format: double */
+            lens_position?: number | null;
+            /** Format: int64 */
+            mean_luma?: number | null;
+            sensor?: string | null;
+            trigger?: string | null;
+            /** Format: int64 */
+            width?: number | null;
         };
         PhotoFace: {
             /** @description Fractions of the oriented image, 0..1. */
@@ -820,9 +955,55 @@ export interface components {
             thumbnail_failures: number;
             unresolved_pending: number;
         };
+        /** @description Renaming a household is an administrator action. */
+        RenameHouseholdRequest: {
+            display_name: string;
+        };
         RotatePhoto: {
             /** Format: int32 */
             degrees: number;
+        };
+        /** @description What `/healthz` reports about the schema, and what a refused request says. */
+        SchemaReport: {
+            /** @description `ok`, `schema_migration_pending` or `schema_migration_drift`. */
+            code: string;
+            /**
+             * Format: int64
+             * @description The highest migration this database has recorded.
+             */
+            current_version: number;
+            detail?: string | null;
+            /**
+             * Format: int64
+             * @description The version this build was compiled against.
+             */
+            expected_version: number;
+            /** @description How many of this build's migrations have not been applied. */
+            pending: number;
+        };
+        /**
+         * @description The libcamera control names `rpicam-still --metadata-format json` prints,
+         *     which the Pi already writes beside each capture. Accepting this shape lets
+         *     the Pi forward its sidecar unchanged; explicit `capture` fields win.
+         *
+         *     Unknown controls are ignored.
+         */
+        SensorMetadata: {
+            /**
+             * @description libcamera prints this as an integer enum in some builds and a name in
+             *     others, so it is read loosely and normalised below.
+             */
+            AfState?: unknown;
+            /** Format: double */
+            AnalogueGain?: number | null;
+            /** Format: int64 */
+            ColourTemperature?: number | null;
+            /** Format: double */
+            DigitalGain?: number | null;
+            /** Format: int64 */
+            ExposureTime?: number | null;
+            /** Format: double */
+            LensPosition?: number | null;
         };
         SignupRequest: {
             display_name: string;
@@ -850,15 +1031,19 @@ export interface components {
          *     guided enrollment so both grant the same contract.
          */
         UploadRequest: {
+            capture?: null | components["schemas"]["CaptureMetadata"];
             capture_id: string;
             /** Format: int64 */
             content_length: number;
             content_type: string;
+            sensor_metadata?: null | components["schemas"]["SensorMetadata"];
         };
         User: {
             display_name: string;
             /** @description Set once the user completes household onboarding. */
             household_id?: string | null;
+            /** @description Account-level standing in that household: `admin` or `member`. */
+            household_role: string;
             id: string;
             /** @description The person record in the catalog that represents this user. */
             person_id?: string | null;
@@ -1288,6 +1473,29 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdSummary"];
+                };
+            };
+        };
+    };
+    patchApiHousehold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameHouseholdRequest"];
+            };
+        };
         responses: {
             200: {
                 headers: {

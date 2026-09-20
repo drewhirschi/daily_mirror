@@ -21,8 +21,17 @@ pub async fn post(
     if let Err(status) = upload_auth::authorize(&registry, &headers).await {
         return status;
     }
-    finalize_upload(&store, &catalog, &processing, &id)
-        .await
-        .map(|()| { crate::background::notify(&wait, Some(id.clone())); StatusCode::NO_CONTENT })
-        .unwrap_or_else(|error| error.status_code())
+    match finalize_upload(&store, &catalog, &processing, &id).await {
+        Ok(()) => {
+            crate::background::notify(&wait, Some(id.clone()));
+            StatusCode::NO_CONTENT
+        }
+        Err(error) => {
+            // A bare status in the camera's log is not enough to debug from:
+            // say what actually went wrong. Nothing here carries a credential.
+            let status = error.status_code();
+            eprintln!("upload_finalize_failed capture_id={id} status={status} error={error}");
+            status
+        }
+    }
 }

@@ -34,9 +34,26 @@ export async function createPasskey(options: JsonObject) {
   };
 }
 
-export async function getPasskey(options: JsonObject) {
+export function supportsConditionalPasskeys() {
+  return (
+    supportsPasskeys() &&
+    typeof PublicKeyCredential.isConditionalMediationAvailable === "function"
+  );
+}
+
+/**
+ * `signal` lets a conditional (autofill) request be abandoned when the person
+ * types a password instead; `conditional` asks the browser to offer saved
+ * passkeys inline rather than opening a modal.
+ */
+export async function getPasskey(
+  options: JsonObject,
+  { conditional = false, signal }: { conditional?: boolean; signal?: AbortSignal } = {},
+) {
   const publicKey = options.publicKey as JsonObject;
   const credential = await navigator.credentials.get({
+    signal,
+    ...(conditional ? { mediation: "conditional" as CredentialMediationRequirement } : {}),
     publicKey: {
       ...publicKey,
       challenge: decode(publicKey.challenge as string),

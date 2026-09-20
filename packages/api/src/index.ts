@@ -14,6 +14,10 @@ export type UploadRequest = components["schemas"]["UploadRequest"];
 export type PersonFlipbook = components["schemas"]["PersonFlipbook"];
 export type FlipbookFrame = components["schemas"]["FlipbookFrame"];
 export type Photo = components["schemas"]["Photo"];
+/** What took a photograph, as the gallery shows it. See docs/capture-metadata.md. */
+export type PhotoCapture = components["schemas"]["PhotoCapture"];
+/** What a camera reports with its upload grant. */
+export type CaptureMetadata = components["schemas"]["CaptureMetadata"];
 export type User = components["schemas"]["User"];
 export type Passkey = components["schemas"]["PasskeySummary"];
 export type NativeSession = components["schemas"]["NativeSession"];
@@ -130,10 +134,12 @@ export class MirrorApi {
       body: JSON.stringify(input),
     });
   }
-  passkeyStart(username: string) {
-    const input: components["schemas"]["NativePasskeyLoginStart"] = {
-      username,
-    };
+  /** Omit the username to let the platform offer its own passkey picker. */
+  passkeyStart(username?: string) {
+    const trimmed = username?.trim();
+    const input: components["schemas"]["NativePasskeyLoginStart"] = trimmed
+      ? { username: trimmed }
+      : {};
     return this.request<components["schemas"]["NativePasskeyChallenge"]>(
       "/api/auth/login/native/passkey/start",
       { method: "POST", body: JSON.stringify(input) },
@@ -153,6 +159,15 @@ export class MirrorApi {
   }
   household(signal?: AbortSignal) {
     return this.request<HouseholdSummary>("/api/household", { signal });
+  }
+  renameHousehold(displayName: string) {
+    const input: components["schemas"]["RenameHouseholdRequest"] = {
+      display_name: displayName,
+    };
+    return this.request<HouseholdSummary>("/api/household", {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
   }
   addHouseholdPerson(input: CreatePersonRequest) {
     return this.request<HouseholdPerson>("/api/household/people", {

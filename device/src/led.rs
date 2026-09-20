@@ -30,13 +30,6 @@ impl LedMode {
             Self::RgbCommonAnode => [!(green || yellow), true, !(red || yellow)],
         }
     }
-
-    pub fn high_duty_cycle(self, brightness: f64) -> f64 {
-        match self {
-            Self::Discrete => brightness,
-            Self::RgbCommonAnode => 1.0 - brightness,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -50,9 +43,6 @@ mod tests {
         assert_eq!(mode.levels(true, false, false), [false, true, true]);
         assert_eq!(mode.levels(false, true, false), [false, true, false]);
         assert_eq!(mode.levels(false, false, true), [true, true, false]);
-        assert_eq!(mode.high_duty_cycle(0.0), 1.0);
-        assert_eq!(mode.high_duty_cycle(1.0), 0.0);
-        assert!((mode.high_duty_cycle(0.25) - 0.75).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -64,7 +54,6 @@ mod tests {
                 }
             }
         }
-        assert_eq!(LedMode::Discrete.high_duty_cycle(0.25), 0.25);
     }
 
     #[test]

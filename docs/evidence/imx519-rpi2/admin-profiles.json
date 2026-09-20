@@ -1,0 +1,274 @@
+[
+  {
+    "profile": "neutral",
+    "photo": "20260911T035757Z-914c13ec.jpg",
+    "metadata": {
+      "camera_args": [
+        "--nopreview",
+        "--timeout",
+        "3000",
+        "--encoding",
+        "jpg",
+        "--quality",
+        "95",
+        "--width",
+        "4656",
+        "--height",
+        "3496",
+        "--autofocus-mode",
+        "continuous",
+        "--autofocus-range",
+        "normal",
+        "--autofocus-speed",
+        "fast",
+        "--autofocus-window",
+        "0.2,0.15,0.6,0.7",
+        "--saturation",
+        "1",
+        "--sharpness",
+        "1",
+        "--contrast",
+        "1",
+        "--exposure",
+        "normal",
+        "--denoise",
+        "auto"
+      ],
+      "captured_at": "2026-09-11T03:58:01.518895867+00:00",
+      "orientation": {
+        "hflip": false,
+        "rotation_degrees": 0,
+        "vflip": false
+      },
+      "sensor": "imx519",
+      "sensor_metadata": {
+        "AeState": 1,
+        "AfPauseState": 0,
+        "AfState": 2,
+        "AnalogueGain": 4.376069,
+        "ColourCorrectionMatrix": [
+          1.411435,
+          -0.253148,
+          -0.158287,
+          -0.278013,
+          1.440808,
+          -0.162803,
+          -0.018135,
+          -0.542557,
+          1.560689
+        ],
+        "ColourGains": [
+          1.637433,
+          1.929967
+        ],
+        "ColourTemperature": 3798,
+        "DigitalGain": 1.001097,
+        "ExposureTime": 59978,
+        "FocusFoM": 5087,
+        "FrameDuration": 111092,
+        "FrameWallClock": 1789099080751159552,
+        "LensPosition": 7.126821,
+        "Lux": 7.279288,
+        "ScalerCrop": "(0, 0)/4656x3496",
+        "SensorBlackLevels": [
+          4096,
+          4096,
+          4096,
+          4096
+        ],
+        "SensorTimestamp": 2628168678000
+      },
+      "settings": {
+        "profile": "neutral",
+        "test_mode": true
+      },
+      "tuning_file": "config/imx519-af.json"
+    },
+    "image_size": [
+      4656,
+      3496
+    ]
+  },
+  {
+    "profile": "fast",
+    "photo": "20260911T035803Z-9d89ebd8.jpg",
+    "metadata": {
+      "camera_args": [
+        "--nopreview",
+        "--timeout",
+        "3000",
+        "--encoding",
+        "jpg",
+        "--quality",
+        "95",
+        "--width",
+        "2328",
+        "--height",
+        "1748",
+        "--autofocus-mode",
+        "continuous",
+        "--autofocus-range",
+        "normal",
+        "--autofocus-speed",
+        "fast",
+        "--autofocus-window",
+        "0.2,0.15,0.6,0.7",
+        "--mode",
+        "2328:1748:10:P",
+        "--saturation",
+        "1.15",
+        "--sharpness",
+        "1.15",
+        "--contrast",
+        "1",
+        "--exposure",
+        "sport",
+        "--denoise",
+        "auto"
+      ],
+      "captured_at": "2026-09-11T03:58:07.060475994+00:00",
+      "orientation": {
+        "hflip": false,
+        "rotation_degrees": 0,
+        "vflip": false
+      },
+      "sensor": "imx519",
+      "sensor_metadata": {
+        "AeState": 1,
+        "AfPauseState": 0,
+        "AfState": 2,
+        "AnalogueGain": 5.988304,
+        "ColourCorrectionMatrix": [
+          1.583699,
+          -0.396339,
+          -0.187359,
+          -0.357691,
+          1.552229,
+          -0.194546,
+          -0.059312,
+          -0.730038,
+          1.789347
+        ],
+        "ColourGains": [
+          1.640947,
+          1.924907
+        ],
+        "ColourTemperature": 3810,
+        "DigitalGain": 1.00207,
+        "ExposureTime": 43772,
+        "FocusFoM": 701,
+        "FrameDuration": 44276,
+        "FrameWallClock": 1789099086795264256,
+        "LensPosition": 7.094556,
+        "Lux": 7.717939,
+        "ScalerCrop": "(0, 0)/4656x3496",
+        "SensorBlackLevels": [
+          4096,
+          4096,
+          4096,
+          4096
+        ],
+        "SensorTimestamp": 2634212783000
+      },
+      "settings": {
+        "profile": "fast",
+        "test_mode": true
+      },
+      "tuning_file": "config/imx519-portrait.json"
+    },
+    "image_size": [
+      2328,
+      1748
+    ]
+  },
+  {
+    "profile": "vibrant",
+    "photo": "20260911T035807Z-2e006da1.jpg",
+    "metadata": {
+      "camera_args": [
+        "--nopreview",
+        "--timeout",
+        "3000",
+        "--encoding",
+        "jpg",
+        "--quality",
+        "95",
+        "--width",
+        "4656",
+        "--height",
+        "3496",
+        "--autofocus-mode",
+        "continuous",
+        "--autofocus-range",
+        "normal",
+        "--autofocus-speed",
+        "fast",
+        "--autofocus-window",
+        "0.2,0.15,0.6,0.7",
+        "--saturation",
+        "1.15",
+        "--sharpness",
+        "1.15",
+        "--contrast",
+        "1",
+        "--exposure",
+        "sport",
+        "--denoise",
+        "auto"
+      ],
+      "captured_at": "2026-09-11T03:58:12.152570183+00:00",
+      "orientation": {
+        "hflip": false,
+        "rotation_degrees": 0,
+        "vflip": false
+      },
+      "sensor": "imx519",
+      "sensor_metadata": {
+        "AeState": 1,
+        "AfPauseState": 0,
+        "AfState": 2,
+        "AnalogueGain": 5.988304,
+        "ColourCorrectionMatrix": [
+          1.586008,
+          -0.398633,
+          -0.187375,
+          -0.358922,
+          1.548691,
+          -0.189777,
+          -0.059391,
+          -0.730222,
+          1.789611
+        ],
+        "ColourGains": [
+          1.632537,
+          1.937091
+        ],
+        "ColourTemperature": 3781,
+        "DigitalGain": 1.002009,
+        "ExposureTime": 43790,
+        "FocusFoM": 5676,
+        "FrameDuration": 111092,
+        "FrameWallClock": 1789099091392492544,
+        "LensPosition": 7.083292,
+        "Lux": 7.260661,
+        "ScalerCrop": "(0, 0)/4656x3496",
+        "SensorBlackLevels": [
+          4096,
+          4096,
+          4096,
+          4096
+        ],
+        "SensorTimestamp": 2638810011000
+      },
+      "settings": {
+        "profile": "vibrant",
+        "test_mode": true
+      },
+      "tuning_file": "config/imx519-portrait.json"
+    },
+    "image_size": [
+      4656,
+      3496
+    ]
+  }
+]

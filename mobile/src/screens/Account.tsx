@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSession, type ActiveSession } from "../session";
 import { IMAGE_CACHE_BUDGET } from "../cache/disk-cache";
+import { NATIVE_PASSKEYS_ENABLED } from "../auth-features";
 import { Button, styles, useColors } from "../ui";
 
 export function Account({
@@ -38,6 +39,14 @@ export function Account({
     queryKey: ["passkeys"],
     queryFn: ({ signal }) => session.api.passkeys(signal),
     staleTime: 60_000,
+  });
+  // Shares the Household screen's cache entry, so opening either keeps both
+  // showing the same name.
+  const household = useQuery({
+    queryKey: ["household"],
+    queryFn: ({ signal }) => session.api.household(signal),
+    staleTime: 15_000,
+    retry: false,
   });
   useFocusEffect(
     useCallback(() => {
@@ -112,20 +121,33 @@ export function Account({
         >
           <Ionicons name="people-outline" color={c.accent} size={24} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.subtitle, { color: c.text }]}>Household</Text>
+            <Text style={[styles.subtitle, { color: c.text }]}>
+              {household.data?.display_name ?? "Household"}
+            </Text>
             <Text style={{ color: c.secondary, marginTop: 4, lineHeight: 22 }}>
               Add the people who live here and take enrollment photos.
             </Text>
           </View>
           <Ionicons name="chevron-forward" color={c.secondary} size={20} />
         </Pressable>
-        <View style={[styles.card, { backgroundColor: c.card }]}>
-          <Text style={[styles.subtitle, { color: c.text }]}>Your mirrors</Text>
-          <Text style={{ color: c.secondary, lineHeight: 23 }}>
-            See the mirrors in your household, and add a new one.
-          </Text>
-          <Button title="Mirrors" quiet onPress={onOpenDevices} />
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onOpenDevices}
+          style={({ pressed }) => [
+            styles.card,
+            styles.row,
+            { backgroundColor: c.card, gap: 14, opacity: pressed ? 0.6 : 1 },
+          ]}
+        >
+          <Ionicons name="camera-outline" color={c.accent} size={24} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.subtitle, { color: c.text }]}>Cameras</Text>
+            <Text style={{ color: c.secondary, marginTop: 4, lineHeight: 22 }}>
+              See the cameras in your household, and add a new one.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" color={c.secondary} size={20} />
+        </Pressable>
         <View style={[styles.card, { backgroundColor: c.card }]}>
           <Text style={[styles.subtitle, { color: c.text }]}>
             On this {deviceName}
@@ -210,8 +232,9 @@ export function Account({
             </Text>
           )}
           <Text style={{ color: c.secondary, lineHeight: 23 }}>
-            Add and manage passkeys in your web account. Use a saved passkey or
-            your password to sign in; your session stays in Keychain.
+            {NATIVE_PASSKEYS_ENABLED
+              ? "Add and manage passkeys in your web account. Use a saved passkey or your password to sign in; your session stays in Keychain."
+              : "Passkeys are available on the website. This app uses password sign-in; your session stays in Keychain."}
           </Text>
           <Button
             title="Open web account"

@@ -21,6 +21,15 @@ const LOGIN_WINDOW: Duration = Duration::from_secs(15 * 60);
 const LOGIN_BLOCK: Duration = Duration::from_secs(15 * 60);
 const LOGIN_MAX_FAILURES: u32 = 8;
 
+/// Account-level standing inside a household. There is no role table: a role
+/// is a property of the account's membership, so it lives on `users`.
+pub const ROLE_ADMIN: &str = "admin";
+pub const ROLE_MEMBER: &str = "member";
+
+/// Discoverable (usernameless) ceremonies have no account until the assertion
+/// arrives, so their state is stored apart from the user-bound ceremonies.
+const DISCOVERABLE_KIND: &str = "passkey-discoverable";
+
 #[derive(Clone, Debug)]
 pub struct AuthStore {
     inner: Arc<AuthInner>,
@@ -47,6 +56,8 @@ pub struct User {
     pub household_id: Option<String>,
     /// The person record in the catalog that represents this user.
     pub person_id: Option<String>,
+    /// Account-level standing in that household: `admin` or `member`.
+    pub household_role: String,
 }
 
 impl User {
@@ -136,56 +147,15 @@ impl AuthStore {
                     }
                 };
                 let connection = database.connect().map_err(io::Error::other)?;
-                connection
-                    .execute_batch(
-                        "CREATE TABLE IF NOT EXISTS users (
-                            id TEXT PRIMARY KEY,
-                            username TEXT NOT NULL COLLATE NOCASE UNIQUE,
-                            display_name TEXT NOT NULL,
-                            password_hash TEXT NOT NULL,
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                        );
-                        CREATE TABLE IF NOT EXISTS auth_sessions (
-                            token_hash TEXT PRIMARY KEY,
-                            user_id TEXT NOT NULL,
-                            expires_at INTEGER NOT NULL,
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-                        );
-                        CREATE INDEX IF NOT EXISTS auth_sessions_user_expires
-                            ON auth_sessions(user_id, expires_at);
-                        CREATE TABLE IF NOT EXISTS passkeys (
-                            credential_id TEXT PRIMARY KEY,
-                            user_id TEXT NOT NULL,
-                            label TEXT NOT NULL,
-                            passkey_json TEXT NOT NULL,
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            last_used_at TEXT,
-                            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-                        );
-                        CREATE INDEX IF NOT EXISTS passkeys_user
-                            ON passkeys(user_id, created_at);
-                        CREATE TABLE IF NOT EXISTS auth_ceremonies (
-                            token_hash TEXT PRIMARY KEY,
-                            kind TEXT NOT NULL,
-                            user_id TEXT NOT NULL,
-                            state_json TEXT NOT NULL,
-                            expires_at INTEGER NOT NULL,
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-                        );
-                        CREATE TABLE IF NOT EXISTS auth_login_limits (
-                            key_hash TEXT PRIMARY KEY,
-                            failures INTEGER NOT NULL,
-                            window_started_at INTEGER NOT NULL,
-                            blocked_until INTEGER NOT NULL
-                        );",
-                    )
-                    .await
-                    .map_err(io::Error::other)?;
-                ensure_column(&connection, "household_id", "TEXT").await?;
-                ensure_column(&connection, "person_id", "TEXT").await?;
+                // The schema itself lives in `server/migrations/`. A local
+                // file is this process's own database, so it is migrated here;
+                // the shared Turso database is only checked, because changing
+                // it belongs to `daily-mirror-migrate up` before the deploy.
+                crate::migrations::prepare(
+                    &connection,
+                    matches!(&self.inner.location, AuthLocation::Local(_)),
+                )
+                .await?;
                 Ok(database)
             })
             .await
@@ -210,6 +180,7 @@ impl AuthStore {
             display_name,
             household_id: None,
             person_id: None,
+            household_role: ROLE_MEMBER.to_owned(),
         };
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         connection
@@ -240,7 +211,8 @@ impl AuthStore {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         let mut rows = connection
             .query(
-                "SELECT id, username, display_name, household_id, person_id, password_hash
+                "SELECT id, username, display_name, household_id, person_id,
+                        household_role, password_hash
                  FROM users WHERE username = ?1 COLLATE NOCASE",
                 params![username],
             )
@@ -255,8 +227,9 @@ impl AuthStore {
                     display_name: row.get(2).map_err(io::Error::other)?,
                     household_id: row.get(3).map_err(io::Error::other)?,
                     person_id: row.get(4).map_err(io::Error::other)?,
+                    household_role: row.get(5).map_err(io::Error::other)?,
                 }),
-                Some(row.get::<String>(5).map_err(io::Error::other)?),
+                Some(row.get::<String>(6).map_err(io::Error::other)?),
             ),
             None => (None, None),
         };
@@ -283,8 +256,8 @@ impl AuthStore {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         let mut rows = connection
             .query(
-                "SELECT id, username, display_name, household_id, person_id FROM users
-                 WHERE username = ?1 COLLATE NOCASE",
+                "SELECT id, username, display_name, household_id, person_id, household_role
+                 FROM users WHERE username = ?1 COLLATE NOCASE",
                 params![username],
             )
             .await
@@ -325,6 +298,18 @@ impl AuthStore {
     }
 
     pub async fn record_login_failure(&self, scope: &str) -> io::Result<()> {
+        self.record_login_failure_limited(scope, LOGIN_MAX_FAILURES)
+            .await
+    }
+
+    /// Some scopes deserve a tighter budget than a password attempt. A
+    /// usernameless passkey challenge identifies nobody, so it is limited by
+    /// address alone and must not be cheap to farm.
+    pub async fn record_login_failure_limited(
+        &self,
+        scope: &str,
+        max_failures: u32,
+    ) -> io::Result<()> {
         let now = unix_now()?;
         let key_hash = secret_hash(scope);
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
@@ -351,7 +336,7 @@ impl AuthStore {
                     key_hash,
                     now,
                     LOGIN_WINDOW.as_secs(),
-                    LOGIN_MAX_FAILURES,
+                    max_failures,
                     LOGIN_BLOCK.as_secs()
                 ],
             )
@@ -376,7 +361,7 @@ impl AuthStore {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
         let mut rows = connection
             .query(
-                "SELECT id, username, display_name, household_id, person_id
+                "SELECT id, username, display_name, household_id, person_id, household_role
                  FROM users WHERE id = ?1",
                 params![id],
             )
@@ -423,7 +408,7 @@ impl AuthStore {
         let mut rows = connection
             .query(
                 "SELECT users.id, users.username, users.display_name,
-                        users.household_id, users.person_id
+                        users.household_id, users.person_id, users.household_role
                  FROM auth_sessions
                  JOIN users ON users.id = auth_sessions.user_id
                  WHERE auth_sessions.token_hash = ?1 AND auth_sessions.expires_at > ?2",
@@ -581,6 +566,116 @@ impl AuthStore {
         }
     }
 
+    /// Store a ceremony that is not yet bound to an account. The user is only
+    /// known once the authenticator returns a user handle.
+    pub async fn store_discoverable_ceremony(&self, state_json: &str) -> io::Result<String> {
+        let token = random_token();
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        connection
+            .execute(
+                "DELETE FROM auth_discoverable_ceremonies WHERE expires_at <= ?1",
+                params![unix_now()?],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        connection
+            .execute(
+                "INSERT INTO auth_discoverable_ceremonies
+                    (token_hash, kind, state_json, expires_at)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    secret_hash(&token),
+                    DISCOVERABLE_KIND,
+                    state_json,
+                    unix_now()?.saturating_add(CEREMONY_TTL.as_secs())
+                ],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        Ok(token)
+    }
+
+    /// Single use, exactly like [`Self::take_ceremony`], so a captured
+    /// assertion cannot be replayed.
+    pub async fn take_discoverable_ceremony(&self, token: &str) -> io::Result<Option<String>> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let mut rows = connection
+            .query(
+                "DELETE FROM auth_discoverable_ceremonies
+                 WHERE token_hash = ?1 AND kind = ?2 AND expires_at > ?3
+                 RETURNING state_json",
+                params![secret_hash(token), DISCOVERABLE_KIND, unix_now()?],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let Some(row) = rows.next().await.map_err(io::Error::other)? else {
+            return Ok(None);
+        };
+        Ok(Some(row.get(0).map_err(io::Error::other)?))
+    }
+
+    /// Set an account's standing in its household.
+    pub async fn set_household_role(&self, user_id: &str, role: &str) -> io::Result<()> {
+        let role = validate_household_role(role)?;
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let changed = connection
+            .execute(
+                "UPDATE users SET household_role = ?2, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?1",
+                params![user_id, role],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        if changed == 0 {
+            Err(io::Error::new(io::ErrorKind::NotFound, "user not found"))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// The accounts linked to a household, as `(person_id, role)` pairs. The
+    /// catalog lives in its own database in tests, so membership roles are
+    /// resolved here rather than joined in SQL.
+    pub async fn household_account_roles(
+        &self,
+        household_id: &str,
+    ) -> io::Result<Vec<(String, String)>> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let mut rows = connection
+            .query(
+                "SELECT person_id, household_role FROM users
+                 WHERE household_id = ?1 AND person_id IS NOT NULL",
+                params![household_id],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let mut roles = Vec::new();
+        while let Some(row) = rows.next().await.map_err(io::Error::other)? {
+            roles.push((
+                row.get(0).map_err(io::Error::other)?,
+                row.get(1).map_err(io::Error::other)?,
+            ));
+        }
+        Ok(roles)
+    }
+
+    /// Usernames of the accounts linked to a household, for the admin survey.
+    pub async fn household_usernames(&self, household_id: &str) -> io::Result<Vec<String>> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let mut rows = connection
+            .query(
+                "SELECT username FROM users WHERE household_id = ?1 ORDER BY username",
+                params![household_id],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let mut usernames = Vec::new();
+        while let Some(row) = rows.next().await.map_err(io::Error::other)? {
+            usernames.push(row.get(0).map_err(io::Error::other)?);
+        }
+        Ok(usernames)
+    }
+
     /// Point a user at the household and person record created during signup.
     pub async fn link_household(
         &self,
@@ -613,35 +708,6 @@ impl AuthStore {
             .await
             .map_err(io::Error::other)?;
         Ok(())
-    }
-}
-
-/// Older databases predate household linkage; add the columns in place.
-async fn ensure_column(
-    connection: &libsql::Connection,
-    name: &str,
-    definition: &str,
-) -> io::Result<()> {
-    let mut rows = connection
-        .query("PRAGMA table_info(users)", ())
-        .await
-        .map_err(io::Error::other)?;
-    while let Some(row) = rows.next().await.map_err(io::Error::other)? {
-        let existing: String = row.get(1).map_err(io::Error::other)?;
-        if existing == name {
-            return Ok(());
-        }
-    }
-    match connection
-        .execute(
-            &format!("ALTER TABLE users ADD COLUMN {name} {definition}"),
-            (),
-        )
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(error) if error.to_string().contains("duplicate column name") => Ok(()),
-        Err(error) => Err(io::Error::other(error)),
     }
 }
 
@@ -689,6 +755,7 @@ fn row_to_user(row: Option<libsql::Row>) -> io::Result<Option<User>> {
             display_name: row.get(2).map_err(io::Error::other)?,
             household_id: row.get(3).map_err(io::Error::other)?,
             person_id: row.get(4).map_err(io::Error::other)?,
+            household_role: row.get(5).map_err(io::Error::other)?,
         })
     })
     .transpose()
@@ -757,6 +824,15 @@ fn validate_password(password: &str) -> io::Result<()> {
         return Err(invalid_config("password must be 12-1024 characters"));
     }
     Ok(())
+}
+
+pub(crate) fn validate_household_role(role: &str) -> io::Result<String> {
+    let role = role.trim().to_ascii_lowercase();
+    if role == ROLE_ADMIN || role == ROLE_MEMBER {
+        Ok(role)
+    } else {
+        Err(invalid_config("role must be \"admin\" or \"member\""))
+    }
 }
 
 fn validate_passkey_label(label: &str) -> io::Result<String> {

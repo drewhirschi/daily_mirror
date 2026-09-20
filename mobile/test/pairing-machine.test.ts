@@ -29,7 +29,7 @@ function fakeDevice(
     reads: number;
   } = { reads: 0 };
   const device: PairingDevice = {
-    name: "Mirror-4F2A",
+    name: "mirror-4f2a",
     connect: async () => undefined,
     scanWifi: async () => [{ ssid: "Home", rssi: -40, open: false }],
     async sendPayload(payload) {
@@ -57,11 +57,10 @@ const run = (
   from: PairingState = initialPairingState,
 ) => events.reduce(pairingReducer, from);
 
-test("the happy path walks instructions to success", () => {
+test("the BLE happy path opens on device selection and walks to success", () => {
   const { device } = fakeDevice([]);
-  let state = run([{ type: "begin", needsManualJoin: true }]);
-  assert.equal(state.step, "join");
-  state = run([{ type: "joined" }], state);
+  assert.equal(initialPairingState.step, "discover");
+  let state = run([{ type: "begin", needsManualJoin: false }]);
   assert.deepEqual([state.step, state.busy], ["discover", true]);
   state = run([{ type: "found", devices: [device] }], state);
   assert.deepEqual(
@@ -101,8 +100,10 @@ test("the happy path walks instructions to success", () => {
   );
 });
 
-test("Android skips the manual join step", () => {
-  const state = run([{ type: "begin", needsManualJoin: false }]);
+test("the SoftAP fallback still inserts the manual join step", () => {
+  let state = run([{ type: "begin", needsManualJoin: true }]);
+  assert.deepEqual([state.step, state.busy], ["join", false]);
+  state = run([{ type: "joined" }], state);
   assert.deepEqual([state.step, state.busy], ["discover", true]);
 });
 
@@ -152,11 +153,11 @@ test("a device-reported failure retries from the send step with plain words", ()
 test("a failed scan returns to discover and can be scanned again", () => {
   let state = run([
     { type: "begin", needsManualJoin: false },
-    { type: "failed", message: "No mirror answered.", retryStep: "discover" },
+    { type: "failed", message: "No camera answered.", retryStep: "discover" },
   ]);
   assert.deepEqual(
     [state.step, state.busy, state.error],
-    ["discover", false, "No mirror answered."],
+    ["discover", false, "No camera answered."],
   );
   state = run([{ type: "retry" }], state);
   assert.deepEqual(
@@ -165,7 +166,7 @@ test("a failed scan returns to discover and can be scanned again", () => {
   );
 });
 
-test("back walks the flow out one step at a time", () => {
+test("back returns from Wi-Fi to device selection and stops there", () => {
   const { device } = fakeDevice([]);
   let state = run([
     { type: "begin", needsManualJoin: false },
@@ -174,8 +175,9 @@ test("back walks the flow out one step at a time", () => {
     { type: "back" },
   ]);
   assert.deepEqual([state.step, state.device], ["discover", null]);
+  // Device selection is the first step now, so there is nowhere further back.
   state = run([{ type: "back" }], state);
-  assert.equal(state.step, "instructions");
+  assert.equal(state.step, "discover");
 });
 
 test("provisioning mints a token, sends the payload, then the Wi-Fi credentials", async () => {
@@ -341,14 +343,14 @@ test("errors are turned into words a person can act on", () => {
   );
   assert.match(
     stepErrorMessage(new Error("Request aborted"), "discover"),
-    /No mirror answered/,
+    /No camera answered/,
   );
   assert.match(
     stepErrorMessage(new Error("could not connect to host"), "wifi"),
-    /joined to its Wi-Fi network/,
+    /Bluetooth is on/,
   );
   assert.match(
     stepErrorMessage(new Error("Request timed out"), "confirm"),
-    /still on its Wi-Fi network/,
+    /Move closer to it/,
   );
 });

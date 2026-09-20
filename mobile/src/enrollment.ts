@@ -2,6 +2,7 @@ import {
   ApiError,
   REQUIRED_ENROLLMENT_PHOTOS,
   type EnrollmentStatus,
+  type CaptureMetadata,
   type MirrorApi,
   type UploadGrant,
 } from "@daily-mirror/api";
@@ -227,6 +228,7 @@ export class EnrollmentUploader {
     fileUri: string,
     byteLength: number,
     contentType = "image/jpeg",
+    capture: CaptureMetadata = {},
   ): Promise<void> {
     const photoId = this.slots[slotIndex]?.photoId ?? createCaptureId();
     this.update(slotIndex, {
@@ -239,10 +241,10 @@ export class EnrollmentUploader {
     });
     try {
       try {
-        await this.send(photoId, fileUri, byteLength, contentType);
+        await this.send(photoId, fileUri, byteLength, contentType, capture);
       } catch (error) {
         if (!isRetryable(error)) throw error;
-        await this.send(photoId, fileUri, byteLength, contentType);
+        await this.send(photoId, fileUri, byteLength, contentType, capture);
       }
       this.update(slotIndex, { status: "processing" });
     } catch (error) {
@@ -262,11 +264,14 @@ export class EnrollmentUploader {
     fileUri: string,
     byteLength: number,
     contentType: string,
+    capture: CaptureMetadata = {},
   ) {
     const grant = await this.api.createEnrollmentUpload(this.personId, {
       capture_id: photoId,
       content_type: contentType,
       content_length: byteLength,
+      // The phone knows what took the photograph; the server records the rest.
+      capture: { capture_source: "phone", trigger: "app", ...capture },
     });
     await this.put(grant, fileUri, byteLength, contentType);
     await this.api.finalizeEnrollmentUpload(this.personId, photoId);

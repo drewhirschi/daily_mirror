@@ -1,5 +1,4 @@
 use std::io;
-use std::sync::Arc;
 
 use axum::http::StatusCode;
 use daily_mirror_vision_contract::{
@@ -7,7 +6,6 @@ use daily_mirror_vision_contract::{
     MAX_CLAIM_LIMIT, PhotoAnalysisResult, QueueStatus,
 };
 use libsql::{TransactionBehavior, params};
-use tokio::sync::OnceCell;
 use uuid::Uuid;
 
 use crate::catalog::PhotoCatalog;
@@ -21,7 +19,6 @@ const MAX_HOSTED_CONCURRENCY: u32 = 8;
 #[derive(Clone, Debug)]
 pub struct ProcessingQueue {
     pub(crate) catalog: PhotoCatalog,
-    schema: Arc<OnceCell<()>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,10 +48,7 @@ impl ProcessingError {
 
 impl ProcessingQueue {
     pub fn new(catalog: PhotoCatalog) -> Self {
-        Self {
-            catalog,
-            schema: Arc::new(OnceCell::new()),
-        }
+        Self { catalog }
     }
 
     pub async fn enqueue_active_photo(&self, photo_id: &str) -> io::Result<bool> {
@@ -580,104 +574,11 @@ impl ProcessingQueue {
         transaction.commit().await.map_err(io::Error::other)
     }
 
+    /// Confirm the catalog database is open and at the schema version this
+    /// build expects. The tables themselves are created by the migrations in
+    /// `server/migrations/`; nothing on a request path alters them.
     pub(crate) async fn ensure_schema(&self) -> io::Result<()> {
-        self.schema
-            .get_or_try_init(|| async {
-                let connection = self.catalog.connection().await?;
-                connection
-                    .execute_batch(
-                        "CREATE TABLE IF NOT EXISTS photo_processing (
-                            photo_id TEXT NOT NULL,
-                            pipeline_version TEXT NOT NULL,
-                            status TEXT NOT NULL DEFAULT 'pending'
-                                CHECK(status IN ('pending', 'leased', 'complete', 'failed')),
-                            available_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            lease_token TEXT,
-                            leased_by TEXT,
-                            lease_expires_at TEXT,
-                            attempt_count INTEGER NOT NULL DEFAULT 0,
-                            last_error TEXT,
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            completed_at TEXT,
-                            PRIMARY KEY(photo_id, pipeline_version)
-                        );
-                        CREATE INDEX IF NOT EXISTS photo_processing_claim
-                            ON photo_processing(pipeline_version, status, available_at, lease_expires_at);
-                        CREATE TABLE IF NOT EXISTS photo_analyses (
-                            photo_id TEXT NOT NULL,
-                            pipeline_version TEXT NOT NULL,
-                            oriented_width INTEGER NOT NULL,
-                            oriented_height INTEGER NOT NULL,
-                            original_sha256 TEXT,
-                            face_count INTEGER NOT NULL,
-                            processing_millis INTEGER NOT NULL,
-                            completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            PRIMARY KEY(photo_id, pipeline_version)
-                        );
-                        CREATE TABLE IF NOT EXISTS faces (
-                            id TEXT PRIMARY KEY,
-                            photo_id TEXT NOT NULL,
-                            pipeline_version TEXT NOT NULL,
-                            ordinal INTEGER NOT NULL,
-                            detector_confidence REAL NOT NULL,
-                            bounds_x REAL NOT NULL,
-                            bounds_y REAL NOT NULL,
-                            bounds_width REAL NOT NULL,
-                            bounds_height REAL NOT NULL,
-                            landmark_model TEXT NOT NULL,
-                            landmark_schema TEXT NOT NULL,
-                            landmarks_json TEXT NOT NULL,
-                            embedding_model TEXT NOT NULL,
-                            embedding BLOB NOT NULL,
-                            embedding_dimension INTEGER NOT NULL,
-                            person_id TEXT,
-                            identity_state TEXT NOT NULL DEFAULT 'unknown'
-                                CHECK(identity_state IN ('unknown', 'proposed', 'confirmed')),
-                            identity_source TEXT,
-                            identity_score REAL,
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            UNIQUE(photo_id, pipeline_version, ordinal)
-                        );
-                        CREATE INDEX IF NOT EXISTS faces_photo
-                            ON faces(photo_id, pipeline_version, ordinal);
-                        CREATE TABLE IF NOT EXISTS people (
-                            id TEXT PRIMARY KEY,
-                            display_name TEXT NOT NULL,
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                        );
-                        CREATE INDEX IF NOT EXISTS people_display_name
-                            ON people(display_name COLLATE NOCASE);
-                        CREATE INDEX IF NOT EXISTS faces_person
-                            ON faces(person_id, pipeline_version, photo_id);
-                        CREATE TABLE IF NOT EXISTS households (
-                            id TEXT PRIMARY KEY,
-                            display_name TEXT NOT NULL,
-                            grid_size INTEGER NOT NULL DEFAULT 4
-                                CHECK(grid_size IN (4, 6)),
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                        );
-                        CREATE INDEX IF NOT EXISTS households_display_name
-                            ON households(display_name COLLATE NOCASE);
-                        CREATE TABLE IF NOT EXISTS household_members (
-                            household_id TEXT NOT NULL,
-                            person_id TEXT NOT NULL,
-                            position INTEGER NOT NULL,
-                            PRIMARY KEY(household_id, person_id),
-                            UNIQUE(household_id, position)
-                        );
-                        CREATE INDEX IF NOT EXISTS household_members_person
-                            ON household_members(person_id, household_id);",
-                    )
-                    .await
-                    .map(|_| ())
-                    .map_err(io::Error::other)
-            })
-            .await
-            .copied()
+        self.catalog.connection().await.map(|_| ())
     }
 }
 

@@ -27,7 +27,6 @@ pub fn list(root: &Path) -> Result<Vec<String>> {
         })
         .collect::<Vec<_>>();
     names.sort_unstable_by(|a, b| b.cmp(a));
-    names.truncate(24);
     Ok(names)
 }
 

@@ -15,7 +15,6 @@ use daily_mirror_core::contract::{
 };
 use libsql::{TransactionBehavior, params};
 use tokio::sync::OnceCell;
-use uuid::Uuid;
 
 use crate::auth::{User, random_token, secret_hash};
 use crate::processing::ProcessingQueue;
@@ -23,6 +22,11 @@ use crate::processing::ProcessingQueue;
 /// Wire timestamps are RFC 3339. SQLite stores `YYYY-MM-DD HH:MM:SS` in UTC,
 /// which is lexicographically ordered and therefore safe to compare directly.
 const RFC3339: &str = "strftime('%Y-%m-%dT%H:%M:%SZ', {column})";
+
+/// Shown to a signed-in account that belongs to no household, so the app can
+/// say what is wrong instead of reporting an opaque failure.
+pub const NO_HOUSEHOLD: &str =
+    "This account has no household. Sign up again or ask an administrator to link one.";
 
 #[derive(Clone, Debug)]
 pub struct DeviceRegistry {
@@ -66,104 +70,103 @@ impl DeviceRegistry {
         }
     }
 
-    /// Migrations run the same way the rest of this server migrates: idempotent
-    /// `CREATE TABLE IF NOT EXISTS` statements applied once per process against
-    /// the shared Turso/libsql database.
+    /// Confirm the shared database is open and at the schema version this
+    /// build expects. `devices`, `device_claim_tokens` and `household_users`
+    /// are created by the migrations in `server/migrations/`.
     pub(crate) async fn ensure_schema(&self) -> io::Result<()> {
         self.schema
-            .get_or_try_init(|| async {
-                // Households and their members are owned by the processing
-                // schema; claim tokens reference them.
-                self.queue.ensure_schema().await?;
-                let connection = self.queue.catalog.connection().await?;
-                connection
-                    .execute_batch(
-                        "CREATE TABLE IF NOT EXISTS devices (
-                            device_id TEXT PRIMARY KEY,
-                            household_id TEXT NOT NULL,
-                            device_name TEXT NOT NULL,
-                            hardware TEXT NOT NULL,
-                            firmware_version TEXT NOT NULL,
-                            device_token_hash TEXT NOT NULL UNIQUE,
-                            claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            last_seen_at TEXT,
-                            released_at TEXT
-                        );
-                        CREATE INDEX IF NOT EXISTS devices_household
-                            ON devices(household_id, claimed_at DESC);
-                        CREATE TABLE IF NOT EXISTS device_claim_tokens (
-                            token_hash TEXT PRIMARY KEY,
-                            household_id TEXT NOT NULL,
-                            created_by_user TEXT NOT NULL,
-                            expires_at TEXT NOT NULL,
-                            consumed_at TEXT,
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                        );
-                        CREATE INDEX IF NOT EXISTS device_claim_tokens_household
-                            ON device_claim_tokens(household_id, expires_at);
-                        CREATE TABLE IF NOT EXISTS household_users (
-                            user_id TEXT PRIMARY KEY,
-                            household_id TEXT NOT NULL,
-                            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                        );",
-                    )
-                    .await
-                    .map(|_| ())
-                    .map_err(io::Error::other)
-            })
+            .get_or_try_init(|| async { self.queue.ensure_schema().await })
             .await
             .copied()
     }
 
-    /// The household a signed-in user pairs devices into.
-    ///
-    /// TODO(tenancy): this server has no membership model yet — every account
-    /// sees every photo. Until one lands, a user is bound to the deployment's
-    /// existing household (created on demand) and that binding is recorded in
-    /// `household_users`, so device rows already carry the right foreign key
-    /// when real multi-tenancy arrives.
-    pub async fn household_for_user(&self, user: &User) -> io::Result<String> {
+    /// The firmware version recorded for a paired device, so an upload that
+    /// does not report its own version still lands on the photo row with the
+    /// version that took it.
+    pub async fn firmware_version(&self, device_id: &str) -> io::Result<Option<String>> {
         self.ensure_schema().await?;
         let connection = self.queue.catalog.connection().await?;
-        if let Some(id) = scalar(
+        let mut rows = connection
+            .query(
+                "SELECT firmware_version FROM devices WHERE device_id = ?1",
+                params![device_id],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let Some(row) = rows.next().await.map_err(io::Error::other)? else {
+            return Ok(None);
+        };
+        row.get::<Option<String>>(0).map_err(io::Error::other)
+    }
+
+    /// The household a signed-in user pairs devices into.
+    ///
+    /// Onboarding is the source of truth: the account's `users.household_id`
+    /// decides, so devices pair into exactly the household the Household
+    /// screen shows, and `household_users` is kept in step.
+    ///
+    /// This server is heading for real multi-tenancy, so it never *guesses* a
+    /// household. An account that has none is refused with a clear conflict
+    /// rather than being quietly attached to whichever household happens to
+    /// exist — that could hand one family's cameras to another. Such accounts
+    /// predate onboarding; `daily-mirror-onboarding link-household` links one.
+    ///
+    /// An existing `household_users` row is still honoured, because it is an
+    /// explicit binding that today's paired cameras depend on.
+    pub async fn household_for_user(&self, user: &User) -> io::Result<String> {
+        self.household_for_user_or_none(user)
+            .await?
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, NO_HOUSEHOLD))
+    }
+
+    /// `None` when the account belongs to no household at all.
+    pub async fn household_for_user_or_none(&self, user: &User) -> io::Result<Option<String>> {
+        self.ensure_schema().await?;
+        let connection = self.queue.catalog.connection().await?;
+        if let Some(household_id) = user.household_id.as_deref() {
+            self.bind_household_user(&connection, &user.id, household_id)
+                .await?;
+            return Ok(Some(household_id.to_owned()));
+        }
+        scalar(
             &connection,
             "SELECT household_id FROM household_users WHERE user_id = ?1",
             params![user.id.clone()],
         )
-        .await?
-        {
-            return Ok(id);
-        }
-        let household_id = match scalar(
-            &connection,
-            "SELECT id FROM households ORDER BY created_at, id LIMIT 1",
-            (),
-        )
-        .await?
-        {
-            Some(id) => id,
-            None => {
-                let id = Uuid::new_v4().to_string();
-                connection
-                    .execute(
-                        "INSERT INTO households (id, display_name, grid_size)
-                         VALUES (?1, ?2, 4)",
-                        params![id.clone(), "Home"],
-                    )
-                    .await
-                    .map_err(io::Error::other)?;
-                id
-            }
-        };
+        .await
+    }
+
+    /// Move an account's legacy pairing binding onto a household. The
+    /// `link-household` admin command calls this so a migrated account's
+    /// cameras follow it to its onboarding household.
+    pub async fn bind_user_to_household(
+        &self,
+        user_id: &str,
+        household_id: &str,
+    ) -> io::Result<()> {
+        self.ensure_schema().await?;
+        let connection = self.queue.catalog.connection().await?;
+        self.bind_household_user(&connection, user_id, household_id)
+            .await
+    }
+
+    /// Record (or correct) the legacy account-to-household binding so the two
+    /// resolution paths always agree.
+    async fn bind_household_user(
+        &self,
+        connection: &libsql::Connection,
+        user_id: &str,
+        household_id: &str,
+    ) -> io::Result<()> {
         connection
             .execute(
                 "INSERT INTO household_users (user_id, household_id) VALUES (?1, ?2)
-                 ON CONFLICT(user_id) DO NOTHING",
-                params![user.id.clone(), household_id.clone()],
+                 ON CONFLICT(user_id) DO UPDATE SET household_id = excluded.household_id",
+                params![user_id, household_id],
             )
             .await
             .map_err(io::Error::other)?;
-        Ok(household_id)
+        Ok(())
     }
 
     pub async fn mint_claim_token(
@@ -175,6 +178,23 @@ impl DeviceRegistry {
             .await
     }
 
+    /// Mint against a household the caller has already resolved, so the route
+    /// can report "no household" separately from a storage failure.
+    pub async fn mint_claim_token_for(
+        &self,
+        household_id: &str,
+        user_id: &str,
+        server_url: &str,
+    ) -> io::Result<ClaimTokenGrant> {
+        self.mint_for(
+            household_id,
+            user_id,
+            server_url,
+            CLAIM_TOKEN_TTL_SECONDS as i64,
+        )
+        .await
+    }
+
     /// Test seam for the expiry path. Negative TTLs mint an already-dead token.
     pub async fn mint_claim_token_with_ttl(
         &self,
@@ -183,6 +203,18 @@ impl DeviceRegistry {
         ttl_seconds: i64,
     ) -> io::Result<ClaimTokenGrant> {
         let household_id = self.household_for_user(user).await?;
+        self.mint_for(&household_id, &user.id, server_url, ttl_seconds)
+            .await
+    }
+
+    async fn mint_for(
+        &self,
+        household_id: &str,
+        user_id: &str,
+        server_url: &str,
+        ttl_seconds: i64,
+    ) -> io::Result<ClaimTokenGrant> {
+        self.ensure_schema().await?;
         let connection = self.queue.catalog.connection().await?;
         let claim_token = random_token();
         // Bound as a parameter so a signed offset ("-60 seconds") stays valid
@@ -193,12 +225,7 @@ impl DeviceRegistry {
                 "INSERT INTO device_claim_tokens
                     (token_hash, household_id, created_by_user, expires_at)
                  VALUES (?1, ?2, ?3, datetime('now', ?4))",
-                params![
-                    secret_hash(&claim_token),
-                    household_id.clone(),
-                    user.id.clone(),
-                    modifier
-                ],
+                params![secret_hash(&claim_token), household_id, user_id, modifier],
             )
             .await
             .map_err(io::Error::other)?;
@@ -386,6 +413,22 @@ impl DeviceRegistry {
     }
 }
 
+/// Resolve the caller's household for a route, turning "no household" into a
+/// 409 the app can explain rather than an opaque server error.
+pub async fn require_household(
+    registry: &DeviceRegistry,
+    user: &User,
+) -> Result<String, axum::response::Response> {
+    match registry.household_for_user_or_none(user).await {
+        Ok(Some(household_id)) => Ok(household_id),
+        Ok(None) => Err(crate::auth_http::error(StatusCode::CONFLICT, NO_HOUSEHOLD)),
+        Err(_) => Err(crate::auth_http::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Device service unavailable",
+        )),
+    }
+}
+
 /// "Mirror 4F2A" from the trailing hex of a device ID, so a freshly paired
 /// device has a name a household can recognize before anyone renames it.
 pub fn friendly_device_name(device_id: &str) -> String {
@@ -523,11 +566,30 @@ mod tests {
             }
         }
 
+        /// An account with no household, as every account was before
+        /// onboarding existed.
         async fn user(&self, username: &str) -> User {
             self.auth
                 .create_user(username, username, "strong-test-password")
                 .await
                 .unwrap()
+        }
+
+        /// An onboarded account: it owns a household of its own.
+        async fn linked_user(&self, username: &str) -> User {
+            let user = self.user(username).await;
+            let household = self
+                .registry
+                .queue
+                .create_household(&format!("{username}'s home"), 4)
+                .await
+                .unwrap();
+            let person = self.registry.queue.create_person(username).await.unwrap();
+            self.auth
+                .link_household(&user.id, &household.id, &person.id)
+                .await
+                .unwrap();
+            self.auth.user_by_id(&user.id).await.unwrap().unwrap()
         }
     }
 
@@ -578,7 +640,7 @@ mod tests {
     #[tokio::test]
     async fn a_claim_consumes_its_token_and_issues_a_device_token() {
         let fixture = Fixture::new("claim").await;
-        let user = fixture.user("claimer").await;
+        let user = fixture.linked_user("claimer").await;
         let grant = fixture
             .registry
             .mint_claim_token(&user, "https://mirror.example")
@@ -640,7 +702,7 @@ mod tests {
     #[tokio::test]
     async fn an_expired_claim_token_is_rejected() {
         let fixture = Fixture::new("expired").await;
-        let user = fixture.user("expirer").await;
+        let user = fixture.linked_user("expirer").await;
         let grant = fixture
             .registry
             .mint_claim_token_with_ttl(&user, "https://mirror.example", -60)
@@ -658,26 +720,13 @@ mod tests {
     #[tokio::test]
     async fn a_device_held_by_another_household_cannot_be_reclaimed() {
         let fixture = Fixture::new("conflict").await;
-        let owner = fixture.user("owner").await;
-        let stranger = fixture.user("stranger").await;
-        // Bind the owner first so the stranger does not inherit the same
-        // deployment household.
+        let owner = fixture.linked_user("owner").await;
+        let stranger = fixture.linked_user("stranger").await;
+        // Two onboarded accounts own two different households.
         let owned = fixture.registry.household_for_user(&owner).await.unwrap();
-        // Give the stranger a household of their own.
-        let other = uuid::Uuid::new_v4().to_string();
-        let connection = fixture.registry.queue.catalog.connection().await.unwrap();
-        connection
-            .execute(
-                "INSERT INTO households (id, display_name, grid_size) VALUES (?1, 'Other', 4)",
-                libsql::params![other.clone()],
-            )
-            .await
-            .unwrap();
-        connection
-            .execute(
-                "INSERT INTO household_users (user_id, household_id) VALUES (?1, ?2)",
-                libsql::params![stranger.id.clone(), other.clone()],
-            )
+        let other = fixture
+            .registry
+            .household_for_user(&stranger)
             .await
             .unwrap();
 
@@ -719,19 +768,94 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn every_user_of_this_single_tenant_deployment_shares_one_household() {
-        let fixture = Fixture::new("household").await;
-        let first = fixture.user("first").await;
-        let second = fixture.user("second").await;
-        let household = fixture.registry.household_for_user(&first).await.unwrap();
+    async fn an_onboarded_account_pairs_into_its_own_household() {
+        let fixture = Fixture::new("onboarded").await;
+        let first = fixture.linked_user("first").await;
+        let second = fixture.linked_user("second").await;
+        let own = second.household_id.clone().unwrap();
+        assert_ne!(own, first.household_id.clone().unwrap());
         assert_eq!(
             fixture.registry.household_for_user(&second).await.unwrap(),
-            household
+            own
         );
-        // Stable across calls.
+
+        // The legacy pairing table is corrected rather than left disagreeing,
+        // so both resolution paths always name the same household.
+        let connection = fixture.registry.queue.catalog.connection().await.unwrap();
         assert_eq!(
-            fixture.registry.household_for_user(&first).await.unwrap(),
-            household
+            super::scalar(
+                &connection,
+                "SELECT household_id FROM household_users WHERE user_id = ?1",
+                libsql::params![second.id.clone()],
+            )
+            .await
+            .unwrap()
+            .as_deref(),
+            Some(own.as_str())
+        );
+    }
+
+    /// Multi-tenancy is the plan, so a household is never guessed. The old
+    /// behaviour bound every account to whichever household happened to exist
+    /// first, which on a shared deployment hands one family's cameras to
+    /// another.
+    #[tokio::test]
+    async fn an_account_without_a_household_is_refused_rather_than_guessed() {
+        let fixture = Fixture::new("household").await;
+        let linked = fixture.linked_user("linked").await;
+        let occupied = fixture.registry.household_for_user(&linked).await.unwrap();
+
+        let stranger = fixture.user("stranger").await;
+        assert_eq!(
+            fixture
+                .registry
+                .household_for_user_or_none(&stranger)
+                .await
+                .unwrap(),
+            None,
+            "an unlinked account must not inherit {occupied}"
+        );
+        let refused = fixture
+            .registry
+            .household_for_user(&stranger)
+            .await
+            .unwrap_err();
+        assert_eq!(refused.kind(), std::io::ErrorKind::NotFound);
+        assert!(
+            fixture
+                .registry
+                .mint_claim_token(&stranger, "https://mirror.example")
+                .await
+                .is_err()
+        );
+        // No household was invented on their behalf.
+        let connection = fixture.registry.queue.catalog.connection().await.unwrap();
+        let mut rows = connection
+            .query("SELECT COUNT(*) FROM households", ())
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.next().await.unwrap().unwrap().get::<i64>(0).unwrap(),
+            1
+        );
+        drop(rows);
+
+        // An explicit legacy binding is still honoured, so cameras paired
+        // before onboarding keep working until link-household runs.
+        connection
+            .execute(
+                "INSERT INTO household_users (user_id, household_id) VALUES (?1, ?2)",
+                libsql::params![stranger.id.clone(), occupied.clone()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            fixture
+                .registry
+                .household_for_user(&stranger)
+                .await
+                .unwrap(),
+            occupied
         );
     }
 }

@@ -1,0 +1,62 @@
+{
+  "original-timing": {
+    "per_frame": [
+      {
+        "wall_highpass_std": 2.2576663494110107,
+        "wall_row_residual_std": 1.7553070783615112,
+        "target_sharpness": 148.5643768310547
+      },
+      {
+        "wall_highpass_std": 2.279968500137329,
+        "wall_row_residual_std": 1.5917202234268188,
+        "target_sharpness": 148.05569458007812
+      },
+      {
+        "wall_highpass_std": 2.289212942123413,
+        "wall_row_residual_std": 1.951999545097351,
+        "target_sharpness": 148.35264587402344
+      },
+      {
+        "wall_highpass_std": 2.2731165885925293,
+        "wall_row_residual_std": 1.8212348222732544,
+        "target_sharpness": 148.24273681640625
+      },
+      {
+        "wall_highpass_std": 2.2888402938842773,
+        "wall_row_residual_std": 1.6266905069351196,
+        "target_sharpness": 147.26150512695312
+      }
+    ],
+    "mean_wall_row_residual_std": 1.749390435218811
+  },
+  "60hz-timing": {
+    "per_frame": [
+      {
+        "wall_highpass_std": 2.4887027740478516,
+        "wall_row_residual_std": 0.8684552907943726,
+        "target_sharpness": 150.17283630371094
+      },
+      {
+        "wall_highpass_std": 2.4909794330596924,
+        "wall_row_residual_std": 0.8601365685462952,
+        "target_sharpness": 149.8318634033203
+      },
+      {
+        "wall_highpass_std": 2.483346462249756,
+        "wall_row_residual_std": 0.8495563268661499,
+        "target_sharpness": 149.2235107421875
+      },
+      {
+        "wall_highpass_std": 2.479271411895752,
+        "wall_row_residual_std": 0.8551483750343323,
+        "target_sharpness": 149.76919555664062
+      },
+      {
+        "wall_highpass_std": 2.4853708744049072,
+        "wall_row_residual_std": 0.8578811287879944,
+        "target_sharpness": 149.86012268066406
+      }
+    ],
+    "mean_wall_row_residual_std": 0.8582355380058289
+  }
+}

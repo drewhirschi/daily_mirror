@@ -29,7 +29,7 @@ import { SignIn } from "./screens/SignIn";
 import { useColors } from "./ui";
 
 const Tab = createNativeBottomTabNavigator();
-// Mirrors are household settings rather than a browsing surface, so they live
+// Cameras are household settings rather than a browsing surface, so they live
 // in a stack pushed from the existing Account tab instead of a fourth tab.
 const AccountStack = createNativeStackNavigator();
 export default function App() {
@@ -179,7 +179,7 @@ function SignedIn({ session }: { session: ActiveSession }) {
                 </AccountStack.Screen>
                 <AccountStack.Screen
                   name="Devices"
-                  options={{ title: "Your mirrors" }}
+                  options={{ title: "Your cameras" }}
                 >
                   {({ navigation }) => (
                     <Devices
@@ -190,7 +190,7 @@ function SignedIn({ session }: { session: ActiveSession }) {
                 </AccountStack.Screen>
                 <AccountStack.Screen
                   name="AddMirror"
-                  options={{ title: "Add a mirror" }}
+                  options={{ title: "Add a camera" }}
                 >
                   {({ navigation }) => (
                     <AddMirror

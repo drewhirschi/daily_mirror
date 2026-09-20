@@ -20,7 +20,12 @@ import {
 import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiError, type Photo, type PhotoFace } from "@daily-mirror/api";
+import {
+  ApiError,
+  type Photo,
+  type PhotoCapture,
+  type PhotoFace,
+} from "@daily-mirror/api";
 import { useSession, type ActiveSession } from "../session";
 import {
   captureDate,
@@ -41,6 +46,9 @@ type PhotoViewerProps = {
 /** A rotation shown on the device before the server has saved it. The
  *  server answers with a new media revision (a new URL), which retires it. */
 type PendingRotation = { id: string; url: string; degrees: number };
+
+/** Controls, status line and the capture details beneath the photograph. */
+const BOTTOM_BAR = 108;
 
 export function PhotoViewer(props: PhotoViewerProps) {
   return (
@@ -90,7 +98,13 @@ function PhotoViewerContent({
     }),
   ).current;
   const pageWidth = Math.max(1, width - insets.left - insets.right);
-  const pageHeight = Math.max(1, height - insets.top - insets.bottom - 160);
+  // 80 for the header, BOTTOM_BAR for the controls, status line and the
+  // capture details. The reservation is constant so a photograph without
+  // capture details does not relayout (and remount) the pager.
+  const pageHeight = Math.max(
+    1,
+    height - insets.top - insets.bottom - 80 - BOTTOM_BAR,
+  );
   const faces = useQuery({
     queryKey: ["photo-faces", photo?.id, photo?.url],
     queryFn: ({ signal }) => session.api.photoFaces(photo!.id, signal),
@@ -359,7 +373,7 @@ function PhotoViewerContent({
           />
         </View>
         <View
-          style={{ height: 80, opacity: controls ? 1 : 0 }}
+          style={{ height: BOTTOM_BAR, opacity: controls ? 1 : 0 }}
           pointerEvents={controls ? "auto" : "none"}
         >
           <View style={[styles.row, { justifyContent: "space-evenly" }]}>
@@ -405,9 +419,75 @@ function PhotoViewerContent({
               {status}
             </Text>
           </View>
+          <CaptureDetails capture={photo.capture} />
         </View>
       </View>
     </>
+  );
+}
+
+/** One decimal at most, and no trailing ".0" — gains read as 8x, not 8.0x. */
+function trim(value: number, places = 1): string {
+  return String(Number(value.toFixed(places)));
+}
+
+/**
+ * A compact line of provenance under the photograph: which camera took it,
+ * running what, and with the settings that decide whether it came out sharp.
+ * Absent fields simply do not appear, because every camera reports a
+ * different subset.
+ */
+function CaptureDetails({ capture }: { capture?: PhotoCapture | null }) {
+  if (!capture) return null;
+  const parts: string[] = [];
+  if (capture.device_name) parts.push(capture.device_name);
+  else if (capture.capture_source === "phone") parts.push("This phone");
+  if (capture.sensor) parts.push(capture.sensor);
+  if (capture.firmware_version) parts.push(`fw ${capture.firmware_version}`);
+  if (capture.width && capture.height)
+    parts.push(`${capture.width}\u00d7${capture.height}`);
+
+  // Exposure, gain and scene brightness are the tuning triple: a dark, slow,
+  // high-gain frame is the shape of this project's known blur problem.
+  const settings: string[] = [];
+  if (capture.exposure_us)
+    settings.push(
+      capture.exposure_us >= 1000
+        ? `${trim(capture.exposure_us / 1000)} ms`
+        : `${capture.exposure_us} \u00b5s`,
+    );
+  if (capture.analog_gain)
+    settings.push(`gain ${trim(capture.analog_gain)}\u00d7`);
+  if (typeof capture.mean_luma === "number")
+    settings.push(`luma ${capture.mean_luma}`);
+  if (capture.af_state && capture.af_state !== "unknown")
+    settings.push(`af ${capture.af_state}`);
+  if (typeof capture.lens_position === "number")
+    settings.push(`lens ${trim(capture.lens_position, 2)}`);
+  if (capture.jpeg_quality) settings.push(`q${capture.jpeg_quality}`);
+
+  const first = parts.length ? `Captured by ${parts.join(" \u00b7 ")}` : "";
+  const second = settings.join(" \u00b7 ");
+  if (!first && !second) return null;
+  return (
+    <View style={{ paddingHorizontal: 18, paddingTop: 2 }}>
+      {first ? (
+        <Text
+          numberOfLines={1}
+          style={{ color: "#6E7D72", fontSize: 11, textAlign: "center" }}
+        >
+          {first}
+        </Text>
+      ) : null}
+      {second ? (
+        <Text
+          numberOfLines={1}
+          style={{ color: "#6E7D72", fontSize: 11, textAlign: "center" }}
+        >
+          {second}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 

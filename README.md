@@ -10,6 +10,8 @@ identity recognition, comparison, notes, alignment, or time-lapse generation.
 
 - `mobile/` — native Expo iOS gallery and account app, with a persistent,
   bounded thumbnail cache. See [`docs/mobile.md`](docs/mobile.md).
+  For remote iPhone builds and installation, see the
+  [free Tailscale/Xcode bridge guide](docs/tailscale-xcode-bridge.md).
 - `packages/api/` — portable TypeScript API client with types generated from
   the Rust server's OpenAPI contract.
 - `device/` — new Rust Raspberry Pi client: camera command, GPIO button and

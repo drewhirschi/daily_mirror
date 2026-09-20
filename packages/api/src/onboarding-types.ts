@@ -7,8 +7,27 @@ type Schemas = components["schemas"];
 export type SignupRequest = Schemas["SignupRequest"];
 export type CreatePersonRequest = Schemas["CreatePersonRequest"];
 export type PersonEnrollment = Schemas["EnrollmentSummary"];
-export type HouseholdPerson = Schemas["HouseholdPerson"];
-export type HouseholdSummary = Schemas["HouseholdSummary"];
+/** An account's standing in its household. */
+export type HouseholdRole = "admin" | "member";
+
+/** Whether a person in the grid has a login of their own. */
+export type HouseholdAccount = "linked" | "none";
+
+export type HouseholdPerson = Omit<
+  Schemas["HouseholdPerson"],
+  "role" | "account"
+> & {
+  role: HouseholdRole | null;
+  account: HouseholdAccount;
+};
+
+export type HouseholdSummary = Omit<
+  Schemas["HouseholdSummary"],
+  "role" | "people"
+> & {
+  role: HouseholdRole;
+  people: HouseholdPerson[];
+};
 
 export type EnrollmentPhotoStatus =
   | "uploading"

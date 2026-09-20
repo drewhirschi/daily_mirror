@@ -52,6 +52,10 @@ pub struct Photo {
     /// Photographs the owner has excluded from every person's flipbook.
     #[serde(default)]
     pub flipbook_excluded: bool,
+    /// What took this photograph and with what settings, when the camera said.
+    /// Absent for photographs captured before cameras reported anything.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capture: Option<crate::capture::PhotoCapture>,
 }
 
 #[derive(Debug)]
@@ -406,8 +410,7 @@ impl PhotoStore {
             .original_bytes(id)
             .await?
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "photo not found"))?;
-        let image = image::load_from_memory_with_format(&bytes, image::ImageFormat::Jpeg)
-            .map_err(io::Error::other)?;
+        let image = decode_jpeg(&bytes)?;
         let rotated = match degrees {
             90 => image.rotate90(),
             -90 => image.rotate270(),
@@ -627,14 +630,28 @@ fn photo(id: &str) -> Photo {
         url: format!("/api/photos/{id}"),
         thumbnail_url: None,
         flipbook_excluded: false,
+        capture: None,
     }
 }
 
 #[cfg(feature = "image-processing")]
 fn thumbnail_webp(jpeg: &[u8]) -> io::Result<Vec<u8>> {
-    let image = image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg)
-        .map_err(io::Error::other)?;
+    let image = decode_jpeg(jpeg)?;
     thumbnail_webp_from_image(&image)
+}
+
+/// Decode a stored original. A decode failure is the *uploader's* problem, not
+/// the storage backend's — a camera that streams the wrong bytes (right length,
+/// shifted content) lands here — so it is reported as `InvalidData` and callers
+/// turn that into a client error instead of a 502 the camera retries forever.
+#[cfg(feature = "image-processing")]
+fn decode_jpeg(jpeg: &[u8]) -> io::Result<image::DynamicImage> {
+    image::load_from_memory_with_format(jpeg, image::ImageFormat::Jpeg).map_err(|error| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("stored object is not a decodable JPEG: {error}"),
+        )
+    })
 }
 
 #[cfg(feature = "image-processing")]

@@ -82,6 +82,104 @@ server rejects missing or incorrect secrets, lists R2, repairs complete
 does not automatically delete—catalog rows whose objects are missing. The job
 is idempotent and is registered only by production deployments.
 
+Cloudflare-provider crons are shipped by `nextrs cron deploy`, which reads
+`CRON_SECRET` — and `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` when the
+API transport is used — from the process environment only; the CLI reads no env
+file. `server/scripts/deploy-prebuilt.sh` therefore exports just those three
+variables from `server/.vercel/.env.production.local` (written by `vercel pull`)
+before that step, parsing the file rather than sourcing it and never printing a
+value. A variable already exported in the shell wins over the file. If the file
+is missing the script warns, suggests the command below, and continues:
+
+```sh
+cd server && vercel env pull .vercel/.env.production.local --environment=production
+```
+
+This is a workaround for a nextrs limitation and can be deleted once the CLI
+loads the pulled env file itself.
+
+## Database schema and migrations
+
+The schema is defined once, by the ordered `.sql` files in
+`server/migrations/`. Nothing on a request path creates or alters a table any
+more: the server only *checks* that the database is at the version its binaries
+expect, and `server/scripts/deploy-prebuilt.sh` applies pending migrations to
+production **before** the new build goes live.
+
+```sh
+cd server
+cargo run --bin daily-mirror-migrate -- status        # read-only
+cargo run --bin daily-mirror-migrate -- up --dry-run  # what `up` would run
+cargo run --bin daily-mirror-migrate -- up            # apply
+```
+
+The binary reads `DAILY_MIRROR_DATABASE_URL` and
+`DAILY_MIRROR_DATABASE_AUTH_TOKEN` exactly as the other bins do. With no URL
+it uses the local `server/data/daily-mirror.db`. Applied migrations are
+recorded in `schema_migrations` (version, name, applied_at, checksum), and a
+single-row `schema_migrations_lock` keeps two runners from interleaving.
+
+### How the deploy gets production credentials
+
+Vercel does not pull variables marked sensitive, so
+`.vercel/.env.production.local` holds a `[SENSITIVE]` placeholder where the
+database token should be. The deploy script therefore, in order:
+
+1. uses `DAILY_MIRROR_DATABASE_URL` and `DAILY_MIRROR_DATABASE_AUTH_TOKEN` if
+   both are already exported;
+2. otherwise takes the URL from `.vercel/.env.production.local` (that one *is*
+   pulled) and mints a one-hour token with the Turso CLI
+   (`~/.turso/turso db tokens create <database> --expiration 1h`), deriving the
+   database name from the URL host — set `DAILY_MIRROR_TURSO_DB` to override;
+3. otherwise stops with an explanation and deploys nothing.
+
+The token is never printed and never written to disk. A preview deploy
+(`just deploy-preview`) skips migrations entirely.
+
+### Failing closed
+
+If the database is behind the running binary — or its recorded history does
+not match the binary's migration files — every `/api/` route answers `503`
+with a machine-readable body:
+
+```json
+{ "current_version": 1, "expected_version": 2, "pending": 1,
+  "code": "schema_migration_pending", "detail": "..." }
+```
+
+`/healthz` stays reachable and reports the same block under `schema`, with
+`status: "degraded"`. Codes are `schema_migration_pending`,
+`schema_migration_drift` and `schema_unreadable`.
+
+### Writing a migration
+
+Vercel keeps serving the *previous* build until the new one is live, and
+migrations run before that switchover. The old code therefore runs against the
+new schema for a minute or two, which gives one hard rule:
+
+> **Migrations are expand-only.** Add nullable columns, new tables and new
+> indexes. Never drop or rename anything in the same release that stops using
+> it — remove it a release later, once nothing deployed reads it.
+
+The checklist:
+
+1. Add `server/migrations/NNNN_short_name.sql`, numbered one past the last.
+2. Keep every statement idempotent: `CREATE TABLE IF NOT EXISTS`,
+   `CREATE INDEX IF NOT EXISTS`, or `ALTER TABLE ... ADD COLUMN` — the runner
+   deliberately ignores "duplicate column name" so an interrupted migration can
+   simply be re-run. No `DROP`, no `NOT NULL` without a `DEFAULT`.
+3. Register it in `MIGRATIONS` in `server/src/migrations.rs`.
+4. Never edit a migration that has shipped. Its checksum is recorded, and a
+   changed file is reported as drift and refused.
+5. `cargo test` — the suite covers a fresh database, adoption of a
+   production-shaped one, drift detection and the fail-closed behaviour.
+6. Deploy. `just deploy` migrates production, then uploads the build.
+
+Migration `0001_baseline` is the schema as it stood before migrations existed.
+It is written to succeed against both an empty database and today's
+production, which already has every object and no `schema_migrations` table —
+the first production run simply records what is already there.
+
 ## Deploy and verify
 
 ```sh
@@ -90,6 +188,16 @@ just server-health https://<preview-url>
 just deploy
 just server-health https://<production-url>
 ```
+
+`just deploy` applies pending schema migrations to production before it
+uploads the build, and stops without deploying if they fail. To see what it
+would do first:
+
+```sh
+cd server && cargo run --bin daily-mirror-migrate -- status
+```
+
+`just server-health` now also reports the schema version and pending count.
 
 After production is healthy, set the Pi's `DAILY_MIRROR_SERVER_URL` to the
 production origin and keep its `DAILY_MIRROR_UPLOAD_TOKEN` equal to the Vercel

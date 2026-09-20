@@ -35,6 +35,7 @@ import {
 import { Thumbnail } from "../components/Thumbnail";
 import { PhotoViewer } from "../components/PhotoViewer";
 import { Button, Empty, IconButton, styles, useColors } from "../ui";
+import { usePullToRefresh } from "../pull-to-refresh";
 
 export function Gallery({
   session,
@@ -110,10 +111,15 @@ export function Gallery({
     (person) => person.id === personId,
   )?.display_name;
   const hasFilters = !!(from || to || personId);
-  const refresh = () => {
-    void photos.refetch();
-    if (personId) void personPhotos.refetch();
-  };
+  const { refetch: refetchPhotos } = photos;
+  const { refetch: refetchPersonPhotos } = personPhotos;
+  const refresh = useCallback(async () => {
+    await Promise.all([
+      refetchPhotos(),
+      ...(personId ? [refetchPersonPhotos()] : []),
+    ]);
+  }, [personId, refetchPhotos, refetchPersonPhotos]);
+  const pull = usePullToRefresh(refresh);
   const selectedPhotos = useMemo(
     () => selectPhotos(photos.data || [], from, to, personPhotoIds),
     [photos.data, from, to, personPhotoIds],
@@ -238,11 +244,8 @@ export function Gallery({
             contentContainerStyle={{ paddingHorizontal: 6, paddingBottom: 24 }}
             refreshControl={
               <RefreshControl
-                refreshing={
-                  photos.isRefetching ||
-                  (!!personId && personPhotos.isRefetching)
-                }
-                onRefresh={refresh}
+                refreshing={pull.refreshing}
+                onRefresh={pull.onRefresh}
                 tintColor={c.accent}
               />
             }

@@ -5,6 +5,7 @@ use std::time::Duration;
 use libsql::{Builder, Database, params};
 use tokio::sync::OnceCell;
 
+use crate::capture::{CaptureMetadata, PhotoCapture};
 use crate::photos::Photo;
 
 /// How long a local-file writer waits for another process's write lock.
@@ -25,6 +26,8 @@ pub struct PendingPhoto {
 struct CatalogInner {
     location: CatalogLocation,
     database: OnceCell<Database>,
+    /// Migrations (local) or the schema-version check (remote), run once.
+    prepared: OnceCell<()>,
 }
 
 #[derive(Debug)]
@@ -39,6 +42,7 @@ impl PhotoCatalog {
             inner: Arc::new(CatalogInner {
                 location: CatalogLocation::Local(path.into()),
                 database: OnceCell::new(),
+                prepared: OnceCell::new(),
             }),
         }
     }
@@ -65,12 +69,15 @@ impl PhotoCatalog {
                 inner: Arc::new(CatalogInner {
                     location,
                     database: OnceCell::new(),
+                    prepared: OnceCell::new(),
                 }),
             },
         })
     }
 
-    async fn database(&self) -> io::Result<&Database> {
+    /// Open the database without touching its schema, so the health check can
+    /// read the migration state of a database this build refuses to serve.
+    async fn open(&self) -> io::Result<&Database> {
         self.inner
             .database
             .get_or_try_init(|| async {
@@ -91,8 +98,8 @@ impl PhotoCatalog {
                             .map_err(io::Error::other)?
                     }
                 };
-                let connection = database.connect().map_err(io::Error::other)?;
                 if matches!(&self.inner.location, CatalogLocation::Local(_)) {
+                    let connection = database.connect().map_err(io::Error::other)?;
                     connection
                         .busy_timeout(LOCAL_BUSY_TIMEOUT)
                         .map_err(io::Error::other)?;
@@ -101,48 +108,34 @@ impl PhotoCatalog {
                         .await
                         .map_err(io::Error::other)?;
                 }
-                connection
-                    .execute_batch(
-                        "CREATE TABLE IF NOT EXISTS photos (
-                    id TEXT PRIMARY KEY,
-                    storage_key TEXT NOT NULL,
-                    captured_at TEXT NOT NULL,
-                    content_type TEXT NOT NULL DEFAULT 'image/jpeg',
-                    byte_size INTEGER,
-                    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'ready')),
-                    rotation_degrees INTEGER NOT NULL DEFAULT 0,
-                    thumbnail_status TEXT NOT NULL DEFAULT 'pending',
-                    media_revision INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE INDEX IF NOT EXISTS photos_ready_captured_at
-                    ON photos(status, captured_at DESC);",
-                    )
-                    .await
-                    .map_err(io::Error::other)?;
-                ensure_column(
-                    &connection,
-                    "thumbnail_status",
-                    "TEXT NOT NULL DEFAULT 'pending'",
-                )
-                .await?;
-                ensure_column(&connection, "media_revision", "INTEGER NOT NULL DEFAULT 0").await?;
-                ensure_column(
-                    &connection,
-                    "flipbook_excluded",
-                    "INTEGER NOT NULL DEFAULT 0",
-                )
-                .await?;
-                // Which paired device uploaded this photo, and through the
-                // devices table which household owns it. NULL for photos that
-                // predate pairing or arrived on the shared upload token.
-                ensure_column(&connection, "device_id", "TEXT").await?;
-                ensure_column(&connection, "source", "TEXT NOT NULL DEFAULT 'device'").await?;
-                ensure_column(&connection, "enrollment_person_id", "TEXT").await?;
                 Ok(database)
             })
             .await
+    }
+
+    /// A connection that has not been schema-checked. Only the health check
+    /// and the migration runner may use one.
+    pub(crate) async fn raw_connection(&self) -> io::Result<libsql::Connection> {
+        self.open().await?.connect().map_err(io::Error::other)
+    }
+
+    async fn database(&self) -> io::Result<&Database> {
+        let database = self.open().await?;
+        self.inner
+            .prepared
+            .get_or_try_init(|| async {
+                // The schema itself lives in `server/migrations/`. A local file
+                // is this process's own database, so it is migrated here; the
+                // shared Turso database is only checked, because changing it
+                // belongs to `daily-mirror-migrate up` before the deploy.
+                crate::migrations::prepare(
+                    &database.connect().map_err(io::Error::other)?,
+                    matches!(&self.inner.location, CatalogLocation::Local(_)),
+                )
+                .await
+            })
+            .await?;
+        Ok(database)
     }
 
     pub(crate) async fn connection(&self) -> io::Result<libsql::Connection> {
@@ -159,35 +152,59 @@ impl PhotoCatalog {
     }
 
     pub async fn reserve(&self, id: &str, storage_key: &str, byte_size: u64) -> io::Result<()> {
-        self.reserve_for_device(id, storage_key, byte_size, None)
-            .await
+        self.reserve_for_device(
+            id,
+            storage_key,
+            byte_size,
+            None,
+            &CaptureMetadata::default(),
+        )
+        .await
     }
 
     /// Reserve an upload slot, recording the device that captured it when the
-    /// uploader authenticated with a per-device token.
+    /// uploader authenticated with a per-device token, along with whatever the
+    /// camera reported about the capture itself.
     pub async fn reserve_for_device(
         &self,
         id: &str,
         storage_key: &str,
         byte_size: u64,
         device_id: Option<&str>,
+        capture: &CaptureMetadata,
     ) -> io::Result<()> {
-        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let connection = self.connection().await?;
+        guard_completed_row(&connection, id, byte_size, device_id).await?;
         connection
             .execute(
-                "INSERT INTO photos (id, storage_key, captured_at, byte_size, status, device_id)
-             VALUES (?1, ?2, ?3, ?4, 'pending', ?5)
+                "INSERT INTO photos (id, storage_key, captured_at, byte_size, status, device_id,
+                    firmware_version, sensor, width, height, jpeg_quality, exposure_us,
+                    analog_gain, digital_gain, af_state, lens_position, colour_temperature_k,
+                    mean_luma, focus_score, trigger, capture_source)
+             VALUES (?1, ?2, ?3, ?4, 'pending', ?5,
+                     ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
              ON CONFLICT(id) DO UPDATE SET
                 byte_size = excluded.byte_size,
+                captured_at = excluded.captured_at,
                 device_id = COALESCE(excluded.device_id, photos.device_id),
+                firmware_version = COALESCE(excluded.firmware_version, photos.firmware_version),
+                sensor = COALESCE(excluded.sensor, photos.sensor),
+                width = COALESCE(excluded.width, photos.width),
+                height = COALESCE(excluded.height, photos.height),
+                jpeg_quality = COALESCE(excluded.jpeg_quality, photos.jpeg_quality),
+                exposure_us = COALESCE(excluded.exposure_us, photos.exposure_us),
+                analog_gain = COALESCE(excluded.analog_gain, photos.analog_gain),
+                digital_gain = COALESCE(excluded.digital_gain, photos.digital_gain),
+                af_state = COALESCE(excluded.af_state, photos.af_state),
+                lens_position = COALESCE(excluded.lens_position, photos.lens_position),
+                colour_temperature_k =
+                    COALESCE(excluded.colour_temperature_k, photos.colour_temperature_k),
+                mean_luma = COALESCE(excluded.mean_luma, photos.mean_luma),
+                focus_score = COALESCE(excluded.focus_score, photos.focus_score),
+                trigger = COALESCE(excluded.trigger, photos.trigger),
+                capture_source = COALESCE(excluded.capture_source, photos.capture_source),
                 updated_at = CURRENT_TIMESTAMP",
-                params![
-                    id,
-                    storage_key,
-                    id_to_timestamp(id),
-                    byte_size as i64,
-                    device_id.map(str::to_owned)
-                ],
+                capture_params(id, storage_key, byte_size, device_id, capture),
             )
             .await
             .map_err(io::Error::other)?;
@@ -215,23 +232,17 @@ impl PhotoCatalog {
         storage_key: &str,
         byte_size: u64,
         person_id: &str,
+        capture: &CaptureMetadata,
     ) -> io::Result<()> {
+        self.reserve_for_device(id, storage_key, byte_size, None, capture)
+            .await?;
         let connection = self.connection().await?;
         connection
             .execute(
-                "INSERT INTO photos (id, storage_key, captured_at, byte_size, status,
-                 source, enrollment_person_id)
-             VALUES (?1, ?2, ?3, ?4, 'pending', 'enrollment', ?5)
-             ON CONFLICT(id) DO UPDATE SET byte_size = excluded.byte_size,
-                 source = 'enrollment', enrollment_person_id = excluded.enrollment_person_id,
-                 updated_at = CURRENT_TIMESTAMP",
-                params![
-                    id,
-                    storage_key,
-                    id_to_timestamp(id),
-                    byte_size as i64,
-                    person_id
-                ],
+                "UPDATE photos SET source = 'enrollment', enrollment_person_id = ?2,
+                    updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?1",
+                params![id, person_id],
             )
             .await
             .map_err(io::Error::other)?;
@@ -295,7 +306,14 @@ impl PhotoCatalog {
         let connection = self.connection().await?;
         let mut rows = connection
             .query(
-                "SELECT id, thumbnail_status, media_revision, flipbook_excluded FROM photos WHERE status = 'ready' ORDER BY captured_at DESC, id DESC",
+                &format!(
+                    "SELECT photos.id, photos.thumbnail_status, photos.media_revision,
+                            photos.flipbook_excluded, {CAPTURE_COLUMNS}
+                     FROM photos
+                     LEFT JOIN devices ON devices.device_id = photos.device_id
+                     WHERE photos.status = 'ready'
+                     ORDER BY photos.captured_at DESC, photos.id DESC"
+                ),
                 (),
             )
             .await
@@ -309,15 +327,37 @@ impl PhotoCatalog {
                 io::Error::new(io::ErrorKind::InvalidData, "invalid photo media revision")
             })?;
             let flipbook_excluded: i64 = row.get(3).map_err(io::Error::other)?;
+            let capture = read_capture(&row, 4)?;
             photos.push(Photo {
                 url: format!("/api/photos/{id}?rev={revision}"),
                 thumbnail_url: (thumbnail_status == "ready")
                     .then(|| format!("/api/photos/{id}/thumbnail?rev={revision}")),
                 flipbook_excluded: flipbook_excluded != 0,
+                capture: (!capture.is_empty()).then_some(capture),
                 id,
             });
         }
         Ok(photos)
+    }
+
+    /// What is known about one photograph's capture, for the detail view.
+    pub async fn capture_for_photo(&self, id: &str) -> io::Result<Option<PhotoCapture>> {
+        let connection = self.connection().await?;
+        let mut rows = connection
+            .query(
+                &format!(
+                    "SELECT {CAPTURE_COLUMNS} FROM photos
+                     LEFT JOIN devices ON devices.device_id = photos.device_id
+                     WHERE photos.id = ?1"
+                ),
+                params![id],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let Some(row) = rows.next().await.map_err(io::Error::other)? else {
+            return Ok(None);
+        };
+        Ok(Some(read_capture(&row, 0)?))
     }
 
     pub async fn ready_is_empty(&self) -> io::Result<bool> {
@@ -355,8 +395,14 @@ impl PhotoCatalog {
         storage_key: &str,
         byte_size: u64,
     ) -> io::Result<()> {
-        self.register_ready_for_device(id, storage_key, byte_size, None)
-            .await
+        self.register_ready_for_device(
+            id,
+            storage_key,
+            byte_size,
+            None,
+            &CaptureMetadata::default(),
+        )
+        .await
     }
 
     pub async fn register_ready_for_device(
@@ -365,8 +411,9 @@ impl PhotoCatalog {
         storage_key: &str,
         byte_size: u64,
         device_id: Option<&str>,
+        capture: &CaptureMetadata,
     ) -> io::Result<()> {
-        self.reserve_for_device(id, storage_key, byte_size, device_id)
+        self.reserve_for_device(id, storage_key, byte_size, device_id, capture)
             .await?;
         self.mark_ready(id).await
     }
@@ -462,27 +509,124 @@ impl PhotoCatalog {
     }
 }
 
-async fn ensure_column(
+/// The provenance columns, in the order [`read_capture`] expects them.
+const CAPTURE_COLUMNS: &str = "photos.device_id, devices.device_name, photos.firmware_version,
+     photos.sensor, photos.width, photos.height, photos.jpeg_quality, photos.exposure_us,
+     photos.analog_gain, photos.digital_gain, photos.af_state, photos.lens_position,
+     photos.colour_temperature_k, photos.mean_luma, photos.focus_score, photos.trigger,
+     photos.capture_source";
+
+fn read_capture(row: &libsql::Row, offset: i32) -> io::Result<PhotoCapture> {
+    let text = |index: i32| -> io::Result<Option<String>> {
+        row.get::<Option<String>>(offset + index)
+            .map_err(io::Error::other)
+    };
+    let number = |index: i32| -> io::Result<Option<i64>> {
+        row.get::<Option<i64>>(offset + index)
+            .map_err(io::Error::other)
+    };
+    let real = |index: i32| -> io::Result<Option<f64>> {
+        row.get::<Option<f64>>(offset + index)
+            .map_err(io::Error::other)
+    };
+    Ok(PhotoCapture {
+        device_id: text(0)?,
+        device_name: text(1)?,
+        firmware_version: text(2)?,
+        sensor: text(3)?,
+        width: number(4)?,
+        height: number(5)?,
+        jpeg_quality: number(6)?,
+        exposure_us: number(7)?,
+        analog_gain: real(8)?,
+        digital_gain: real(9)?,
+        af_state: text(10)?,
+        lens_position: real(11)?,
+        colour_temperature_k: number(12)?,
+        mean_luma: number(13)?,
+        focus_score: number(14)?,
+        trigger: text(15)?,
+        capture_source: text(16)?,
+    })
+}
+
+fn capture_params(
+    id: &str,
+    storage_key: &str,
+    byte_size: u64,
+    device_id: Option<&str>,
+    capture: &CaptureMetadata,
+) -> Vec<libsql::Value> {
+    use libsql::Value;
+    let text = |value: &Option<String>| value.clone().map_or(Value::Null, Value::Text);
+    let number = |value: Option<i64>| value.map_or(Value::Null, Value::Integer);
+    let real = |value: Option<f64>| value.map_or(Value::Null, Value::Real);
+    vec![
+        Value::Text(id.to_owned()),
+        Value::Text(storage_key.to_owned()),
+        Value::Text(
+            capture
+                .captured_at
+                .clone()
+                .unwrap_or_else(|| id_to_timestamp(id)),
+        ),
+        Value::Integer(byte_size as i64),
+        device_id.map_or(Value::Null, |value| Value::Text(value.to_owned())),
+        text(&capture.firmware_version),
+        text(&capture.sensor),
+        number(capture.width),
+        number(capture.height),
+        number(capture.jpeg_quality),
+        number(capture.exposure_us),
+        real(capture.analog_gain),
+        real(capture.digital_gain),
+        text(&capture.af_state),
+        real(capture.lens_position),
+        number(capture.colour_temperature_k),
+        number(capture.mean_luma),
+        number(capture.focus_score),
+        text(&capture.trigger),
+        text(&capture.capture_source),
+    ]
+}
+
+/// Reservation upserts on the capture ID, which is fine for a camera retrying
+/// its own upload and catastrophic for two cameras that pick the same ID: the
+/// second grant would silently repoint a finished photograph at a different
+/// object. A completed row is therefore only re-reserved when the request
+/// describes the very same upload.
+async fn guard_completed_row(
     connection: &libsql::Connection,
-    name: &str,
-    definition: &str,
+    id: &str,
+    byte_size: u64,
+    device_id: Option<&str>,
 ) -> io::Result<()> {
     let mut rows = connection
-        .query("PRAGMA table_info(photos)", ())
+        .query(
+            "SELECT status, byte_size, device_id FROM photos WHERE id = ?1",
+            params![id],
+        )
         .await
         .map_err(io::Error::other)?;
-    while let Some(row) = rows.next().await.map_err(io::Error::other)? {
-        let existing: String = row.get(1).map_err(io::Error::other)?;
-        if existing == name {
-            return Ok(());
-        }
+    let Some(row) = rows.next().await.map_err(io::Error::other)? else {
+        return Ok(());
+    };
+    let status: String = row.get(0).map_err(io::Error::other)?;
+    if status != "ready" {
+        return Ok(());
     }
-    let statement = format!("ALTER TABLE photos ADD COLUMN {name} {definition}");
-    match connection.execute(&statement, ()).await {
-        Ok(_) => Ok(()),
-        Err(error) if error.to_string().contains("duplicate column name") => Ok(()),
-        Err(error) => Err(io::Error::other(error)),
+    let existing_size: Option<i64> = row.get(1).map_err(io::Error::other)?;
+    let existing_device: Option<String> = row.get(2).map_err(io::Error::other)?;
+    let same_size = existing_size == Some(byte_size as i64);
+    // A request that names no device never claims one away from a row.
+    let same_device = device_id.is_none() || device_id == existing_device.as_deref();
+    if same_size && same_device {
+        return Ok(());
     }
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        format!("capture {id} is already stored; a different photograph may not reuse its ID"),
+    ))
 }
 
 async fn ready_photo_count(connection: &libsql::Connection) -> io::Result<i64> {
@@ -586,6 +730,7 @@ mod tests {
                     url: format!("/api/photos/{id}"),
                     thumbnail_url: None,
                     flipbook_excluded: false,
+                    capture: None,
                 },
                 "photos/test.jpg".to_owned(),
             )])

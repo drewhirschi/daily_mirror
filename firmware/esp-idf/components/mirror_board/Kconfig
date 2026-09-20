@@ -1,3 +1,17 @@
+# ---------------------------------------------------------------------------
+# What a board is, in Kconfig.
+#
+# Every option here DECLARES something a board may have; none of them carries a
+# board's value. The values live in boards/<name>/sdkconfig.defaults, which is
+# the one file a new board has to write - see "Adding a new board" in
+# firmware/esp-idf/README.md. The four adapter pieces (camera, button, signal
+# LED, capture flash) all follow that same rule, so "where is this pin set?"
+# has one answer instead of four.
+#
+# GPIO defaults are -1 and booleans default n, so a board that forgets an
+# option loses that feature visibly rather than driving GPIO 0 or inverting an
+# LED it never configured.
+# ---------------------------------------------------------------------------
 menu "Daily Mirror board"
 
 choice MIRROR_BOARD
@@ -21,13 +35,16 @@ endchoice
 
 config MIRROR_BUTTON_GPIO
     int "Shutter button GPIO (momentary switch to GND, internal pull-up)"
-    default 20 if MIRROR_BOARD_P4_IMX519
-    default 1 if MIRROR_BOARD_S3_OV5640
-    default 0
+    default -1
     range -1 56
     help
         The press flow's button. -1 disables the button task, leaving
         POST /press as the only trigger.
+
+        Every board sets this in its own boards/<name>/sdkconfig.defaults -
+        see "Adding a new board" in firmware/esp-idf/README.md. The default
+        here is -1 on purpose: a board that forgets loses its button, which is
+        obvious, rather than quietly driving GPIO 0.
 
 config MIRROR_JPEG_QUALITY
     int "JPEG quality (0-100)"
@@ -37,14 +54,60 @@ config MIRROR_JPEG_QUALITY
         On the P4 this is the hardware encoder's quality. On the S3 it is
         mapped onto esp32-camera's inverted 0-63 scale.
 
+menu "Capture flash"
+
+config MIRROR_FLASH_GPIO
+    int "Capture flash / fill light GPIO (-1 disables it)"
+    default -1
+    range -1 56
+    help
+        A light that comes on for the photograph. -1 means there is none, and
+        nothing below has any effect.
+
+        Set per board in boards/<name>/sdkconfig.defaults; -1 here so a board
+        with no light compiles the flash away to nothing.
+
+        Driven straight from the pin today, which limits it to whatever the
+        GPIO can source. A MOSFET stage is coming; board_flash_set_level()
+        already takes a 0-255 level so LEDC dimming can replace the plain
+        on/off without changing anything above the board adapter.
+
+config MIRROR_FLASH_ACTIVE_HIGH
+    bool "The flash pin is active high"
+    default n
+    help
+        Unset for a low-side driver that turns the light on when the pin is
+        pulled low.
+
+config MIRROR_FLASH_LEAD_MS
+    int "Milliseconds the flash is on before the shutter"
+    default 1500
+    range 0 4000
+    help
+        The light comes on this long before the frame is taken, during the
+        last part of the press countdown, and stays on through the grab.
+
+        This is not a strobe and must not become one. Auto-exposure, white
+        balance and autofocus all have to settle WITH the light on, or the
+        frame is metered for the dark room and comes out blown out; and a
+        pulse shorter than a frame lights only part of a rolling-shutter
+        readout. Both are written up in docs/burst-processing-experiment.md
+        ("hold illumination steady through settling and the entire capture")
+        and docs/imx519-sensor-profile-guide.md.
+
+        The frame flush that settles auto-exposure runs after the light is on -
+        see board_camera_prepare_settle().
+
+endmenu # Capture flash
+
 menu "Status LED"
 
 if MIRROR_BOARD_S3_OV5640
 
 config MIRROR_LED_WS2812_GPIO
     int "WS2812 data GPIO"
-    default 48
-    range 0 48
+    default -1
+    range -1 48
     help
         The single addressable LED on the Freenove ESP32-S3-WROOM CAM board.
 
@@ -54,22 +117,22 @@ if MIRROR_BOARD_P4_IMX519
 
 config MIRROR_LED_R_GPIO
     int "RGB LED red GPIO (LEDC PWM)"
-    default 21
-    range 0 56
+    default -1
+    range -1 56
 
 config MIRROR_LED_G_GPIO
     int "RGB LED green GPIO (LEDC PWM)"
-    default 22
-    range 0 56
+    default -1
+    range -1 56
 
 config MIRROR_LED_B_GPIO
     int "RGB LED blue GPIO (LEDC PWM)"
-    default 23
-    range 0 56
+    default -1
+    range -1 56
 
 config MIRROR_LED_COMMON_ANODE
     bool "RGB LED is common anode (common leg to 3V3)"
-    default y
+    default n
     help
         A four-leg RGB LED with one 330 ohm resistor per colour. Common anode
         means the common leg goes to 3V3 and each channel is pulled low to
@@ -87,13 +150,13 @@ if MIRROR_BOARD_P4_IMX519
 
 config MIRROR_CAM_SCCB_SDA_GPIO
     int "Camera I2C (SCCB) SDA GPIO"
-    default 7
-    range 0 56
+    default -1
+    range -1 56
 
 config MIRROR_CAM_SCCB_SCL_GPIO
     int "Camera I2C (SCCB) SCL GPIO"
-    default 8
-    range 0 56
+    default -1
+    range -1 56
 
 endif # MIRROR_BOARD_P4_IMX519
 
@@ -101,52 +164,53 @@ if MIRROR_BOARD_S3_OV5640
 
 config MIRROR_CAM_XCLK_GPIO
     int "Camera XCLK GPIO"
-    default 15
+    default -1
 config MIRROR_CAM_SDA_GPIO
     int "Camera SCCB SDA GPIO"
-    default 4
+    default -1
 config MIRROR_CAM_SCL_GPIO
     int "Camera SCCB SCL GPIO"
-    default 5
+    default -1
 config MIRROR_CAM_D0_GPIO
     int "Camera D0 GPIO"
-    default 11
+    default -1
 config MIRROR_CAM_D1_GPIO
     int "Camera D1 GPIO"
-    default 9
+    default -1
 config MIRROR_CAM_D2_GPIO
     int "Camera D2 GPIO"
-    default 8
+    default -1
 config MIRROR_CAM_D3_GPIO
     int "Camera D3 GPIO"
-    default 10
+    default -1
 config MIRROR_CAM_D4_GPIO
     int "Camera D4 GPIO"
-    default 12
+    default -1
 config MIRROR_CAM_D5_GPIO
     int "Camera D5 GPIO"
-    default 18
+    default -1
 config MIRROR_CAM_D6_GPIO
     int "Camera D6 GPIO"
-    default 17
+    default -1
 config MIRROR_CAM_D7_GPIO
     int "Camera D7 GPIO"
-    default 16
+    default -1
 config MIRROR_CAM_VSYNC_GPIO
     int "Camera VSYNC GPIO"
-    default 6
+    default -1
 config MIRROR_CAM_HREF_GPIO
     int "Camera HREF GPIO"
-    default 7
+    default -1
 config MIRROR_CAM_PCLK_GPIO
     int "Camera PCLK GPIO"
-    default 13
+    default -1
 
 config MIRROR_CAM_VFLIP
     bool "Flip the image vertically"
-    default y
+    default n
     help
-        The Freenove module is mounted upside down on the bench rig.
+        Set per board. The Freenove module is mounted upside down on the bench
+        rig, so boards/s3_ov5640/sdkconfig.defaults turns this on.
 
 config MIRROR_CAM_HMIRROR
     bool "Mirror the image horizontally"

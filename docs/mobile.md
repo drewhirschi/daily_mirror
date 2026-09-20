@@ -26,6 +26,17 @@ generating the portable declarations. Never edit the generated declarations.
 
 ## Run locally
 
+Native passkey sign-in needs Associated Domains, which only a paid Apple
+Developer Program team may use. It is enabled again as of September 19, 2026:
+`associatedDomains` is set in `mobile/app.config.ts` and
+`NATIVE_PASSKEYS_ENABLED` is true in `mobile/src/auth-features.ts`. A username
+is optional — leaving it empty runs a discoverable (usernameless) ceremony.
+
+On a free Personal Team both must be turned off again, and an already generated
+iOS project must also drop `com.apple.developer.associated-domains` from
+`DailyMirror/DailyMirror.entitlements` before it can sign. Password login and
+Keychain sessions are unaffected either way.
+
 Use Node 22.13+ and npm. The app currently targets Expo SDK 57 / React Native
 0.86; use an SDK-compatible development build.
 
@@ -56,7 +67,12 @@ your workstation's `localhost`; enter its reachable origin.
 
 No passwords, API secrets, or signing keys belong in Expo public config.
 
-## Remote Mac (terakar; JSN fallback)
+## Remote Mac (JSN)
+
+JSN is the verified build host with Xcode 26.6. The free
+[Tailscale/Xcode bridge](tailscale-xcode-bridge.md) lets it reach the paired
+iPhone on a different network. The guide covers discovery, starting and
+stopping the bridge, signed Release builds, installation, and launch.
 
 SSH must already be reachable, Remote Login enabled on the Mac, and the
 host key trusted. Override the SSH target with `DAILY_MIRROR_MAC_HOST`, for
@@ -68,7 +84,7 @@ The helper includes Homebrew Node 22 in PATH, sets a UTF-8 locale, and uses
 `/Applications/Xcode.app` when the global selection is still Command Line Tools.
 
 ```sh
-export DAILY_MIRROR_MAC_HOST=drew@terakar
+export DAILY_MIRROR_MAC_HOST=drew@jsn
 ./scripts/mobile-mac.sh doctor
 ./scripts/mobile-mac.sh sync
 ./scripts/mobile-mac.sh build

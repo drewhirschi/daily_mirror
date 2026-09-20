@@ -26,6 +26,34 @@ config MIRROR_AP_PASSWORD
         firmware/README.md - it is not a secret, and a shipping product should
         derive a per-device password instead.
 
+config MIRROR_PROV_USERNAME
+    string "Provisioning username (protocomm security 2 / SRP6a)"
+    default "mirror"
+    help
+        The SRP6a username the mobile app authenticates with. It is not a
+        secret - it is half of an agreed identity - but it must be byte for
+        byte what the app passes to ESPDevice.connect(), or the handshake
+        fails before any data is exchanged.
+
+        The salt and verifier are derived from this and MIRROR_PROV_POP at
+        start-up, so changing either here is enough; there is no array to
+        regenerate with Espressif's esp_prov tooling.
+
+config MIRROR_PROV_POP
+    string "Provisioning proof of possession"
+    default "daily-mirror"
+    help
+        The SRP6a password. The app must pass the same string as the proof of
+        possession, and the pairing session is encrypted with a key derived
+        from it, so a phone that does not know it cannot send this device
+        Wi-Fi credentials or a claim token.
+
+        This build-time default is shared by every bench unit and is in the
+        repository, so it is not a secret in any useful sense. A shipping
+        product should derive a per-device value and print it on the device or
+        its box; the firmware only needs the string to change here for that to
+        work.
+
 config MIRROR_DEBUG_ISP_STATS
     bool "Log the ISP 3A statistics at debug level"
     default n

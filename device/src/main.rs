@@ -5,7 +5,6 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -30,6 +29,8 @@ use uuid::Uuid;
 
 mod camera_profile;
 mod capture_mode;
+mod photo_settings;
+use photo_settings::PhotoSettings;
 mod lab;
 use camera_profile::CameraProfile;
 use capture_mode::CaptureMode;
@@ -82,7 +83,8 @@ struct Config {
     red_led_pin: u8,
     led_mode: LedMode,
     camera_profile: CameraProfile,
-    capture_mode: CaptureMode,
+    photo_settings: Arc<RwLock<PhotoSettings>>,
+    photo_settings_path: PathBuf,
     local_dir: PathBuf,
 }
 
@@ -113,9 +115,23 @@ impl Config {
         if fs::canonicalize(&queue_dir)? == fs::canonicalize(&local_dir)? {
             bail!("Local photo directory must be separate from the upload queue");
         }
+        let photo_settings_path = std::env::var_os("DAILY_MIRROR_PHOTO_SETTINGS_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("data/photo-settings.json"));
+        let photo_settings = match fs::read(&photo_settings_path) {
+            Ok(bytes) => serde_json::from_slice::<PhotoSettings>(&bytes)
+                .context("read saved photo settings")?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => PhotoSettings {
+                test_mode: capture_mode == CaptureMode::Local,
+                profile: "configured".into(),
+            },
+            Err(error) => return Err(error.into()),
+        };
+        photo_settings.validate(camera_profile)?;
         Ok(Self {
             camera_profile,
-            capture_mode,
+            photo_settings: Arc::new(RwLock::new(photo_settings)),
+            photo_settings_path,
             local_dir,
             server_url: std::env::var("DAILY_MIRROR_SERVER_URL").ok(),
             upload_token: std::env::var("DAILY_MIRROR_UPLOAD_TOKEN").ok(),
@@ -137,6 +153,13 @@ impl Config {
         })
     }
 
+    fn capture_mode(&self) -> CaptureMode {
+        self.photo_settings
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .mode()
+    }
+
     fn upload_url(&self) -> Result<String> {
         let base = self
             .server_url
@@ -149,9 +172,9 @@ impl Config {
 fn main() -> Result<()> {
     dotenvy::dotenv().ok();
     let cli = Cli::parse();
-    let mut config = Config::from_env()?;
+    let config = Config::from_env()?;
     if matches!(cli.command, DeviceCommand::CaptureOnce { no_upload: true }) {
-        config.capture_mode = CaptureMode::Local;
+        config.photo_settings.write().unwrap().test_mode = true;
     }
     let device = Device::new(config)?;
 
@@ -159,7 +182,7 @@ fn main() -> Result<()> {
         DeviceCommand::CaptureOnce { no_upload } => {
             let capture = device.camera.capture()?;
             println!("captured {}", capture.display());
-            if !no_upload && device.config.capture_mode == CaptureMode::Upload {
+            if !no_upload && device.config.capture_mode() == CaptureMode::Upload {
                 match device.uploader.upload(&capture) {
                     Ok(()) => println!("uploaded {}", capture.display()),
                     Err(error) => {
@@ -169,7 +192,7 @@ fn main() -> Result<()> {
             }
         }
         DeviceCommand::Upload { path } => {
-            if device.config.capture_mode == CaptureMode::Local {
+            if device.config.capture_mode() == CaptureMode::Local {
                 bail!("Uploads are disabled in local mode");
             }
             let queued = device.camera.queue_existing(&path)?;
@@ -343,22 +366,21 @@ impl Device {
         set_runtime_status(
             &self.runtime_status,
             "processing",
-            self.config.capture_mode.processing_message(),
+            self.config.capture_mode().processing_message(),
         );
-        let mut pulse = leds
-            .lock()
+        leds.lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .begin_processing();
         let upload = leds
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .while_processing(&mut pulse, || self.uploader.upload(&capture));
+            .while_processing(|| self.uploader.upload(&capture));
         match upload {
             Ok(()) => {
                 set_runtime_status(
                     &self.runtime_status,
                     "success",
-                    self.config.capture_mode.success_message(),
+                    self.config.capture_mode().success_message(),
                 );
                 leds.lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -427,6 +449,8 @@ struct Camera {
     profile: CameraProfile,
     command: String,
     args: Vec<String>,
+    photo_settings: Arc<RwLock<PhotoSettings>>,
+    local_dir: PathBuf,
     queue_dir: PathBuf,
     camera_lock: Arc<Mutex<()>>,
     orientation: Arc<RwLock<CameraOrientation>>,
@@ -442,11 +466,9 @@ impl Camera {
             profile: config.camera_profile,
             command: config.camera_command.clone(),
             args: config.camera_args.clone(),
-            queue_dir: if config.capture_mode == CaptureMode::Local {
-                config.local_dir.clone()
-            } else {
-                config.queue_dir.clone()
-            },
+            queue_dir: config.queue_dir.clone(),
+            local_dir: config.local_dir.clone(),
+            photo_settings: Arc::clone(&config.photo_settings),
             camera_lock: Arc::new(Mutex::new(())),
             orientation: Arc::new(RwLock::new(orientation)),
             orientation_path: config.camera_settings_path.clone(),
@@ -462,9 +484,21 @@ impl Camera {
             .camera_lock
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let settings = self
+            .photo_settings
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let destination = if settings.test_mode {
+            &self.local_dir
+        } else {
+            &self.queue_dir
+        };
         let id = capture_id();
-        let temporary = self.queue_dir.join(format!(".{id}.tmp"));
-        let final_path = self.queue_dir.join(format!("{id}.jpg"));
+        let temporary = destination.join(format!(".{id}.tmp"));
+        let final_path = destination.join(format!("{id}.jpg"));
+        let metadata_path = destination.join(format!(".{id}.metadata.tmp"));
+        let args = capture_metadata_args(settings.args(self.profile, &self.args));
         // Orientation is deliberately NOT passed to the camera: sensor-side
         // flips change the IMX519 Bayer phase and break autofocus. The JPEG
         // is transformed losslessly after capture instead.
@@ -473,8 +507,14 @@ impl Camera {
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone();
-        let child = Command::new(&self.command)
-            .args(&self.args)
+        let mut command = Command::new(&self.command);
+        command.args(&args);
+        if let Some(tuning) = settings.tuning_file() {
+            command.env("LIBCAMERA_RPI_TUNING_FILE", tuning);
+        }
+        let child = command
+            .args(["--metadata-format", "json", "--metadata"])
+            .arg(&metadata_path)
             .arg("--output")
             .arg(&temporary)
             .spawn()
@@ -484,7 +524,15 @@ impl Camera {
             child,
             temporary,
             final_path,
-            queue_dir: &self.queue_dir,
+            queue_dir: destination,
+            metadata_path,
+            tuning_file: settings
+                .tuning_file()
+                .map(str::to_owned)
+                .or_else(|| std::env::var("LIBCAMERA_RPI_TUNING_FILE").ok()),
+            sensor: self.profile.name(),
+            settings,
+            args,
             orientation,
         })
     }
@@ -559,6 +607,9 @@ impl Camera {
     }
 
     fn queue_existing(&self, source: &Path) -> Result<PathBuf> {
+        if fs::canonicalize(source)?.starts_with(fs::canonicalize(&self.local_dir)?) {
+            bail!("Local test photos cannot be added to the upload queue");
+        }
         validate_jpeg_file(source)?;
         let id = capture_id();
         let temporary = self.queue_dir.join(format!(".{id}.tmp"));
@@ -578,20 +629,68 @@ struct PendingCapture<'a> {
     temporary: PathBuf,
     final_path: PathBuf,
     queue_dir: &'a Path,
+    metadata_path: PathBuf,
+    tuning_file: Option<String>,
+    sensor: &'static str,
+    settings: PhotoSettings,
+    args: Vec<String>,
     orientation: CameraOrientation,
 }
 
 impl PendingCapture<'_> {
     fn finish(mut self) -> Result<PathBuf> {
         let status = self.child.wait().context("wait for camera command")?;
-        Camera::finish_capture(
+        let result = Camera::finish_capture(
             self.queue_dir,
             &self.temporary,
             &self.final_path,
             status,
             &self.orientation,
-        )
+        );
+        let metadata = fs::read(&self.metadata_path)
+            .ok()
+            .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+        let _ = fs::remove_file(&self.metadata_path);
+        let path = result?;
+        if self.settings.test_mode {
+            save_json(
+                &path.with_extension("json"),
+                &serde_json::json!({
+                    "settings": self.settings, "camera_args": self.args,
+                "sensor": self.sensor, "tuning_file": self.tuning_file,
+                    "orientation": self.orientation, "sensor_metadata": metadata,
+                    "captured_at": Utc::now().to_rfc3339(),
+                }),
+            )?;
+        }
+        Ok(path)
     }
+}
+
+// The service owns metadata output so each capture gets a durable sidecar.
+fn capture_metadata_args(args: Vec<String>) -> Vec<String> {
+    let mut args = args.into_iter();
+    let mut result = Vec::new();
+    while let Some(arg) = args.next() {
+        if matches!(arg.as_str(), "--metadata" | "--metadata-format") {
+            args.next();
+        } else if !arg.starts_with("--metadata=") && !arg.starts_with("--metadata-format=") {
+            result.push(arg);
+        }
+    }
+    result
+}
+
+fn save_json(path: &Path, value: &impl Serialize) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temporary = path.with_extension("json.tmp");
+    fs::write(&temporary, serde_json::to_vec_pretty(value)?)?;
+    File::open(&temporary)?.sync_all()?;
+    fs::rename(&temporary, path)?;
+    sync_directory(path.parent().unwrap_or(Path::new(".")))?;
+    Ok(())
 }
 
 /// Apply the saved orientation to a captured JPEG losslessly with jpegtran.
@@ -632,7 +731,8 @@ fn apply_orientation(path: &Path, orientation: &CameraOrientation) {
 
 #[derive(Clone)]
 struct Uploader {
-    mode: CaptureMode,
+    photo_settings: Arc<RwLock<PhotoSettings>>,
+    local_dir: PathBuf,
     client: Client,
     upload_url: Option<String>,
     upload_token: Option<String>,
@@ -657,27 +757,29 @@ struct UploadGrant {
 impl Uploader {
     fn new(config: &Config) -> Result<Self> {
         Ok(Self {
-            mode: config.capture_mode,
+            photo_settings: Arc::clone(&config.photo_settings),
+            local_dir: config.local_dir.clone(),
             client: Client::builder()
                 .connect_timeout(Duration::from_secs(10))
                 .timeout(Duration::from_secs(90))
                 .build()?,
-            upload_url: if config.capture_mode == CaptureMode::Local {
-                None
-            } else {
-                config.upload_url().ok()
-            },
-            upload_token: if config.capture_mode == CaptureMode::Local {
-                None
-            } else {
-                config.upload_token.clone()
-            },
+            upload_url: config.upload_url().ok(),
+            upload_token: config.upload_token.clone(),
             queue_dir: config.queue_dir.clone(),
         })
     }
 
     fn upload(&self, path: &Path) -> Result<()> {
-        if self.mode == CaptureMode::Local {
+        // Local files are never upload candidates, even after test mode is disabled.
+        if fs::canonicalize(path)?.starts_with(fs::canonicalize(&self.local_dir)?) {
+            return Ok(());
+        }
+        if self
+            .photo_settings
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .test_mode
+        {
             return Ok(());
         }
         let grant_url = self
@@ -781,7 +883,12 @@ impl Uploader {
     }
 
     fn retry_all(&self) -> Result<usize> {
-        if self.mode == CaptureMode::Local {
+        if self
+            .photo_settings
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .test_mode
+        {
             return Ok(0);
         }
         let mut queued = fs::read_dir(&self.queue_dir)?
@@ -799,7 +906,12 @@ impl Uploader {
     }
 
     fn pending_count(&self) -> Result<usize> {
-        if self.mode == CaptureMode::Local {
+        if self
+            .photo_settings
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .test_mode
+        {
             return Ok(0);
         }
         Ok(fs::read_dir(&self.queue_dir)?
@@ -865,6 +977,7 @@ struct AdminStatus {
     camera_profile: &'static str,
     camera_autofocus: bool,
     capture_mode: &'static str,
+    photo_settings: PhotoSettings,
     server_url: Option<String>,
     button_pin: u8,
     green_led_pin: u8,
@@ -931,14 +1044,20 @@ impl AdminState {
             pending_photos: self.uploader.pending_count().unwrap_or_default(),
             camera_available: Path::new(&self.camera.command).exists(),
             camera_command: self.camera.command.clone(),
-            server_url: if self.config.capture_mode == CaptureMode::Local {
+            server_url: if self.config.capture_mode() == CaptureMode::Local {
                 None
             } else {
                 self.config.server_url.clone()
             },
             camera_profile: self.config.camera_profile.name(),
             camera_autofocus: self.config.camera_profile.autofocus(),
-            capture_mode: self.config.capture_mode.name(),
+            capture_mode: self.config.capture_mode().name(),
+            photo_settings: self
+                .config
+                .photo_settings
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone(),
             button_pin: self.config.button_pin,
             green_led_pin: self.config.green_led_pin,
             yellow_led_pin: self.config.yellow_led_pin,
@@ -995,20 +1114,19 @@ impl AdminState {
             set_runtime_status(
                 &self.runtime_status,
                 "processing",
-                self.config.capture_mode.processing_message(),
+                self.config.capture_mode().processing_message(),
             );
-            let mut pulse = self
-                .leds
+            self.leds
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .begin_processing();
             self.leds
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .while_processing(&mut pulse, || self.uploader.upload(&capture))?;
+                .while_processing(|| self.uploader.upload(&capture))?;
             Ok(format!(
                 "{}: {capture_id}",
-                self.config.capture_mode.success_message()
+                self.config.capture_mode().success_message()
             ))
         })();
 
@@ -1070,27 +1188,32 @@ impl AdminState {
             "lab capture",
             "Hold still — capturing a full-resolution test image",
         );
-        let mut pulse = self
-            .leds
+        self.leds
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .begin_processing();
-        let result = self
-            .leds
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .while_processing(&mut pulse, || {
-                self.camera
+        let result =
+            self.leds
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .while_processing(|| {
+                    self.camera
                     .capture_lab(&self.lab.settings())
-                    .map(|(jpeg, metadata)| {
-                        let size = jpeg.len();
+                    .and_then(|(jpeg, metadata)| {
+                        let id = capture_id();
+                        let path = self.config.local_dir.join(format!("{id}.jpg"));
+                        let temporary = path.with_extension("tmp");
+                        fs::write(&temporary, &jpeg)?;
+                        File::open(&temporary)?.sync_all()?;
+                        fs::rename(&temporary, &path)?;
+                        save_json(&path.with_extension("json"), &serde_json::json!({
+                            "profile": "custom-lab", "settings": self.lab.settings(),
+                            "sensor_metadata": metadata, "captured_at": Utc::now().to_rfc3339(),
+                        }))?;
                         self.lab.store_capture(jpeg, metadata);
-                        format!(
-                            "Test photo captured in memory ({:.1} MB); it was not uploaded",
-                            size as f64 / 1024.0 / 1024.0
-                        )
+                        Ok(format!("Test photo saved locally: {id}; never queued for upload"))
                     })
-            });
+                });
         match &result {
             Ok(message) => {
                 set_runtime_status(&self.runtime_status, "lab captured", message);
@@ -1116,7 +1239,7 @@ impl AdminState {
     }
 
     fn retry_uploads(&self) -> Result<String> {
-        if self.config.capture_mode == CaptureMode::Local {
+        if self.config.capture_mode() == CaptureMode::Local {
             return Ok("Uploads disabled — local photos are not queued".into());
         }
         let _operation = self
@@ -1124,8 +1247,7 @@ impl AdminState {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         self.led_test_active.store(false, Ordering::Relaxed);
-        let mut pulse = self
-            .leds
+        self.leds
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .begin_processing();
@@ -1134,7 +1256,7 @@ impl AdminState {
             .leds
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .while_processing(&mut pulse, || self.uploader.retry_all())
+            .while_processing(|| self.uploader.retry_all())
             .map(|remaining| format!("Retry finished; {remaining} photo(s) remain queued"));
         match &result {
             Ok(message) => {
@@ -1208,11 +1330,17 @@ fn admin_router(state: AdminState) -> Router {
         .route("/", get(admin_page))
         .route("/healthz", get(admin_health))
         .route("/api/status", get(admin_status))
+        .route("/api/photo-settings", post(admin_photo_settings))
+        .route(
+            "/api/local/photos/{name}/metadata",
+            get(admin_photo_metadata),
+        )
         .route(
             "/local-photo-viewer.js",
             get(admin_local_photo_viewer_script),
         )
         .route("/api/local/photos", get(admin_local_photos))
+        .route("/api/local/catalog", get(admin_local_catalog))
         .route("/api/local/photos/{name}", get(admin_local_photo))
         .route("/api/events", get(admin_events))
         .route("/api/actions/capture", post(admin_capture))
@@ -1225,6 +1353,61 @@ fn admin_router(state: AdminState) -> Router {
         .route("/api/lab/frame.jpg", get(admin_lab_frame))
         .route("/api/lab/capture.jpg", get(admin_lab_capture_image))
         .with_state(state)
+}
+
+async fn admin_photo_settings(
+    State(state): State<AdminState>,
+    Json(settings): Json<PhotoSettings>,
+) -> (StatusCode, Json<ActionResponse>) {
+    action_response(
+        tokio::task::spawn_blocking(move || {
+            // Serialize mode changes with capture and retry operations. A successful
+            // response means no previously started upload remains in flight.
+            let _operation = state
+                .operation_lock
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            settings.validate(state.config.camera_profile)?;
+            if !settings.test_mode
+                && (state.config.server_url.is_none() || state.config.upload_token.is_none())
+            {
+                bail!("Cloud capture is not configured on this Pi; keep Test mode enabled");
+            }
+            save_json(&state.config.photo_settings_path, &settings)?;
+            *state
+                .config
+                .photo_settings
+                .write()
+                .unwrap_or_else(|e| e.into_inner()) = settings;
+            let message = "Photo settings saved — applied to the next button or Capture now photo";
+            set_runtime_status(&state.runtime_status, "ready", message);
+            Ok(message.into())
+        })
+        .await,
+    )
+}
+
+async fn admin_photo_metadata(
+    AxumPath(name): AxumPath<String>,
+    State(state): State<AdminState>,
+) -> Response {
+    match local_photos::resolve(&state.config.local_dir, &name).and_then(|p| {
+        let path = p.with_extension("json");
+        if !fs::symlink_metadata(&path)?.file_type().is_file() {
+            bail!("Not a regular metadata file");
+        }
+        Ok(fs::read(path)?)
+    }) {
+        Ok(bytes) => (
+            [
+                ("content-type", "application/json"),
+                ("cache-control", "no-store"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 async fn admin_page() -> Html<&'static str> {
@@ -1245,10 +1428,22 @@ async fn admin_local_photo_viewer_script() -> impl IntoResponse {
     )
 }
 
-async fn admin_local_photos(State(state): State<AdminState>) -> Response {
-    if state.config.capture_mode != CaptureMode::Local {
-        return StatusCode::NOT_FOUND.into_response();
+async fn admin_local_catalog(State(state): State<AdminState>) -> Response {
+    match local_photos::list(&state.config.local_dir) {
+        Ok(names) => Json(names.into_iter().map(|name| {
+            let path = state.config.local_dir.join(&name).with_extension("json");
+            let metadata = fs::symlink_metadata(&path).ok().filter(|m| m.file_type().is_file())
+                .and_then(|_| fs::read(path).ok())
+                .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+            let profile = metadata.as_ref().and_then(|m| m.pointer("/settings/profile").or_else(|| m.get("profile")))
+                .and_then(|p| p.as_str()).unwrap_or("earlier capture");
+            serde_json::json!({"name": name, "profile": profile, "has_metadata": metadata.is_some()})
+        }).collect::<Vec<_>>()).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
+}
+
+async fn admin_local_photos(State(state): State<AdminState>) -> Response {
     match local_photos::list(&state.config.local_dir) {
         Ok(names) => Json(names).into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -1259,9 +1454,6 @@ async fn admin_local_photo(
     AxumPath(name): AxumPath<String>,
     State(state): State<AdminState>,
 ) -> Response {
-    if state.config.capture_mode != CaptureMode::Local {
-        return StatusCode::NOT_FOUND.into_response();
-    }
     match local_photos::resolve(&state.config.local_dir, &name).and_then(|p| Ok(fs::read(p)?)) {
         Ok(bytes) => (
             [
@@ -1514,6 +1706,13 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
     .metadata-raw summary { cursor: pointer; }
     .metadata-raw pre { max-height: 240px; overflow: auto; white-space: pre-wrap; color: #a9bdb3; }
     .lab-note { margin: 0; color: #71857b; font-size: 12px; line-height: 1.45; }
+    #photo-settings { display: grid; gap: 12px; margin-bottom: 18px; }
+    #photo-settings button { justify-self: start; }
+    #photo-settings-result:empty { display: none; }
+    .local-photo-item { min-width: 0; }
+    .local-photo-item button { width: 100%; }
+    .local-photo-downloads { padding: 10px 0; font-size: 12px; }
+    .local-photo-downloads a { color: #9bdcba; }
     footer { margin-top: 18px; color: #687c72; font-size: 13px; }
     @media (max-width: 760px) { header { display: block; } .badge { display: inline-block; margin-top: 18px; } .grid, .lab-layout { grid-template-columns: 1fr; } .card.wide { grid-column: auto; } }
   </style>
@@ -1525,7 +1724,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       <div class="phase" id="phase">starting</div>
       <p class="message" id="message">Connecting to the device…</p>
       <div class="signals" aria-label="Physical LED state">
-        <div class="signal"><span class="lamp green" id="green-led"></span><span>Ready / processing</span></div>
+        <div class="signal"><span class="lamp green" id="green-led"></span><span>Success</span></div>
         <div class="signal"><span class="lamp yellow" id="yellow-led"></span><span>Countdown</span></div>
         <div class="signal"><span class="lamp red" id="red-led"></span><span>Error</span></div>
       </div>
@@ -1552,6 +1751,21 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
         </dl>
       </section>
       <section class="card wide">
+        <h2>Photo settings</h2>
+        <form id="photo-settings">
+          <label><input type="checkbox" id="test-mode"> Test mode — save only on this Pi</label>
+          <p class="lab-note">Test photos stay local permanently, including after Test mode is turned off. Settings survive a restart.</p>
+          <label for="photo-profile">Photo profile</label>
+          <select id="photo-profile">
+            <option value="configured">Current device configuration</option>
+            <option value="neutral">Neutral · 16 MP reference</option>
+            <option value="vibrant">Vibrant · 16 MP</option>
+            <option value="fast">Fast · 4 MP binned, vibrant</option>
+          </select>
+          <button type="submit">Save photo settings</button>
+          <p id="photo-settings-result" role="status"></p>
+        </form>
+        <p class="lab-note">Profiles apply to the physical button and Capture now. The camera lab below uses its own custom controls. Multi-frame merging remains an offline experiment.</p>
         <h2>Controls</h2>
         <div class="actions">
           <button data-action="/api/actions/capture">Capture now</button>
@@ -1573,7 +1787,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
           <div class="lab-screen">
             <img id="lab-viewer" alt="Camera lab preview" hidden>
             <div class="focus-window" id="focus-window" aria-hidden="true"></div>
-            <div class="lab-placeholder" id="lab-placeholder">Start live preview to tune the camera, or take a full-resolution test snap. Lab images stay in memory and are never queued or uploaded.</div>
+            <div class="lab-placeholder" id="lab-placeholder">Start live preview to tune the camera, or take a full-resolution test snap. Test snaps save on this Pi and are never queued or uploaded.</div>
           </div>
           <div class="actions lab-toolbar">
             <button data-action="/api/lab/preview/start" data-result="lab-result">Start live preview</button>
@@ -1631,7 +1845,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
             <button type="submit">Apply settings</button>
             <button class="secondary" type="button" id="lab-reset">Reset controls</button>
           </div>
-          <p class="lab-note">Start preview or take a test snap to apply every visible control automatically. Test snaps stay in memory and are never uploaded. The AF window uses normalized x, y, width, and height values. Fixed-distance presets convert feet to approximate dioptres; use the reported lens position and full-resolution image to calibrate the actual module. Camera orientation is saved on the Pi and applies to normal captures after restart; other lab values remain temporary.</p>
+          <p class="lab-note">Start preview or take a test snap to apply every visible control automatically. Test snaps save on this Pi with their settings and are never uploaded. The AF window uses normalized x, y, width, and height values. Fixed-distance presets convert feet to approximate dioptres; use the reported lens position and full-resolution image to calibrate the actual module. Camera orientation is saved on the Pi and applies to normal captures after restart; other lab values remain temporary.</p>
         </form>
       </div>
     </section>
@@ -1686,17 +1900,20 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       if (localPhotosLoading) return;
       localPhotosLoading = true;
       try {
-        const response = await fetch('/api/local/photos');
+        const response = await fetch('/api/local/catalog');
         if (!response.ok) throw new Error('Could not load local photos');
-        const names = await response.json();
-        const key = JSON.stringify(names);
+        const photos = await response.json();
+        const names = photos.map(photo => photo.name);
+        const key = JSON.stringify(photos);
         if (key === localPhotosKey) return;
         localPhotosKey = key;
         window.localPhotoViewer.setPhotos(names);
         const container = byId('local-photo-list');
         container.replaceChildren();
         if (!names.length) container.textContent = 'No local photos yet.';
-        for (const name of names) {
+        for (const photo of photos) {
+          const name = photo.name;
+          const item = document.createElement('div'); item.className = 'local-photo-item';
           const button = document.createElement('button');
           button.type = 'button'; button.className = 'local-photo-tile';
           button.setAttribute('aria-label', `View ${name}`);
@@ -1704,12 +1921,18 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
           const image = document.createElement('img');
           image.src = `/api/local/photos/${encodeURIComponent(name)}`;
           image.alt = ''; image.loading = 'lazy';
-          const label = document.createElement('span'); label.textContent = name;
-          button.append(image, label); container.appendChild(button);
+          const label = document.createElement('span'); label.textContent = `${photo.profile} · ${name}`;
+          button.append(image, label); item.appendChild(button);
+          const download = document.createElement('a'); download.href = image.src; download.download = name; download.textContent = 'Download photo';
+          const metadata = document.createElement('a'); metadata.href = image.src + '/metadata'; metadata.download = name.replace('.jpg', '.json'); metadata.textContent = 'Download settings';
+          const links = document.createElement('div'); links.className = 'local-photo-downloads'; links.append(download);
+          if (photo.has_metadata) links.append(document.createTextNode(' · '), metadata);
+          item.appendChild(links); container.appendChild(item);
         }
       } catch (error) { byId('local-photo-list').textContent = error.message; localPhotosKey = null; }
       finally { localPhotosLoading = false; }
     }
+    let photoSettingsDirty = false;
     function render(status) {
       lastStatus = status;
       uptimeBase = status.uptime_seconds;
@@ -1721,11 +1944,16 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       byId('camera').textContent = `${status.camera_profile} · ${status.camera_available ? 'capture tool installed' : 'capture tool missing'}`;
       const local = status.capture_mode === 'local';
       byId('capture-mode').textContent = local ? 'Local only — no uploads' : 'Upload to server';
-      byId('local-photos').hidden = !local;
+      byId('local-photos').hidden = false;
+      if (!photoSettingsDirty) {
+        byId('test-mode').checked = status.photo_settings.test_mode;
+        byId('photo-profile').value = status.photo_settings.profile;
+      }
+      byId('photo-profile').disabled = status.camera_profile !== 'imx519';
       document.querySelector('[data-action="/api/actions/retry"]').hidden = local;
       document.querySelector('[data-action="/api/actions/capture"]').textContent = local ? 'Capture locally' : 'Capture now';
       document.querySelectorAll('[name^="autofocus_"], [name="lens_position"], [data-focus-feet]').forEach(el => { el.disabled = !status.camera_autofocus; });
-      if (local) refreshLocalPhotos();
+      refreshLocalPhotos();
       byId('pending').textContent = status.pending_photos;
       byId('gpio').textContent = `button P${status.button_pin} · ${status.led_mode} · outputs P${status.green_led_pin}/P${status.yellow_led_pin}/P${status.red_led_pin}`;
       byId('temperature').textContent = status.cpu_temperature_celsius == null ? '—' : `${status.cpu_temperature_celsius.toFixed(1)} °C`;
@@ -1754,7 +1982,7 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
         byId('lab-result').textContent = 'Live preview active · full field of view · 960×720 at up to 8 fps';
         byId('lab-placeholder').textContent = 'Starting camera and waiting for the first frame…';
       } else if (status.lab_has_capture) {
-        byId('lab-result').textContent = 'Full-resolution test photo held in memory · not uploaded';
+        byId('lab-result').textContent = 'Custom lab photo saved on this Pi · not uploaded';
         if (!labCaptureLoaded) {
           labCaptureLoaded = true;
           loadLabImage(`/api/lab/capture.jpg?revision=${status.revision}`, 'Full-resolution local test capture');
@@ -1908,6 +2136,22 @@ const ADMIN_PAGE: &str = r#"<!doctype html>
       }
     }
     document.querySelectorAll('button[data-action]').forEach(button => button.addEventListener('click', () => action(button)));
+    byId('photo-settings').addEventListener('input', () => { photoSettingsDirty = true; });
+    byId('photo-settings').addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = event.submitter; button.disabled = true;
+      byId('photo-settings-result').textContent = 'Saving; waiting for any current capture or upload to finish…';
+      try {
+        const response = await fetch('/api/photo-settings', {method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({test_mode: byId('test-mode').checked, profile: byId('photo-profile').value})});
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || 'Unable to save settings');
+        photoSettingsDirty = false;
+        byId('photo-settings-result').textContent = result.message;
+        render(await (await fetch('/api/status')).json());
+      } catch (error) { byId('photo-settings-result').textContent = error.message; }
+      finally { button.disabled = false; }
+    });
     byId('lab-settings').addEventListener('input', updateLabReadouts);
     byId('lab-settings').addEventListener('submit', async event => {
       event.preventDefault();
@@ -1971,10 +2215,6 @@ struct LedPanel {
     runtime_status: watch::Sender<RuntimeStatus>,
 }
 
-struct ProcessingPulse {
-    step: u32,
-}
-
 impl LedPanel {
     fn new(
         gpio: &Gpio,
@@ -2018,12 +2258,7 @@ impl LedPanel {
     }
 
     fn ready(&mut self, has_queued_photos: bool) {
-        // An RGB LED cannot show separate green and red: that would look like countdown yellow.
-        self.set(
-            !has_queued_photos || self.mode == LedMode::Discrete,
-            false,
-            has_queued_photos,
-        );
+        self.set(false, false, has_queued_photos);
     }
 
     fn countdown(&mut self) {
@@ -2042,45 +2277,12 @@ impl LedPanel {
         self.set(false, true, false);
     }
 
-    fn begin_processing(&mut self) -> ProcessingPulse {
-        self.set(true, false, false);
-        let mut pulse = ProcessingPulse { step: 0 };
-        self.processing_tick(&mut pulse);
-        pulse
+    fn begin_processing(&mut self) {
+        self.set(false, false, false);
     }
 
-    fn processing_tick(&mut self, pulse: &mut ProcessingPulse) {
-        let duty_cycle = self.mode.high_duty_cycle(processing_duty_cycle(pulse.step));
-        if self.green.set_pwm_frequency(100.0, duty_cycle).is_err() {
-            if self.mode == LedMode::RgbCommonAnode {
-                self.green.set_low();
-            } else {
-                self.green.set_high();
-            }
-        }
-        pulse.step = pulse.step.wrapping_add(1);
-    }
-
-    fn while_processing<T: Send>(
-        &mut self,
-        pulse: &mut ProcessingPulse,
-        operation: impl FnOnce() -> T + Send,
-    ) -> T {
-        let result = thread::scope(|scope| {
-            let (sender, receiver) = mpsc::sync_channel(1);
-            scope.spawn(move || {
-                let _ = sender.send(operation());
-            });
-            loop {
-                match receiver.recv_timeout(Duration::from_millis(40)) {
-                    Ok(result) => break result,
-                    Err(mpsc::RecvTimeoutError::Timeout) => self.processing_tick(pulse),
-                    Err(mpsc::RecvTimeoutError::Disconnected) => {
-                        panic!("processing operation stopped without a result")
-                    }
-                }
-            }
-        });
+    fn while_processing<T>(&mut self, operation: impl FnOnce() -> T) -> T {
+        let result = operation();
         self.finish_processing();
         result
     }
@@ -2104,11 +2306,6 @@ impl LedPanel {
     fn error(&mut self) {
         self.set(false, false, true);
     }
-}
-
-fn processing_duty_cycle(step: u32) -> f64 {
-    let phase = (step % 100) as f64 / 100.0 * std::f64::consts::TAU;
-    0.12 + 0.58 * ((phase - std::f64::consts::FRAC_PI_2).sin() + 1.0) / 2.0
 }
 
 #[cfg(test)]
@@ -2241,9 +2438,7 @@ fn filesystem_usage(path: &Path) -> Option<(u64, u64, u64)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        ADMIN_PAGE, capture_id, default_camera_args, processing_duty_cycle, validate_jpeg_file,
-    };
+    use super::{ADMIN_PAGE, capture_id, default_camera_args, validate_jpeg_file};
     use std::io::Write;
 
     #[test]
@@ -2255,7 +2450,11 @@ mod tests {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let uploader = super::Uploader {
-            mode: super::CaptureMode::Local,
+            photo_settings: std::sync::Arc::new(std::sync::RwLock::new(super::PhotoSettings {
+                test_mode: true,
+                profile: "configured".into(),
+            })),
+            local_dir: root.clone(),
             client: reqwest::blocking::Client::new(),
             upload_url: Some(format!(
                 "http://{}/api/uploads",
@@ -2268,8 +2467,27 @@ mod tests {
         assert_eq!(uploader.retry_all().unwrap(), 0);
         assert_eq!(uploader.pending_count().unwrap(), 0);
         assert!(listener.accept().is_err());
+        uploader.photo_settings.write().unwrap().test_mode = false;
+        uploader.upload(&photo).unwrap();
+        // Even retrying a directory containing a local file cannot upload it.
+        uploader.retry_all().unwrap();
+        assert!(listener.accept().is_err());
         assert_eq!(std::fs::read(&photo).unwrap(), b"retained photo");
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn metadata_output_is_owned_by_the_capture_service() {
+        let args = [
+            "--metadata",
+            "-",
+            "--metadata-format=json",
+            "--width",
+            "4656",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        assert_eq!(super::capture_metadata_args(args), ["--width", "4656"]);
     }
 
     #[test]
@@ -2309,7 +2527,7 @@ mod tests {
         assert!(ADMIN_PAGE.contains("data-focus-feet=\"3\""));
         assert!(ADMIN_PAGE.contains("id=\"focus-metadata-raw\""));
         assert!(ADMIN_PAGE.contains("id=\"lab-full-resolution\""));
-        assert!(ADMIN_PAGE.contains("Ready / processing"));
+        assert!(ADMIN_PAGE.contains("Success"));
         assert!(ADMIN_PAGE.contains("Countdown"));
     }
 
@@ -2358,19 +2576,5 @@ mod tests {
         assert!(args.windows(2).any(|pair| pair == ["--metadata", "-"]));
         assert!(!args.iter().any(|arg| arg == "--autofocus-on-capture"));
         assert!(!args.iter().any(|arg| arg == "--immediate"));
-    }
-
-    #[test]
-    fn processing_green_breathes_within_a_safe_duty_cycle() {
-        let duty_cycles = (0..100).map(processing_duty_cycle).collect::<Vec<_>>();
-        let minimum = duty_cycles.iter().copied().fold(f64::INFINITY, f64::min);
-        let maximum = duty_cycles
-            .iter()
-            .copied()
-            .fold(f64::NEG_INFINITY, f64::max);
-
-        assert!((minimum - 0.12).abs() < 0.000_001);
-        assert!((maximum - 0.70).abs() < 0.000_001);
-        assert!((processing_duty_cycle(0) - processing_duty_cycle(100)).abs() < f64::EPSILON);
     }
 }

@@ -9,16 +9,19 @@ use axum::{Extension, extract::DefaultBodyLimit, middleware};
 pub mod auth;
 pub mod auth_http;
 pub mod background;
+pub mod capture;
 pub mod catalog;
 pub mod cron_auth;
 pub mod devices;
 pub mod face_admin;
 pub mod face_matching;
+pub mod migrations;
 pub mod onboarding;
 pub mod passkeys;
 pub mod photos;
 pub mod processing;
 pub mod processor_auth;
+pub mod schema_gate;
 pub mod upload_auth;
 pub mod upload_flow;
 pub mod view_auth;
@@ -36,6 +39,7 @@ pub fn app() -> axum::Router {
     let photo_catalog = catalog::PhotoCatalog::from_env()
         .unwrap_or_else(|error| panic!("invalid photo catalog configuration: {error}"));
     let processing_queue = processing::ProcessingQueue::new(photo_catalog.clone());
+    let schema_gate = schema_gate::SchemaGate::new(photo_catalog.clone());
     let device_registry = devices::DeviceRegistry::new(processing_queue.clone());
     let auth_store = auth::AuthStore::from_env()
         .unwrap_or_else(|error| panic!("invalid authentication storage configuration: {error}"));
@@ -56,10 +60,18 @@ pub fn app() -> axum::Router {
         .layer(Extension(device_registry))
         .layer(Extension(passkey_service))
         .layer(Extension(auth_store.clone()))
+        .layer(Extension(schema_gate.clone()))
         .layer(middleware::from_fn(reject_unmatched_api))
         .layer(middleware::from_fn_with_state(
             auth_store,
             view_auth::protect,
+        ))
+        // Outermost, so a database that is behind this build answers 503 with
+        // its reason instead of a 500 from whichever store happened to be
+        // touched first — including the session lookup in `view_auth`.
+        .layer(middleware::from_fn_with_state(
+            schema_gate,
+            schema_gate::protect,
         ))
 }
 

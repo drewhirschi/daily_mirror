@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { passkeyErrorMessage } from "../passkey-login";
+import { NATIVE_PASSKEYS_ENABLED } from "../auth-features";
 import { useSession } from "../session";
 import { SignUp } from "./SignUp";
 import { Button, IconButton, styles, useColors } from "../ui";
@@ -55,12 +56,12 @@ export function SignIn() {
       setBusy(false);
     }
   };
+  /**
+   * No username needed: an empty field asks the server for a discoverable
+   * ceremony, and iOS shows its own picker of the passkeys saved for this app.
+   */
   const submitPasskey = async () => {
     if (busy) return;
-    if (!username.trim()) {
-      setError("Enter your username to use a saved passkey.");
-      return;
-    }
     setBusy(true);
     setError("");
     try {
@@ -188,7 +189,7 @@ export function SignIn() {
               </Text>
             ) : null}
             <Button title="Sign in" busy={busy} onPress={() => void submit()} />
-            {Platform.OS === "ios" ? (
+            {NATIVE_PASSKEYS_ENABLED && Platform.OS === "ios" ? (
               <Button
                 title="Sign in with a passkey"
                 quiet

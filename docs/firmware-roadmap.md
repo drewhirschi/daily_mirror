@@ -67,8 +67,9 @@ fallback access point are bench conveniences. The app expects Espressif's
 standard provisioning service, so the device side is:
 
 - [ ] Run ESP-IDF's `wifi_provisioning` manager when unprovisioned: service
-      name `Mirror-XXXX` (the app searches for the `Mirror-` prefix), security
-      2, SoftAP transport first because that is what the app uses today.
+      name `mirror-<hex>` (the app searches for the `mirror-` prefix), security
+      2, BLE transport (`wifi_prov_scheme_ble`) because that is what the app
+      uses today; SoftAP stays as a bench fallback.
 - [ ] Custom provisioning endpoint `daily-mirror`: accept the claim payload
       (claim token and server URL), answer result reads, as defined in
       `mobile/src/pairing/contract.ts` and `crates/mirror-core/src/contract.rs`.

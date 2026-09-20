@@ -7,6 +7,7 @@ use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::capture::{CaptureMetadata, SensorMetadata};
 use crate::catalog::PhotoCatalog;
 #[cfg(feature = "image-processing")]
 use crate::photos::PhotoStore;
@@ -19,7 +20,13 @@ pub enum FinalizeError {
     InvalidCaptureId(io::Error),
     ReservationNotFound,
     ObjectNotFound,
-    SizeMismatch { expected: u64, actual: u64 },
+    SizeMismatch {
+        expected: u64,
+        actual: u64,
+    },
+    /// The object is in storage, is the promised length, and is not a usable
+    /// photograph. Retrying uploads the same bytes, so this is a client error.
+    UnreadableImage(io::Error),
     Catalog(io::Error),
     Storage(io::Error),
 }
@@ -34,6 +41,9 @@ impl fmt::Display for FinalizeError {
                 formatter,
                 "uploaded object size mismatch: expected {expected}, got {actual}"
             ),
+            Self::UnreadableImage(error) => {
+                write!(formatter, "uploaded object is not a usable JPEG: {error}")
+            }
             Self::Catalog(error) => write!(formatter, "photo catalog failed: {error}"),
             Self::Storage(error) => write!(formatter, "photo storage failed: {error}"),
         }
@@ -45,7 +55,9 @@ impl std::error::Error for FinalizeError {}
 impl FinalizeError {
     pub fn status_code(&self) -> StatusCode {
         match self {
-            Self::InvalidCaptureId(_) => StatusCode::BAD_REQUEST,
+            // A camera that keeps its spool retries anything but 4xx forever,
+            // so bytes that will never decode have to come back as a 400.
+            Self::InvalidCaptureId(_) | Self::UnreadableImage(_) => StatusCode::BAD_REQUEST,
             Self::ReservationNotFound => StatusCode::NOT_FOUND,
             Self::ObjectNotFound | Self::SizeMismatch { .. } => StatusCode::CONFLICT,
             Self::Storage(_) => StatusCode::BAD_GATEWAY,
@@ -56,11 +68,39 @@ impl FinalizeError {
 
 /// The capture a client wants to upload. Shared by the device flow and
 /// guided enrollment so both grant the same contract.
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Default, Deserialize, Serialize, ToSchema)]
 pub struct UploadRequest {
     pub capture_id: String,
     pub content_type: String,
     pub content_length: u64,
+    /// What the camera knows about this capture. Every field is optional and
+    /// unknown fields are ignored, so a camera may start sending more of them
+    /// before the server learns to store them. See `docs/capture-metadata.md`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capture: Option<CaptureMetadata>,
+    /// The raw libcamera control block `rpicam-still --metadata-format json`
+    /// writes, which the Pi already produces beside every capture. Explicit
+    /// `capture` fields win over anything mapped out of this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sensor_metadata: Option<SensorMetadata>,
+}
+
+impl UploadRequest {
+    /// The validated capture metadata this request should be stored with.
+    ///
+    /// `source` is what this endpoint knows the uploader to be when the client
+    /// did not say. The capture ID is checked here too: the catalog derives
+    /// `photos.captured_at` from it, so a malformed ID is a data problem, not
+    /// a cosmetic one.
+    pub fn validated_capture(&self, source: &str) -> io::Result<CaptureMetadata> {
+        crate::capture::validate_capture_id_format(&self.capture_id)?;
+        let capture = self.capture.clone().unwrap_or_default();
+        let capture = match &self.sensor_metadata {
+            Some(sensor) => sensor.merge_into(capture),
+            None => capture,
+        };
+        Ok(capture.validated()?.with_source(source))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -118,10 +158,13 @@ pub async fn finalize_upload(
     if actual != expected {
         return Err(FinalizeError::SizeMismatch { expected, actual });
     }
-    store
-        .ensure_thumbnail(id)
-        .await
-        .map_err(FinalizeError::Storage)?;
+    store.ensure_thumbnail(id).await.map_err(|error| {
+        if error.kind() == io::ErrorKind::InvalidData {
+            FinalizeError::UnreadableImage(error)
+        } else {
+            FinalizeError::Storage(error)
+        }
+    })?;
     catalog.mark_ready(id).await.map_err(|error| {
         if error.kind() == io::ErrorKind::NotFound {
             FinalizeError::ReservationNotFound
@@ -314,6 +357,50 @@ mod tests {
         );
         assert_eq!(storage.status_code(), StatusCode::BAD_GATEWAY);
         assert_eq!(catalog.status_code(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            FinalizeError::UnreadableImage(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "not a jpeg",
+            ))
+            .status_code(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    /// The ESP32 camera once streamed its spool a few bytes out of alignment:
+    /// the object was exactly the promised length and began with the tail of
+    /// the metadata JSON. Completion used to call that a storage fault and
+    /// answer 502, which the camera reads as "try again", so it retried the
+    /// same unusable bytes forever. It is the upload that is wrong.
+    #[tokio::test]
+    async fn completion_rejects_an_object_that_is_not_a_decodable_jpeg() {
+        let fixture = Fixture::new("unreadable").await;
+        let id = "20260830T210700Z-shifted01";
+        // Framed like a JPEG, decodable as nothing.
+        let bytes = vec![0xff, 0xd8, 7, 0xff, 0xd9];
+        fixture
+            .catalog
+            .reserve(
+                id,
+                &fixture.store.storage_key(id).unwrap(),
+                bytes.len() as u64,
+            )
+            .await
+            .unwrap();
+        fixture.store.save(id, &bytes).await.unwrap();
+
+        let error = finalize_upload(&fixture.store, &fixture.catalog, &fixture.processing, id)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(error, FinalizeError::UnreadableImage(_)),
+            "expected an unreadable-image error, got {error:?}"
+        );
+        assert_eq!(error.status_code(), StatusCode::BAD_REQUEST);
+        // The row stays pending, so nothing half-finished reaches the gallery.
+        assert!(fixture.catalog.list().await.unwrap().is_empty());
+        assert_eq!(fixture.catalog.pending().await.unwrap()[0].id, id);
+        fixture.cleanup().await;
     }
 
     #[tokio::test]

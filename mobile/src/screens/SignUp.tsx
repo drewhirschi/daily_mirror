@@ -98,7 +98,7 @@ export function SignUp({
           >
             <Text style={{ color: c.secondary, lineHeight: 23 }}>
               Your account creates a household. You can add everyone who lives
-              with you next, and take a few photos so the mirror learns their
+              with you next, and take a few photos so the cameras learn their
               faces.
             </Text>
             <Text style={{ color: c.text, fontWeight: "600" }}>Username</Text>

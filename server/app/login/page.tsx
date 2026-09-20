@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
-import { getPasskey, supportsPasskeys } from "../../components/webauthn";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { getPasskey, supportsConditionalPasskeys, supportsPasskeys } from "../../components/webauthn";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -7,10 +7,37 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [passkeysAvailable, setPasskeysAvailable] = useState(false);
+  const autofill = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setPasskeysAvailable(supportsPasskeys());
     setUsername(window.localStorage.getItem("daily-mirror-username") ?? "");
+  }, []);
+
+  /**
+   * Conditional UI: ask the browser once, on load, to offer any passkey saved
+   * for this site inside the username field. It resolves only if the person
+   * picks one, so nothing here blocks the ordinary password form.
+   */
+  useEffect(() => {
+    if (!supportsConditionalPasskeys()) return;
+    const controller = new AbortController();
+    autofill.current = controller;
+    void (async () => {
+      try {
+        if (!(await PublicKeyCredential.isConditionalMediationAvailable())) return;
+        const start = await startPasskey();
+        const credential = await getPasskey(start.options, {
+          conditional: true,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        await finishPasskey(start.ceremony_id, credential);
+      } catch {
+        /* the person signed in another way, or declined */
+      }
+    })();
+    return () => controller.abort();
   }, []);
 
   return (
@@ -48,7 +75,7 @@ export default function LoginPage() {
         <button
           className="auth-passkey"
           type="button"
-          disabled={busy || !passkeysAvailable || !username.trim()}
+          disabled={busy || !passkeysAvailable}
           onClick={passkeyLogin}
         >
           Sign in with a passkey
@@ -72,22 +99,35 @@ export default function LoginPage() {
     });
   }
 
+  /** An empty username asks for a discoverable ceremony and the browser picks. */
+  async function startPasskey() {
+    const response = await fetch("/api/auth/login/passkey/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(username.trim() ? { username: username.trim() } : {}),
+    });
+    return await requireJson(response) as {
+      ceremony_id: string;
+      options: Record<string, unknown>;
+    };
+  }
+
+  async function finishPasskey(ceremonyId: string, credential: unknown) {
+    const response = await fetch("/api/auth/login/passkey/finish", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ceremony_id: ceremonyId, credential }),
+    });
+    await requireOk(response);
+    finishLogin();
+  }
+
   async function passkeyLogin() {
+    autofill.current?.abort();
     await run(async () => {
-      const startResponse = await fetch("/api/auth/login/passkey/start", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username }),
-      });
-      const start = await requireJson(startResponse) as { ceremony_id: string; options: Record<string, unknown> };
+      const start = await startPasskey();
       const credential = await getPasskey(start.options);
-      const finishResponse = await fetch("/api/auth/login/passkey/finish", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ceremony_id: start.ceremony_id, credential }),
-      });
-      await requireOk(finishResponse);
-      finishLogin();
+      await finishPasskey(start.ceremony_id, credential);
     });
   }
 
@@ -104,7 +144,8 @@ export default function LoginPage() {
   }
 
   function finishLogin() {
-    window.localStorage.setItem("daily-mirror-username", username.trim());
+    if (username.trim())
+      window.localStorage.setItem("daily-mirror-username", username.trim());
     const next = new URLSearchParams(window.location.search).get("next") ?? "/";
     window.location.assign(next.startsWith("/") && !next.startsWith("//") ? next : "/");
   }

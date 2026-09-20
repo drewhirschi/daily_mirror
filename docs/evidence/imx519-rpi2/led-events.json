@@ -1,0 +1,86 @@
+[
+  {
+    "phase": "lab captured",
+    "green_on": false,
+    "yellow_on": false,
+    "red_on": false
+  },
+  {
+    "phase": "countdown",
+    "green_on": false,
+    "yellow_on": false,
+    "red_on": false
+  },
+  {
+    "phase": "countdown",
+    "green_on": false,
+    "yellow_on": true,
+    "red_on": false
+  },
+  {
+    "phase": "countdown",
+    "green_on": false,
+    "yellow_on": false,
+    "red_on": false
+  },
+  {
+    "phase": "countdown",
+    "green_on": false,
+    "yellow_on": true,
+    "red_on": false
+  },
+  {
+    "phase": "countdown",
+    "green_on": false,
+    "yellow_on": false,
+    "red_on": false
+  },
+  {
+    "phase": "countdown",
+    "green_on": false,
+    "yellow_on": true,
+    "red_on": false
+  },
+  {
+    "phase": "countdown",
+    "green_on": false,
+    "yellow_on": false,
+    "red_on": false
+  },
+  {
+    "phase": "capturing",
+    "green_on": false,
+    "yellow_on": true,
+    "red_on": false
+  },
+  {
+    "phase": "success",
+    "green_on": true,
+    "yellow_on": false,
+    "red_on": false
+  },
+  {
+    "phase": "success",
+    "green_on": false,
+    "yellow_on": false,
+    "red_on": false
+  },
+  {
+    "phase": "success",
+    "green_on": true,
+    "yellow_on": false,
+    "red_on": false
+  },
+  {
+    "phase": "success",
+    "green_on": false,
+    "yellow_on": false,
+    "red_on": false
+  },
+  {
+    "phase": "ready",
+    "green_on": false,
+    "yellow_on": false,
+    "red_on": false
+  }
+]

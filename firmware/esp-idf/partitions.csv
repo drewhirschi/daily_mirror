@@ -20,3 +20,14 @@ phy_init,   data, phy,     0xf000,   0x1000,
 otadata,    data, ota,     0x10000,  0x2000,
 ota_0,      app,  ota_0,   0x20000,  6M,
 ota_1,      app,  ota_1,   ,         6M,
+# The upload spool: LittleFS, holding captures until the server has them.
+#
+# It is appended into the flash tail that was already unallocated - 3.88 MB
+# past 0xC20000 on the 16 MB S3 - so every offset above is byte for byte what
+# it was. That is not tidiness: nvs at 0x9000 holds the device_token a claim
+# issued, and moving it by one byte un-claims every device in the field.
+#
+# 3.5 MB is roughly a dozen 1600x1200 JPEGs at the 209-386 KB these come out
+# at, which is days of normal use and far longer than any outage worth
+# designing for. The remaining ~380 KB of the tail stays free.
+spool,      data, littlefs, ,        3584K,

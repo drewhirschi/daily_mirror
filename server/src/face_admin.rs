@@ -445,6 +445,56 @@ impl ProcessingQueue {
         })
     }
 
+    /// Change only a household's name, leaving its grid and membership alone.
+    /// `update_household` replaces the whole configuration, which is more than
+    /// the household screen's rename should ever touch.
+    pub async fn rename_household(
+        &self,
+        household_id: &str,
+        display_name: &str,
+    ) -> io::Result<String> {
+        self.ensure_schema().await?;
+        let display_name = validate_person_name(display_name)?;
+        let connection = self.catalog.connection().await?;
+        let changed = connection
+            .execute(
+                "UPDATE households SET display_name = ?2, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?1",
+                params![household_id, display_name.clone()],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        if changed == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "household not found",
+            ));
+        }
+        Ok(display_name)
+    }
+
+    /// Widen the grid so more people fit. The column only accepts 4 or 6.
+    pub async fn set_grid_size(&self, household_id: &str, grid_size: u32) -> io::Result<()> {
+        self.ensure_schema().await?;
+        validate_grid_size(grid_size)?;
+        let connection = self.catalog.connection().await?;
+        let changed = connection
+            .execute(
+                "UPDATE households SET grid_size = ?2, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?1",
+                params![household_id, i64::from(grid_size)],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        if changed == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "household not found",
+            ));
+        }
+        Ok(())
+    }
+
     pub async fn update_household(
         &self,
         household_id: &str,

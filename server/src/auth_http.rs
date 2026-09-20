@@ -124,6 +124,14 @@ pub fn rate_limited(retry_after_seconds: u64) -> Response {
     response
 }
 
+/// The rate-limit scope for a challenge that names no account. It has no
+/// username part, so the limiter keys on the client address alone.
+pub const DISCOVERABLE_SCOPE: &str = "passkey:discoverable";
+
+/// Tighter than a password attempt: a usernameless challenge identifies
+/// nobody, so there is no legitimate reason to ask for many in a row.
+pub const DISCOVERABLE_MAX_CHALLENGES: u32 = 4;
+
 pub fn login_scope(username: &str, headers: &axum::http::HeaderMap) -> String {
     let client = headers
         .get("x-forwarded-for")

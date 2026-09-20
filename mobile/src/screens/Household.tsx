@@ -21,6 +21,26 @@ import type { ActiveSession } from "../session";
 import { EnrollmentCapture } from "./EnrollmentCapture";
 import { Button, IconButton, styles, useColors, useInputStyle } from "../ui";
 
+/** The small pill used for "You", "Admin" and "Has account". */
+function Badge({ label, color, background }: {
+  label: string;
+  color: string;
+  background: string;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: background,
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+      }}
+    >
+      <Text style={{ color, fontSize: 12, fontWeight: "700" }}>{label}</Text>
+    </View>
+  );
+}
+
 function enrollmentLabel(enrollment: PersonEnrollment) {
   if (enrollment.enrolled) return "Enrolled";
   if (enrollment.enrolled_photos > 0)
@@ -43,6 +63,11 @@ export function Household({
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  /** The household name being edited, or null when the title is just read. */
+  const [householdName, setHouseholdName] = useState<string | null>(null);
+  const [renameError, setRenameError] = useState("");
+  /** The person an admin tried to invite, while invites are still unbuilt. */
+  const [inviting, setInviting] = useState<string | null>(null);
   /** The person just added, so we can offer their capture straight away. */
   const [offer, setOffer] = useState<HouseholdPerson | null>(null);
   const [capturing, setCapturing] = useState<HouseholdPerson | null>(null);
@@ -73,6 +98,34 @@ export function Household({
       ),
   });
 
+  const rename = useMutation({
+    mutationFn: (displayName: string) =>
+      session.api.renameHousehold(displayName),
+    onSuccess: async () => {
+      setHouseholdName(null);
+      setRenameError("");
+      await client.invalidateQueries({ queryKey: ["household"] });
+    },
+    onError: (caught) =>
+      setRenameError(
+        caught instanceof ApiError
+          ? caught.status === 403
+            ? "Only an administrator can rename this household."
+            : caught.message
+          : "Could not rename this household. Please try again.",
+      ),
+  });
+
+  const submitHouseholdName = () => {
+    const trimmed = (householdName ?? "").trim();
+    if (!trimmed) {
+      setRenameError("Enter a name for your household.");
+      return;
+    }
+    setRenameError("");
+    rename.mutate(trimmed);
+  };
+
   const submitName = () => {
     const trimmed = name.trim();
     if (!trimmed) {
@@ -85,6 +138,13 @@ export function Household({
 
   const missingHousehold =
     household.error instanceof ApiError && household.error.status === 409;
+  /**
+   * A 404 means this server build has no household route at all, which is a
+   * stale deployment rather than anything the person can fix by retrying.
+   */
+  const serverTooOld =
+    household.error instanceof ApiError && household.error.status === 404;
+  const isAdmin = household.data?.role === "admin";
 
   return (
     <SafeAreaProvider>
@@ -99,12 +159,17 @@ export function Household({
               { justifyContent: "space-between", paddingHorizontal: 22 },
             ]}
           >
-            <Text
-              accessibilityRole="header"
-              style={[styles.title, { color: c.text, flexShrink: 1 }]}
-            >
-              Your household
-            </Text>
+            <View style={[styles.row, { gap: 10, flexShrink: 1 }]}>
+              <Text
+                accessibilityRole="header"
+                style={[styles.title, { color: c.text, flexShrink: 1 }]}
+              >
+                {household.data?.display_name ?? "Your household"}
+              </Text>
+              {isAdmin ? (
+                <Badge label="Admin" color={c.accent} background={c.tint} />
+              ) : null}
+            </View>
             <IconButton
               icon="close"
               label="Close household"
@@ -130,9 +195,71 @@ export function Household({
               </View>
             ) : null}
             <Text style={{ color: c.secondary, lineHeight: 23 }}>
-              Five photos from five angles teach the mirror a face, so new
+              Five photos from five angles teach the cameras a face, so new
               photos of that person are tagged automatically.
             </Text>
+
+            {/* Only an administrator may rename, and the server enforces it. */}
+            {household.isSuccess && isAdmin ? (
+              householdName === null ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Rename household"
+                  onPress={() => {
+                    setHouseholdName(household.data.display_name);
+                    setRenameError("");
+                  }}
+                  style={({ pressed }) => [
+                    styles.row,
+                    { gap: 8, opacity: pressed ? 0.6 : 1 },
+                  ]}
+                >
+                  <Ionicons name="create-outline" size={18} color={c.accent} />
+                  <Text style={{ color: c.accent, fontWeight: "600" }}>
+                    Rename household
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={[styles.card, { backgroundColor: c.card }]}>
+                  <Text style={{ color: c.text, fontWeight: "600" }}>
+                    Household name
+                  </Text>
+                  <TextInput
+                    accessibilityLabel="Household name"
+                    style={input}
+                    value={householdName}
+                    onChangeText={setHouseholdName}
+                    editable={!rename.isPending}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    autoFocus
+                    maxLength={80}
+                    returnKeyType="done"
+                    onSubmitEditing={submitHouseholdName}
+                    placeholder="Your household's name"
+                    placeholderTextColor={c.secondary}
+                  />
+                  {renameError ? (
+                    <Text accessibilityRole="alert" style={{ color: c.danger }}>
+                      {renameError}
+                    </Text>
+                  ) : null}
+                  <Button
+                    title="Save"
+                    busy={rename.isPending}
+                    onPress={submitHouseholdName}
+                  />
+                  <Button
+                    title="Cancel"
+                    quiet
+                    onPress={() => {
+                      setHouseholdName(null);
+                      setRenameError("");
+                    }}
+                  />
+                </View>
+              )
+            ) : null}
 
             {household.isPending ? (
               <Text style={{ color: c.secondary }}>
@@ -143,7 +270,9 @@ export function Household({
                 <Text style={{ color: c.text, lineHeight: 23 }}>
                   {missingHousehold
                     ? "This account is not linked to a household yet. Ask an administrator to add you, or create a new account."
-                    : "Your household could not be loaded."}
+                    : serverTooOld
+                      ? "This server is running an older version of Daily Mirror that does not have households yet. Update the server, then try again."
+                      : "Your household could not be loaded."}
                 </Text>
                 {missingHousehold ? null : (
                   <Button
@@ -171,24 +300,13 @@ export function Household({
                         {person.display_name}
                       </Text>
                       {you ? (
-                        <View
-                          style={{
-                            backgroundColor: c.tint,
-                            borderRadius: 8,
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: c.accent,
-                              fontSize: 12,
-                              fontWeight: "700",
-                            }}
-                          >
-                            You
-                          </Text>
-                        </View>
+                        <Badge label="You" color={c.accent} background={c.tint} />
+                      ) : person.account === "linked" ? (
+                        <Badge
+                          label="Has account"
+                          color={c.accent}
+                          background={c.tint}
+                        />
                       ) : null}
                     </View>
                     <View style={[styles.row, { gap: 8 }]}>
@@ -223,12 +341,25 @@ export function Household({
                       accessibilityLabel={`Take photos of ${person.display_name}`}
                       onPress={() => setCapturing(person)}
                     />
+                    {/*
+                      Someone without a login is perfectly normal here — young
+                      children never get one. Invites are not built yet, so an
+                      admin is told plainly rather than shown a dead end.
+                    */}
+                    {isAdmin && !you && person.account !== "linked" ? (
+                      <Button
+                        title="Invite to sign in"
+                        quiet
+                        accessibilityLabel={`Invite ${person.display_name} to sign in`}
+                        onPress={() => setInviting(person.display_name)}
+                      />
+                    ) : null}
                   </View>
                 );
               })
             )}
 
-            {household.isSuccess ? (
+            {household.isSuccess && isAdmin ? (
               adding ? (
                 <View style={[styles.card, { backgroundColor: c.card }]}>
                   <Text style={{ color: c.text, fontWeight: "600" }}>
@@ -295,6 +426,34 @@ export function Household({
             ) : null}
           </ScrollView>
         </KeyboardAvoidingView>
+
+        <Modal
+          visible={!!inviting}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setInviting(null)}
+        >
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "#00000088",
+              justifyContent: "center",
+              padding: 28,
+            }}
+          >
+            <View style={[styles.card, { backgroundColor: c.card }]}>
+              <Text style={[styles.subtitle, { color: c.text }]}>
+                Invites are coming soon
+              </Text>
+              <Text style={{ color: c.secondary, lineHeight: 23 }}>
+                {inviting} does not have their own sign-in yet. Inviting someone
+                by email is not built, so for now they can create an account and
+                an administrator can link them.
+              </Text>
+              <Button title="Got it" onPress={() => setInviting(null)} />
+            </View>
+          </View>
+        </Modal>
 
         {/* Offer the guided capture immediately after a person is added. */}
         <Modal

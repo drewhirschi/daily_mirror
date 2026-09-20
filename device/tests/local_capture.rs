@@ -14,6 +14,10 @@ fn local_capture_and_no_upload_stay_out_of_upload_queue() {
         Command::new(env!("CARGO_BIN_EXE_daily-mirror-device"))
             .current_dir(&root)
             .env("DAILY_MIRROR_CAPTURE_MODE", mode)
+            .env(
+                "DAILY_MIRROR_PHOTO_SETTINGS_PATH",
+                root.join("photo-settings.json"),
+            )
             .env("DAILY_MIRROR_CAMERA_PROFILE", "ov5647")
             .env("DAILY_MIRROR_CAMERA_COMMAND", &camera)
             .env("DAILY_MIRROR_CAMERA_ARGS", "")
@@ -38,7 +42,7 @@ fn local_capture_and_no_upload_stay_out_of_upload_queue() {
             .status
             .success()
     );
-    assert_eq!(fs::read_dir(root.join("local")).unwrap().count(), 2);
+    assert_eq!(fs::read_dir(root.join("local")).unwrap().count(), 4);
     assert_eq!(fs::read_dir(root.join("pending")).unwrap().count(), 0);
     assert!(run("local", &["retry"]).status.success());
     assert!(
@@ -50,6 +54,35 @@ fn local_capture_and_no_upload_stay_out_of_upload_queue() {
         listener.accept().is_err(),
         "local mode attempted an HTTP connection"
     );
-    assert_eq!(fs::read_dir(root.join("local")).unwrap().count(), 2);
+    assert_eq!(fs::read_dir(root.join("local")).unwrap().count(), 4);
+    // Saved admin policy overrides the environment after a service restart.
+    fs::write(
+        root.join("photo-settings.json"),
+        r#"{"test_mode":true,"profile":"configured"}"#,
+    )
+    .unwrap();
+    assert!(run("upload", &["capture-once"]).status.success());
+    assert_eq!(fs::read_dir(root.join("local")).unwrap().count(), 6);
+    assert_eq!(fs::read_dir(root.join("pending")).unwrap().count(), 0);
+    fs::write(
+        root.join("photo-settings.json"),
+        r#"{"test_mode":false,"profile":"configured"}"#,
+    )
+    .unwrap();
+    assert!(run("upload", &["retry"]).status.success());
+    let photo = fs::read_dir(root.join("local"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.extension().unwrap() == "jpg")
+        .unwrap();
+    assert!(
+        !run("upload", &["upload", photo.to_str().unwrap()])
+            .status
+            .success()
+    );
+    assert!(
+        listener.accept().is_err(),
+        "test photos were uploaded after leaving test mode"
+    );
     fs::remove_dir_all(root).unwrap();
 }

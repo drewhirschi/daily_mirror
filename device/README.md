@@ -42,8 +42,8 @@ resistors.
 cargo run --release -- run
 ```
 
-- Green: solid when ready, slowly breathing while the JPEG is finalized and
-  uploaded, and two quick flashes when the complete workflow succeeds.
+- Green: two quick flashes only when the complete workflow succeeds.
+  Standby and processing keep the indicator off.
 - Yellow: three one-second countdown pulses only.
 - Red: a capture/upload error or at least one photograph awaiting retry.
 
@@ -53,9 +53,7 @@ the button to move into the expected 3–5 foot portrait position. The default
 focus window covers the central 60% of the frame width and 70% of its height,
 rather than only the camera stack's middle third. Yellow stays solid after the
 third pulse only until the actual full-resolution frame arrives, so it remains
-an unambiguous “hold still” indicator. Green starts only after the shutter,
-breathes during local JPEG validation and upload, flashes twice on success,
-then returns to solid ready. Yellow is never reused for background work.
+an unambiguous “hold still” indicator. Green flashes twice on success, then returns to off. Yellow is never reused for background work.
 
 Each normal capture also writes the camera metadata JSON to standard output,
 which makes fields supplied by the camera stack such as `AfState`,
@@ -121,8 +119,8 @@ resistor), and leg 4 red (P22 through its own resistor). Button: SDA/P2 to GND.
 Set `DAILY_MIRROR_LED_MODE=rgb-common-anode`. Keep the legacy pin environment
 names: `YELLOW_LED_PIN=27` now identifies the physical blue output.
 
-RGB mode starts all channels HIGH/off and inverts green PWM. Countdown yellow
-combines red and green; ready/processing/success remain green. A queued upload
+RGB mode starts all channels HIGH/off. Countdown yellow
+combines red and green; success flashes green while ready/processing stay off. A queued upload
 shows steady red instead of combining ready green and error red into yellow.
 The admin's green/yellow/red lamps represent logical status colors; `/api/status`
 also reports `led_mode`. Blue and white are reserved for later behavior.
@@ -148,7 +146,7 @@ DAILY_MIRROR_LOCAL_DIR=./data/local
 
 | Profile | Camera | Full-resolution still | Focus |
 | --- | --- | --- | --- |
-| `imx519` | Arducam IMX519 | 4656 × 3496 | Autofocus, manual lens control |
+| `imx519` | IMX519 | 4656 × 3496 | Autofocus, manual lens control |
 | `ov5647` | Pi Camera v1 / Rev 1.3 | 2592 × 1944 | Fixed focus |
 | `imx219` | Pi Camera v2 | 3280 × 2464 | Fixed focus |
 
@@ -180,11 +178,15 @@ the example environment explicitly selects `local` for new development setups.
 The standalone `upload` command refuses to run in local mode.
 
 On rpi2, uploads are disabled and production credentials have been removed.
-The camera is now confirmed as OV5647. Automatic detection missed it; explicitly
-loading `ov5647` detected the sensor and produced a valid 2592 × 1944 local JPEG.
-Boot configuration now sets `camera_auto_detect=0` and `dtoverlay=ov5647`.
-Runtime detection and capture are verified; boot persistence is configured but
-has not yet been tested by rebooting. The admin `camera_available` API field
+The replacement camera is now IMX519. Boot configuration sets
+`camera_auto_detect=0` and `dtoverlay=imx519`; detection was verified after reboot.
+The stock sensor tuning lacked `rpi.af`, even though the AK7375 lens driver was
+bound. A separate `config/imx519-portrait.json` adds contrast autofocus and a gentle
+shadow lift, selected by
+`LIBCAMERA_RPI_TUNING_FILE` in the device `.env` for both stills and preview.
+The actuator map is provisional: reported lens position and distance presets
+are not calibrated physical distances for this replacement module.
+See [the calibration record](../docs/imx519-rpi2-calibration.md). The admin `camera_available` API field
 remains an executable check, not a sensor probe.
 
 ### Inspect local test photos
@@ -203,3 +205,38 @@ timezone, and reported focus distance is not a measurement of subject distance.
 This does not change capture processing or rewrite the originals.
 
 Parser checks: `node device/tests/local_photo_viewer.test.cjs` from the repository root.
+
+### Admin Test mode and photo profiles
+
+In **Photo settings**, enable **Test mode**, choose a profile, and press **Save photo settings**.
+This controls the physical button and **Capture now**. Test captures go to `data/local/` with
+JSON sidecars containing the profile, command arguments, orientation, tuning file, and sensor
+metadata. They are never queued for upload, including after Test mode is disabled. Upload
+retries pause in Test mode. A mode change waits for an existing capture/upload to finish;
+the saved confirmation marks when the new policy applies.
+
+The selection survives service restarts in `data/photo-settings.json` (override with
+`DAILY_MIRROR_PHOTO_SETTINGS_PATH`); saved settings take precedence over the environment's
+initial capture mode. `capture-once --no-upload` still forces a local capture.
+
+IMX519 profiles:
+- **Current device configuration** preserves the configured camera arguments and tuning.
+- **Neutral**: 4656×3496, stock tone with contrast AF, neutral color/sharpness.
+- **Vibrant**: 4656×3496, lifted shadows, saturation/sharpness 1.15, sport exposure.
+- **Fast**: 2328×1748 with the full-field binned sensor mode, Vibrant processing.
+
+Named profiles require `config/imx519-af.json` and/or `config/imx519-portrait.json` relative
+to the service working directory. These already exist on rpi2; use
+`scripts/prepare_imx519_tuning.py` on the Pi to generate them (shadow exponent 1 and 0.85).
+Other sensors retain their device configuration. Multi-frame merging is not yet an admin profile.
+
+**Local test photos** offers photo and settings downloads in either mode. For bulk retrieval,
+copy the device's `data/local/` directory with SCP/rsync. Existing photos predating metadata
+sidecars may have no settings download. Custom camera-lab captures also save here, labeled
+`custom-lab`; the lab keeps its independent controls rather than applying the photo profile.
+No automatic local-photo deletion is performed; the admin page shows remaining storage.
+
+API: `POST /api/photo-settings` with `{"test_mode":true,"profile":"vibrant"}`; active settings
+appear in `/api/status`. Local files: `/api/local/photos`, `/api/local/photos/{name}`, and
+`/api/local/photos/{name}/metadata`. Returning to cloud capture requires configured server
+URL and upload token; it resumes the existing upload queue, never local test photos.

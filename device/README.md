@@ -82,6 +82,31 @@ the device is not in an error phase; otherwise it returns HTTP 503 with the same
 small JSON diagnostic body. The response includes `software_version` from the
 running Rust package. It does not capture a photograph.
 
+## Upload credentials and capture metadata
+
+Set `DAILY_MIRROR_DEVICE_TOKEN` to the token this camera was issued when it
+paired, and it is used as the `Authorization: Bearer` credential for every
+server call: the upload grant, the signed upload when it targets the server
+itself, and the completion call. Photographs then land against this device with
+`capture_source` `device`. When it is unset (or blank), the legacy shared
+`DAILY_MIRROR_UPLOAD_TOKEN` is used exactly as before and photographs land as
+`legacy` with no device attached.
+
+Each queued capture also writes a `<capture-id>.json` sidecar beside its
+`<capture-id>.jpg` in the durable queue, holding the `capture` object described
+in `docs/capture-metadata.md` — sensor, geometry, JPEG quality, exposure, gains,
+lens position, AF state, colour temperature, firmware version, trigger and
+`captured_at` — plus the raw libcamera control block as `sensor_metadata`. The
+uploader reads it when requesting the grant and removes it with the JPEG once
+the upload completes, so the metadata survives a restart or a queue drained
+hours later. A queued photograph with no sidecar (one left by an older binary,
+or a corrupt sidecar) still uploads; the `capture` object is simply omitted.
+
+The trigger is recorded as `button` for the physical button, `app` for the
+admin page's Capture now and `POST /api/actions/capture`, and `debug` for the
+`capture-once` subcommand. Test-mode and camera-lab captures keep their own
+richer local sidecars and are never uploaded.
+
 ## Camera lab
 
 The admin's camera lab forces the IMX519's full-field 2328×1748 binned sensor

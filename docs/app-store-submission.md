@@ -349,4 +349,15 @@ DAILY_MIRROR_MAC_HOST=drew@jsn bash scripts/mobile-mac.sh store
 archive at `~/work/daily-mirror-mobile/DailyMirror.xcarchive` and the `.ipa` in
 `~/work/daily-mirror-mobile/export/`. It never uploads anything.
 
+The build takes long enough that the ssh connection waiting on it may time out
+first. **That does not stop the build** — xcodebuild runs as a LaunchAgent on
+`jsn` and carries on. It happened on both runs here. To see where it got to:
+
+```bash
+DAILY_MIRROR_MAC_HOST=drew@jsn bash scripts/mobile-mac.sh store-status
+```
+
+which prints whether the job is still running, the tail of the log, and whether
+an `.ipa` was produced.
+
 Before each upload, bump `ios.buildNumber` in `mobile/app.config.ts`.

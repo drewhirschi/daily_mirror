@@ -124,12 +124,33 @@ PLIST
       : > "$root/store-build.log"
       launchctl bootout "gui/$(id -u)/app.dailymirror.storebuild" 2>/dev/null || true
       launchctl bootstrap "gui/$(id -u)" "$root/store-build.plist"
-      while launchctl print "gui/$(id -u)/app.dailymirror.storebuild" >/dev/null 2>&1; do sleep 20; done
+      # The build outlives this ssh session. If the connection drops while we
+      # wait -- it is a twenty-minute silence and something in the middle will
+      # eventually time it out -- the LaunchAgent carries on regardless, and
+      # `scripts/mobile-mac.sh store-status` reports where it got to.
+      while launchctl print "gui/$(id -u)/app.dailymirror.storebuild" >/dev/null 2>&1; do
+        printf .
+        sleep 20
+      done
+      echo
       tail -40 "$root/store-build.log"
       ls -l "$root/export" 2>/dev/null || echo "NO EXPORT DIRECTORY"'
+    ;;
+  store-status)
+    # Where the store build got to, for when `store` lost its ssh connection
+    # while waiting. The build itself is unaffected by that.
+    ssh "${ssh_options[@]}" "$mac_host" "$remote_setup"'
+      root="$HOME/work/daily-mirror-mobile"
+      if launchctl print "gui/$(id -u)/app.dailymirror.storebuild" >/dev/null 2>&1; then
+        echo "STILL BUILDING"
+      else
+        echo "FINISHED"
+      fi
+      tail -20 "$root/store-build.log" 2>/dev/null || echo "no log yet"
+      ls -l "$root/export" 2>/dev/null || echo "NO EXPORT DIRECTORY (see the log above for why)"'
     ;;
   start)
     ssh -t -F /dev/null "$mac_host" "$remote_setup"'; cd "$HOME/work/daily-mirror-mobile"; npm run mobile'
     ;;
-  *) echo 'Usage: scripts/mobile-mac.sh {doctor|sync|build|archive|store|start}' >&2; exit 2 ;;
+  *) echo 'Usage: scripts/mobile-mac.sh {doctor|sync|build|archive|store|store-status|start}' >&2; exit 2 ;;
 esac

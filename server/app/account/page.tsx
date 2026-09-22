@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPasskey, supportsPasskeys } from "../../components/webauthn";
 
 type User = { id: string; username: string; display_name: string };
+type DeletionRequest = { requested_at: string };
 type Passkey = { credential_id: string; label: string; created_at: string; last_used_at?: string };
 
 export default function AccountPage() {
@@ -10,6 +11,8 @@ export default function AccountPage() {
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deletion, setDeletion] = useState<DeletionRequest | null>(null);
 
   useEffect(() => { void refresh(); }, []);
 
@@ -50,6 +53,29 @@ export default function AccountPage() {
         ) : <p className="auth-note">No passkeys enrolled yet. Your password remains the recovery method.</p>}
       </section>
 
+      <section className="account-card">
+        <h2>Delete account</h2>
+        {deletion ? (
+          <p role="status">
+            You asked for this account to be deleted on {new Date(deletion.requested_at).toLocaleDateString()}. It
+            will be deleted, with your photographs and face data, within 30 days. You can keep using Daily Mirror
+            until then.
+          </p>
+        ) : (
+          <>
+            <p>
+              You can ask for your account to be deleted. Requests are carried out by hand within 30 days and remove
+              your login, your passkeys, your enrollment photographs and the face data derived from them. If yours is
+              the only account in the household, the household, its cameras and every photograph they took are
+              deleted as well. See the <a href="/privacy">privacy policy</a> for what is stored.
+            </p>
+            <button className="danger-button" type="button" disabled={deleting} onClick={requestDeletion}>
+              {deleting ? "Sending…" : "Request account deletion"}
+            </button>
+          </>
+        )}
+      </section>
+
       <section className="account-card install-card">
         <img src="/icons/icon-192.png" alt="" width="72" height="72" />
         <div>
@@ -61,13 +87,15 @@ export default function AccountPage() {
   );
 
   async function refresh() {
-    const [userResponse, passkeyResponse] = await Promise.all([
+    const [userResponse, passkeyResponse, deletionResponse] = await Promise.all([
       fetch("/api/auth/me"),
       fetch("/api/auth/passkeys"),
+      fetch("/api/auth/account/deletion-request"),
     ]);
     if (userResponse.status === 401) return window.location.assign("/login?next=/account");
     if (userResponse.ok) setUser(await userResponse.json());
     if (passkeyResponse.ok) setPasskeys((await passkeyResponse.json()).passkeys);
+    if (deletionResponse.ok) setDeletion(await deletionResponse.json());
   }
 
   async function addPasskey() {
@@ -91,6 +119,21 @@ export default function AccountPage() {
       setMessage(caught instanceof Error ? caught.message : "Passkey enrollment failed.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function requestDeletion() {
+    if (!window.confirm("Ask for your account and its data to be deleted? Once carried out, this cannot be undone.")) return;
+    setDeleting(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/auth/account/deletion-request", { method: "POST" });
+      if (!response.ok) throw new Error("The request could not be sent. Nothing was changed; please try again.");
+      setDeletion(await response.json());
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "The request could not be sent.");
+    } finally {
+      setDeleting(false);
     }
   }
 

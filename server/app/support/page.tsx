@@ -1,24 +1,18 @@
 // The support URL the App Store listing points at. Reachable without signing
-// in; `bypasses_authentication` in src/view_auth.rs allows it.
-//
-// DRAFT. The contact address below is a placeholder and must be a real,
-// monitored address before the listing cites this page: App Review checks that
-// the support URL works and offers a way to get in touch.
+// in; `bypasses_authentication` in src/view_auth.rs allows it. App Review
+// checks that the page works and offers a way to get in touch.
+import { CONTACT_EMAIL } from "../../components/contact";
+
 export default function SupportPage() {
   return (
     <main className="prose-page">
       <p className="eyebrow">Daily Mirror</p>
       <h1>Support</h1>
-      <p className="prose-draft" role="note">
-        <strong>Draft awaiting review.</strong> Replace the contact address
-        below with a real one before submitting to the App Store.
-      </p>
-
       <h2>Get in touch</h2>
       <p>
-        Email <a href="mailto:support@example.com">support@example.com</a>{" "}
-        &mdash; <em>placeholder, replace me</em>. Please say which iPhone and
-        iOS version you are on, and what you were doing when it went wrong.
+        Email <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. Please
+        say which iPhone and iOS version you are on, and what you were doing
+        when it went wrong.
       </p>
 
       <h2>Setting up a camera</h2>
@@ -45,8 +39,9 @@ export default function SupportPage() {
 
       <h2>Deleting your account</h2>
       <p>
-        Account &rarr; Delete account, in the app. What that removes is set out
-        in the <a href="/privacy">privacy policy</a>.
+        Account &rarr; Request account deletion, in the app or on the account
+        page of this site. Requests are carried out within 30 days. What that
+        removes is set out in the <a href="/privacy">privacy policy</a>.
       </p>
 
       <h2>Privacy</h2>

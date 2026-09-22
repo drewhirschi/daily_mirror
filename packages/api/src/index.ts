@@ -1,6 +1,7 @@
 import type { components } from "./schema";
 import type {
   CreatePersonRequest,
+  DeletionRequest,
   EnrollmentStatus,
   HouseholdPerson,
   HouseholdSummary,
@@ -221,12 +222,29 @@ export class MirrorApi {
     return this.request<void>("/api/auth/logout", { method: "POST" });
   }
   /**
-   * Deletes the signed-in account, which App Review guideline 5.1.1(v)
-   * requires the app to offer. The session is dead once this returns, so the
-   * caller signs out locally afterwards without calling the server again.
+   * Ask for the account and its data to be deleted, which App Review
+   * guideline 5.1.1(v) requires the app to offer. Nothing is removed by this
+   * call: an operator carries the request out. Repeating it returns the
+   * original request.
    */
-  deleteAccount() {
-    return this.request<void>("/api/account", { method: "DELETE" });
+  requestAccountDeletion() {
+    return this.request<DeletionRequest>("/api/auth/account/deletion-request", {
+      method: "POST",
+    });
+  }
+  /** The open deletion request for this account, or null when there is none. */
+  async accountDeletionRequest(
+    signal?: AbortSignal,
+  ): Promise<DeletionRequest | null> {
+    try {
+      return await this.request<DeletionRequest>(
+        "/api/auth/account/deletion-request",
+        { signal },
+      );
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) return null;
+      throw caught;
+    }
   }
   rotate(id: string, degrees: -90 | 90) {
     const edit: components["schemas"]["RotatePhoto"] = { degrees };

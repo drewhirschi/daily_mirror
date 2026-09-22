@@ -30,11 +30,7 @@ export type HouseholdSummary = Omit<
 };
 
 export type EnrollmentPhotoStatus =
-  | "uploading"
-  | "processing"
-  | "enrolled"
-  | "retake"
-  | "failed";
+  "uploading" | "processing" | "enrolled" | "retake" | "failed";
 
 export type EnrollmentPhoto = Omit<Schemas["EnrollmentPhoto"], "status"> & {
   status: EnrollmentPhotoStatus;
@@ -46,3 +42,16 @@ export type EnrollmentStatus = Omit<Schemas["EnrollmentStatus"], "photos"> & {
 
 /** The number of guided poses a person needs before their profile is active. */
 export const REQUIRED_ENROLLMENT_PHOTOS = 5;
+
+/**
+ * An account's standing request to be deleted. Deletion is carried out by an
+ * operator, not by the app, so the request is what the Account screen shows.
+ * Hand-written until the route carries an OpenAPI schema.
+ */
+export type DeletionRequest = {
+  user_id: string;
+  username: string;
+  /** RFC 3339, UTC. */
+  requested_at: string;
+  fulfilled_at?: string;
+};

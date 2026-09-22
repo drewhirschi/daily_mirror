@@ -66,6 +66,17 @@ impl User {
     }
 }
 
+/// An account's standing request to be deleted, as the app shows it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct DeletionRequest {
+    pub user_id: String,
+    pub username: String,
+    /// RFC 3339, UTC.
+    pub requested_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fulfilled_at: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct PasskeySummary {
     pub credential_id: String,
@@ -727,11 +738,105 @@ impl AuthStore {
         Ok((total as u32, admins as u32))
     }
 
-    /// Undo a partially completed signup so the username can be reused.
+    /// Remove an account and everything the auth database holds for it:
+    /// sessions, passkeys and in-flight ceremonies. Foreign keys are not
+    /// enforced on these connections, so the cascade is spelled out. Signup
+    /// also calls this to undo a partial account so the username is reusable.
     pub async fn delete_user(&self, user_id: &str) -> io::Result<()> {
         let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        for statement in [
+            "DELETE FROM auth_sessions WHERE user_id = ?1",
+            "DELETE FROM passkeys WHERE user_id = ?1",
+            "DELETE FROM auth_ceremonies WHERE user_id = ?1",
+            "DELETE FROM users WHERE id = ?1",
+        ] {
+            connection
+                .execute(statement, params![user_id])
+                .await
+                .map_err(io::Error::other)?;
+        }
+        Ok(())
+    }
+
+    /// Record that an account wants to be deleted. Idempotent: a second
+    /// request returns the first. Nothing is deleted until an operator runs
+    /// `daily-mirror-onboarding delete-account`.
+    pub async fn request_account_deletion(&self, user: &User) -> io::Result<DeletionRequest> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
         connection
-            .execute("DELETE FROM users WHERE id = ?1", params![user_id])
+            .execute(
+                "INSERT INTO account_deletion_requests (user_id, username)
+                 VALUES (?1, ?2)
+                 ON CONFLICT(user_id) DO NOTHING",
+                params![user.id.clone(), user.username.clone()],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        self.account_deletion_request(&user.id)
+            .await?
+            .ok_or_else(|| io::Error::other("deletion request was not recorded"))
+    }
+
+    /// The open deletion request for an account, if it has one.
+    pub async fn account_deletion_request(
+        &self,
+        user_id: &str,
+    ) -> io::Result<Option<DeletionRequest>> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let mut rows = connection
+            .query(
+                &format!(
+                    "SELECT user_id, username, {requested}, {fulfilled}
+                     FROM account_deletion_requests
+                     WHERE user_id = ?1 AND fulfilled_at IS NULL",
+                    requested = rfc3339("requested_at"),
+                    fulfilled = rfc3339("fulfilled_at"),
+                ),
+                params![user_id],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        rows.next()
+            .await
+            .map_err(io::Error::other)?
+            .map(row_to_deletion_request)
+            .transpose()
+    }
+
+    /// Every request an operator still has to carry out, oldest first.
+    pub async fn pending_deletion_requests(&self) -> io::Result<Vec<DeletionRequest>> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        let mut rows = connection
+            .query(
+                &format!(
+                    "SELECT user_id, username, {requested}, {fulfilled}
+                     FROM account_deletion_requests
+                     WHERE fulfilled_at IS NULL
+                     ORDER BY requested_at, user_id",
+                    requested = rfc3339("requested_at"),
+                    fulfilled = rfc3339("fulfilled_at"),
+                ),
+                (),
+            )
+            .await
+            .map_err(io::Error::other)?;
+        let mut requests = Vec::new();
+        while let Some(row) = rows.next().await.map_err(io::Error::other)? {
+            requests.push(row_to_deletion_request(row)?);
+        }
+        Ok(requests)
+    }
+
+    /// Close the request once the account is gone. The row stays as the
+    /// record of what was asked for and when it was honoured.
+    pub async fn mark_deletion_fulfilled(&self, user_id: &str) -> io::Result<()> {
+        let connection = self.database().await?.connect().map_err(io::Error::other)?;
+        connection
+            .execute(
+                "UPDATE account_deletion_requests SET fulfilled_at = CURRENT_TIMESTAMP
+                 WHERE user_id = ?1 AND fulfilled_at IS NULL",
+                params![user_id],
+            )
             .await
             .map_err(io::Error::other)?;
         Ok(())
@@ -772,6 +877,20 @@ pub fn request_session_token(headers: &axum::http::HeaderMap) -> Option<String> 
         .then(|| token.to_owned());
     }
     cookie_value(headers, SESSION_COOKIE)
+}
+
+/// SQLite's `CURRENT_TIMESTAMP` is `YYYY-MM-DD HH:MM:SS`; clients get RFC 3339.
+fn rfc3339(column: &str) -> String {
+    format!("CASE WHEN {column} IS NULL THEN NULL ELSE replace({column}, ' ', 'T') || 'Z' END")
+}
+
+fn row_to_deletion_request(row: libsql::Row) -> io::Result<DeletionRequest> {
+    Ok(DeletionRequest {
+        user_id: row.get(0).map_err(io::Error::other)?,
+        username: row.get(1).map_err(io::Error::other)?,
+        requested_at: row.get(2).map_err(io::Error::other)?,
+        fulfilled_at: row.get(3).map_err(io::Error::other)?,
+    })
 }
 
 fn row_to_user(row: Option<libsql::Row>) -> io::Result<Option<User>> {

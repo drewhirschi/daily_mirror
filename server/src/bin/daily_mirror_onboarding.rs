@@ -6,6 +6,7 @@ use server::auth::{AuthStore, User};
 use server::catalog::PhotoCatalog;
 use server::devices::DeviceRegistry;
 use server::onboarding::{self, LinkRequest, PlannedPerson, SignupRequest};
+use server::photos::PhotoStore;
 use server::processing::ProcessingQueue;
 
 #[tokio::main]
@@ -70,6 +71,56 @@ async fn main() -> io::Result<()> {
             let user = resolve(&auth, args.next()).await?;
             let (request, apply) = link_options(args)?;
             link_household(&auth, &queue, &user, &request, apply).await?;
+        }
+        "deletion-requests" => {
+            if args.next().is_some() {
+                return usage();
+            }
+            let requests = auth.pending_deletion_requests().await?;
+            if requests.is_empty() {
+                println!("No pending deletion requests");
+            }
+            for request in requests {
+                println!("{}\t{}", request.requested_at, request.username);
+            }
+        }
+        "delete-account" => {
+            let user = resolve(&auth, args.next()).await?;
+            let apply = match args.next().as_deref() {
+                None => false,
+                Some("--apply") => true,
+                Some(_) => return usage(),
+            };
+            if args.next().is_some() {
+                return usage();
+            }
+            // Deletion is only ever carried out for an account that asked.
+            let Some(request) = auth.account_deletion_request(&user.id).await? else {
+                return Err(invalid(format!(
+                    "{} has not requested deletion; nothing done",
+                    user.username
+                )));
+            };
+            println!(
+                "{} requested deletion at {}",
+                request.username, request.requested_at
+            );
+            if !apply {
+                println!("Dry run. Re-run with --apply to delete the account and its data.");
+                return Ok(());
+            }
+            let store = PhotoStore::from_env()?;
+            let deleted = onboarding::delete_account(&queue, &auth, &store, &user).await?;
+            println!(
+                "Deleted {}: {} photograph(s) removed, household {}",
+                user.username,
+                deleted.photos_deleted,
+                if deleted.household_erased {
+                    "erased"
+                } else {
+                    "kept for its other accounts"
+                }
+            );
         }
         _ => return usage(),
     }
@@ -251,7 +302,9 @@ fn usage<T>() -> io::Result<T> {
         "       daily-mirror-onboarding add-person <username> <display-name>\n",
         "       daily-mirror-onboarding link-household <username> [--household-id ID]\n",
         "           [--person-id ID] [--new-person] [--role admin|member] [--name NAME]\n",
-        "           [--members \"A,B,C\"] [--create-missing] [--apply]"
+        "           [--members \"A,B,C\"] [--create-missing] [--apply]\n",
+        "       daily-mirror-onboarding deletion-requests\n",
+        "       daily-mirror-onboarding delete-account <username> [--apply]"
     )))
 }
 

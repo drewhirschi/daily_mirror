@@ -16,6 +16,14 @@ export default function Layout({ children }: { children: ReactNode }) {
           </nav>
         </header>
         {children}
+        {/*
+          The App Store listing cites both of these, and Apple checks that the
+          URLs work for somebody who is not signed in.
+        */}
+        <footer className="site-footer">
+          <a href="/privacy">Privacy</a>
+          <a href="/support">Support</a>
+        </footer>
       </div>
     </>
   );

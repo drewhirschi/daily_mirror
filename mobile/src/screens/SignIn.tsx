@@ -16,6 +16,7 @@ import { NATIVE_PASSKEYS_ENABLED } from "../auth-features";
 import { useSession } from "../session";
 import { SignUp } from "./SignUp";
 import { Button, IconButton, styles, useColors } from "../ui";
+import { STORE_BUILD } from "../store-build";
 
 export function SignIn() {
   const {
@@ -212,16 +213,22 @@ export function SignIn() {
                 Create an account
               </Text>
             </Pressable>
-            <Pressable
-              onPress={() => setSettings(!settings)}
-              accessibilityRole="button"
-              style={{ padding: 14 }}
-            >
-              <Text style={{ color: c.secondary, textAlign: "center" }}>
-                Server settings
-              </Text>
-            </Pressable>
-            {settings ? (
+            {/*
+              Pointing the app at another server is a development affordance,
+              and a shipped build keeps the one server it was built for.
+            */}
+            {STORE_BUILD ? null : (
+              <Pressable
+                onPress={() => setSettings(!settings)}
+                accessibilityRole="button"
+                style={{ padding: 14 }}
+              >
+                <Text style={{ color: c.secondary, textAlign: "center" }}>
+                  Server settings
+                </Text>
+              </Pressable>
+            )}
+            {settings && !STORE_BUILD ? (
               <TextInput
                 accessibilityLabel="Server address"
                 style={input}

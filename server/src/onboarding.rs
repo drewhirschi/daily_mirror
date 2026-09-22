@@ -101,6 +101,9 @@ pub enum OnboardingError {
     HouseholdFull,
     /// The action needs the `admin` role on the household.
     Forbidden,
+    /// Deleting this account would leave a household with members but no
+    /// administrator, and nobody able to add a camera or a person again.
+    LastAdmin,
     PersonNotInHousehold,
     Invalid(String),
     #[cfg(feature = "image-processing")]
@@ -112,6 +115,7 @@ impl OnboardingError {
     pub fn status_code(&self) -> StatusCode {
         match self {
             Self::Disabled | Self::Forbidden => StatusCode::FORBIDDEN,
+            Self::LastAdmin => StatusCode::CONFLICT,
             Self::UsernameTaken | Self::NoHousehold | Self::HouseholdFull => StatusCode::CONFLICT,
             Self::PersonNotInHousehold => StatusCode::NOT_FOUND,
             Self::Invalid(_) => StatusCode::BAD_REQUEST,
@@ -131,6 +135,10 @@ impl OnboardingError {
             }
             Self::HouseholdFull => "This household is already full".to_owned(),
             Self::Forbidden => "Only a household administrator can do that".to_owned(),
+            Self::LastAdmin => "You are the only administrator of a household that still has \
+                 other accounts. Make someone else an administrator first, then delete your \
+                 account."
+                .to_owned(),
             Self::PersonNotInHousehold => "That person is not in your household".to_owned(),
             Self::Invalid(message) => message.clone(),
             #[cfg(feature = "image-processing")]
@@ -414,6 +422,167 @@ pub async fn rename_household(
             _ => storage(error),
         })?;
     household_for_user(queue, auth, user).await
+}
+
+// --- Account deletion ------------------------------------------------------
+//
+// App Review guideline 5.1.1(v): an app that lets people create an account
+// must let them delete it from inside the app, not by writing to support. The
+// rules below are the honest reading of a household product:
+//
+//   * A household is shared. Leaving one does not destroy the photographs the
+//     people still in it are looking at, so an account that has housemates is
+//     unseated and deleted, and the household carries on without it.
+//   * An administrator who is the last one left, with other accounts still in
+//     the household, is refused: unseating them would strand everybody else
+//     with no way to add a person or a camera. They are told to promote
+//     somebody first. (A lone administrator with no housemates is the normal
+//     case and is never refused.)
+//   * When the account was the last one in its household, nobody is left to
+//     see any of it, so the household is erased with it: every photograph and
+//     its stored object, the faces and face embeddings derived from them, the
+//     people, the seating, and the cameras' claims.
+
+/// Everything that was removed, for the log line and the tests.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DeletedAccount {
+    /// True when this account was the last one in its household and the
+    /// household's own data was erased too.
+    pub household_erased: bool,
+    pub photos_deleted: u32,
+    pub people_deleted: u32,
+    pub devices_released: u32,
+}
+
+/// Deletes the signed-in account. See the note above for the household rules.
+pub async fn delete_account(
+    queue: &ProcessingQueue,
+    auth: &AuthStore,
+    store: &PhotoStore,
+    user: &User,
+) -> Result<DeletedAccount, OnboardingError> {
+    queue.ensure_schema().await.map_err(storage)?;
+    let connection = queue.catalog.connection().await.map_err(storage)?;
+    let mut deleted = DeletedAccount::default();
+    if let Some(household_id) = user.household_id.clone() {
+        let (peers, peer_admins) = auth
+            .household_peers(&household_id, &user.id)
+            .await
+            .map_err(storage)?;
+        if peers > 0 {
+            if user.household_role == ROLE_ADMIN && peer_admins == 0 {
+                return Err(OnboardingError::LastAdmin);
+            }
+        } else {
+            deleted = erase_household(queue, store, &connection, &household_id).await?;
+            deleted.household_erased = true;
+        }
+    }
+    // The pairing table binds an account to a household independently of
+    // `users.household_id`, and has no foreign key to cascade.
+    if table_exists(&connection, "household_users").await? {
+        connection
+            .execute(
+                "DELETE FROM household_users WHERE user_id = ?1",
+                params![user.id.clone()],
+            )
+            .await
+            .map_err(other)?;
+    }
+    // Sessions, passkeys and half-finished ceremonies all cascade from `users`.
+    auth.delete_user(&user.id).await.map_err(storage)?;
+    Ok(deleted)
+}
+
+/// Removes a household nobody is left in: its photographs and their stored
+/// objects first, because an object outliving its row is the one failure the
+/// nightly reconciliation would turn back into a broken photo.
+async fn erase_household(
+    queue: &ProcessingQueue,
+    store: &PhotoStore,
+    connection: &libsql::Connection,
+    household_id: &str,
+) -> Result<DeletedAccount, OnboardingError> {
+    let mut deleted = DeletedAccount::default();
+    let has_devices = table_exists(connection, "devices").await?;
+    // A household's photographs are the ones its cameras took, plus the
+    // enrollment captures taken with a phone for the people seated in it.
+    let mut photo_ids = Vec::new();
+    let mut rows = connection
+        .query(
+            "SELECT id FROM photos
+             WHERE enrollment_person_id IN
+                   (SELECT person_id FROM household_members WHERE household_id = ?1)",
+            params![household_id],
+        )
+        .await
+        .map_err(other)?;
+    while let Some(row) = rows.next().await.map_err(other)? {
+        photo_ids.push(row.get::<String>(0).map_err(other)?);
+    }
+    drop(rows);
+    if has_devices {
+        let mut rows = connection
+            .query(
+                "SELECT id FROM photos
+                 WHERE device_id IN (SELECT device_id FROM devices WHERE household_id = ?1)",
+                params![household_id],
+            )
+            .await
+            .map_err(other)?;
+        while let Some(row) = rows.next().await.map_err(other)? {
+            photo_ids.push(row.get::<String>(0).map_err(other)?);
+        }
+        drop(rows);
+    }
+    photo_ids.sort();
+    photo_ids.dedup();
+    for id in &photo_ids {
+        // A missing object is not a failure here: the row is going either way.
+        store.delete(id).await.map_err(storage)?;
+        queue.catalog.delete(id).await.map_err(storage)?;
+        queue.delete_photo(id).await.map_err(storage)?;
+        deleted.photos_deleted += 1;
+    }
+    if has_devices {
+        deleted.devices_released = connection
+            .execute(
+                "DELETE FROM devices WHERE household_id = ?1",
+                params![household_id],
+            )
+            .await
+            .map_err(other)? as u32;
+        connection
+            .execute(
+                "DELETE FROM device_claim_tokens WHERE household_id = ?1",
+                params![household_id],
+            )
+            .await
+            .map_err(other)?;
+    }
+    deleted.people_deleted = connection
+        .execute(
+            "DELETE FROM people WHERE id IN
+                 (SELECT person_id FROM household_members WHERE household_id = ?1)",
+            params![household_id],
+        )
+        .await
+        .map_err(other)? as u32;
+    connection
+        .execute(
+            "DELETE FROM household_members WHERE household_id = ?1",
+            params![household_id],
+        )
+        .await
+        .map_err(other)?;
+    connection
+        .execute(
+            "DELETE FROM households WHERE id = ?1",
+            params![household_id],
+        )
+        .await
+        .map_err(other)?;
+    Ok(deleted)
 }
 
 // --- Administrator linkage -------------------------------------------------

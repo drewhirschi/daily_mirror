@@ -220,6 +220,14 @@ export class MirrorApi {
   logout() {
     return this.request<void>("/api/auth/logout", { method: "POST" });
   }
+  /**
+   * Deletes the signed-in account, which App Review guideline 5.1.1(v)
+   * requires the app to offer. The session is dead once this returns, so the
+   * caller signs out locally afterwards without calling the server again.
+   */
+  deleteAccount() {
+    return this.request<void>("/api/account", { method: "DELETE" });
+  }
   rotate(id: string, degrees: -90 | 90) {
     const edit: components["schemas"]["RotatePhoto"] = { degrees };
     return this.request<void>(`/api/photos/${encodeURIComponent(id)}`, {

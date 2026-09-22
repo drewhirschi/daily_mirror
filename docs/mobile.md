@@ -242,6 +242,25 @@ stills only. `app.config.ts` now has an `android` block with package
 existing dev client and any previously distributed build cannot load these
 screens; rebuild with `expo run:ios` / `expo run:android` or a new EAS build.
 
+## Account deletion and the privacy policy
+
+The App Store requires an in-app way to delete an account, and a public
+privacy policy that covers face data. Both exist as of September 22, 2026:
+
+- **Request account deletion** is at the bottom of the Account tab, and on
+  the web account page. The app posts to `/api/auth/account/deletion-request`
+  and then shows the pending request; nothing is deleted automatically. An
+  operator carries it out with `just delete-account <username> --apply`
+  within the 30 days the app promises. What that removes is documented on
+  `onboarding::delete_account` and pinned by `server/tests/account_deletion.rs`.
+- **Privacy policy** and **support** pages are served at `/privacy` and
+  `/support` without a session (`view_auth::bypasses_authentication`). The
+  Account tab links to the policy. Keep it in step with what the server
+  stores and with the App Privacy answers.
+
+The submission checklist, listing text and review notes are in
+[`docs/app-store-submission.md`](app-store-submission.md).
+
 ## Verification before distributing
 
 Implementation checks on September 7, 2026 passed TypeScript validation, all
@@ -303,6 +322,10 @@ On an iPhone or simulator, verify the following before a release:
    Delete a disposable test photo and check it disappears on both clients.
 6. Sign out while previews download, sign into another account, and confirm
    no previous account's thumbnails or catalog appear.
+7. With a throwaway account, request deletion from the Account tab, confirm
+   the screen shows the pending request after a restart, then run
+   `just delete-account <username> --apply` and confirm the old session is
+   refused and the username can be reused.
 
 References: [Expo monorepos](https://docs.expo.dev/guides/monorepos/),
 [Expo Image](https://docs.expo.dev/versions/latest/sdk/image/),

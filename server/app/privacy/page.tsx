@@ -1,21 +1,16 @@
 // The privacy policy URL the App Store listing points at. It must be reachable
 // without signing in; `bypasses_authentication` in src/view_auth.rs allows it.
-//
-// DRAFT. Everything below describes what the system actually does today, taken
-// from the schema and the storage code, but Drew has to read it, decide the
-// retention periods he is willing to promise, fill in the contact address, and
-// publish it before the listing can cite it.
+// Everything below describes what the system actually does today, taken from
+// the schema and the storage code. Keep it in step with the App Privacy
+// answers in App Store Connect (docs/app-store-submission.md).
+import { CONTACT_EMAIL } from "../../components/contact";
+
 export default function PrivacyPage() {
   return (
     <main className="prose-page">
       <p className="eyebrow">Daily Mirror</p>
       <h1>Privacy Policy</h1>
-      <p className="prose-draft" role="note">
-        <strong>Draft awaiting review.</strong> This describes how Daily Mirror
-        works today. Replace the contact address and confirm the retention
-        periods before relying on it.
-      </p>
-      <p className="prose-meta">Last updated: 19 September 2026</p>
+      <p className="prose-meta">Last updated: 22 September 2026</p>
 
       <h2>Who runs Daily Mirror</h2>
       <p>
@@ -96,10 +91,11 @@ export default function PrivacyPage() {
 
       <h2>Deleting your account and your data</h2>
       <p>
-        You can delete your account from inside the app, on the Account screen,
-        or from the account page on this site. Deleting your account removes
-        your login, your password hash, your passkeys and your sessions
-        immediately.
+        You can ask for your account to be deleted from inside the app, on the
+        Account screen, or from the account page on this site. Deletion
+        requests are carried out by hand within 30 days, and the app shows your
+        request as pending until then. Deleting your account removes your
+        login, your password hash, your passkeys and your sessions.
       </p>
       <p>
         If you are the only member of your household, deleting your account also
@@ -141,7 +137,8 @@ export default function PrivacyPage() {
 
       <h2>Contact</h2>
       <p>
-        Questions, or a request to have something removed:{" "}
+        Questions, a copy of your data, or a request to have something removed:
+        write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>, or see{" "}
         <a href="/support">the support page</a>.
       </p>
     </main>

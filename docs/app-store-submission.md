@@ -44,12 +44,24 @@ Identity, as shipped:
   C617.1, disk space E174.1, user defaults CA92.1, system boot time 35F9.1).
   Verified present in the built `DailyMirror.app/PrivacyInfo.xcprivacy`, along
   with the per-SDK manifests Expo bundles.
-- **Account deletion (guideline 5.1.1(v)).** Implemented:
-  `DELETE /api/account` (`server/app/api/account/route.rs`,
-  `onboarding::delete_account`) and an Account → **Delete account** control in
-  the app with a confirming alert. Rules:
+- **Account deletion (guideline 5.1.1(v)).** A request, never automatic.
+  Account → **Request account deletion** in the app (and on the web account
+  page) posts to `POST /api/auth/account/deletion-request`, which records the
+  request (`account_deletion_requests`, migration 0003) and shows it as
+  pending. Apple accepts a request flow as long as it starts in the app and
+  completes in a reasonable time; the app and the privacy policy promise 30
+  days. An operator carries it out:
+
+  ```sh
+  just deletion-requests            # who has asked, oldest first
+  just delete-account <username>    # dry run: shows the request
+  just delete-account <username> --apply
+  ```
+
+  `onboarding::delete_account` does the work, and refuses accounts that never
+  asked. Rules:
   - The account, its password hash, passkeys, sessions and half-finished
-    ceremonies go immediately.
+    ceremonies go when the request is carried out.
   - If other accounts share the household, only the account leaves; the
     household and its archive carry on.
   - If the account is the **last one in its household**, the household is
@@ -58,7 +70,9 @@ Identity, as shipped:
     cameras' claims.
   - A lone remaining **administrator with housemates** gets a 409 asking them
     to promote somebody first, rather than stranding everyone else.
-  Covered by `server/tests/account_deletion.rs` (3 tests).
+  Covered by `server/tests/account_deletion.rs` (4 tests). Migration 0003
+  must be applied (`cargo run --bin daily-mirror-migrate -- up`) before the
+  deployed server will serve the route.
 - **Placeholder and debug UI hidden in Release.** `mobile/src/store-build.ts`
   exports `STORE_BUILD = !__DEV__`, and it hides the "Invite to sign in" →
   "Invites are coming soon" dialog, the raw error line under a failed pairing
@@ -67,7 +81,7 @@ Identity, as shipped:
 - **Privacy and support pages.** `server/app/privacy/page.tsx` and
   `server/app/support/page.tsx`, linked from the site footer and reachable
   without signing in (`bypasses_authentication` in `server/src/view_auth.rs`).
-  **Both are drafts and say so on the page.**
+  Reviewed on 22 September 2026; the contact address is `ashirsc@gmail.com`.
 - **Repeatable archive.** `scripts/mobile-mac.sh store` prebuilds, archives
   Release and runs `-exportArchive` with
   `method = app-store-connect`, `destination = export` (never upload) and
@@ -249,15 +263,16 @@ What works without the hardware
   • Flipbooks
   • Household: the people in the home and their enrollment status
   • Enrollment capture: takes photographs with the iPhone camera
-  • Account: including Delete account
+  • Account: including Request account deletion
 
 What needs the hardware
   • Account > Cameras > Add a camera pairs a physical camera over Bluetooth.
     A video of the whole pairing flow on real hardware is attached.
 
 Account deletion
-  Account > Delete account, two taps. It deletes the login, password and
-  passkeys immediately, and erases the household's photographs and face data
+  Account > Request account deletion, two taps. The request is shown as
+  pending in the app and carried out within 30 days: it deletes the login,
+  password and passkeys, and erases the household's photographs and face data
   when no one else is left in the household.
 
 Face data
@@ -317,8 +332,9 @@ Then TestFlight → internal testing on Drew's own phone before submitting.
    Noted in `server/app/api/auth/signup/route.rs`. Not an App Review blocker
    today because production has one household, but it contradicts the spirit of
    the privacy policy and should be fixed before anyone else has an account.
-5. **The privacy and support pages are not deployed.** They exist on this
-   branch only. The URLs must resolve before the listing can cite them.
+5. **The privacy and support pages and the deletion request route are not
+   deployed.** The URLs must resolve, and migration 0003 must be applied,
+   before the listing can cite them or a reviewer taps the request button.
 6. **`app.dailymirror.ios` must be registered as an App ID with the Associated
    Domains capability.** Automatic signing has been doing this with
    `-allowProvisioningUpdates`, but confirm in the developer portal that the
@@ -361,3 +377,22 @@ which prints whether the job is still running, the tail of the log, and whether
 an `.ipa` was produced.
 
 Before each upload, bump `ios.buildNumber` in `mobile/app.config.ts`.
+
+---
+
+## Planned after the first submission
+
+Notes from the submission review on 22 September 2026, to be planned
+properly before they are built:
+
+- **Soft-delete photographs.** Deleting a photograph from the archive should
+  mark it deleted and hide it, and a scheduled job should remove the object
+  and its rows for good 30 days later. That gives a household a window to
+  recover a mistaken deletion and lets account deletion follow the same
+  path. Until then, deleting a photograph is immediate and the privacy
+  policy says so.
+- **A place to review unidentified faces.** The app should list the faces
+  the pipeline could not match to anyone in the household, so the person
+  reviewing can say who each one is, or ignore it when it is a visitor who
+  does not belong in the household. The website's Faces admin page does
+  this today; the app has no equivalent.

@@ -60,6 +60,11 @@ pub static MIGRATIONS: &[Migration] = &[
         name: "capture_metadata",
         sql: include_str!("../migrations/0002_capture_metadata.sql"),
     },
+    Migration {
+        version: 3,
+        name: "account_deletion_requests",
+        sql: include_str!("../migrations/0003_account_deletion_requests.sql"),
+    },
 ];
 
 /// The schema version this binary was built against.

@@ -51,6 +51,14 @@ onboarding-household username:
 onboarding-add-person username name:
     cd server && cargo run --locked --bin daily-mirror-onboarding -- add-person "{{username}}" "{{name}}"
 
+# List the accounts that have asked to be deleted from the app or website.
+deletion-requests:
+    cd server && cargo run --locked --bin daily-mirror-onboarding -- deletion-requests
+
+# Carry out one account's deletion request. Dry run unless `--apply` is passed.
+delete-account username *flags:
+    cd server && cargo run --locked --bin daily-mirror-onboarding -- delete-account "{{username}}" {{flags}}
+
 # Regenerate the typed web client after changing a Rust API route.
 client:
     cd server && npm run client:generate

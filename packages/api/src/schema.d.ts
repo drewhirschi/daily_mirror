@@ -4,28 +4,6 @@
  */
 
 export interface paths {
-    "/api/account": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Deletes the signed-in account, as App Review guideline 5.1.1(v) requires.
-         * @description The session is revoked first so a half-finished delete can never leave a
-         *     usable token pointing at a deleted account, and the browser cookie is
-         *     expired on the way out.
-         */
-        delete: operations["deleteApiAccount"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/faces": {
         parameters: {
             query?: never;
@@ -1080,24 +1058,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    deleteApiAccount: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Account deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     getApiAdminFaces: {
         parameters: {
             query?: never;

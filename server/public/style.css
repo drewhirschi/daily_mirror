@@ -689,6 +689,9 @@ code {
 .passkey-list li span:last-child { grid-column: 2; }
 
 .account-card + .account-card { margin-top: 20px; }
+.account-card a { color: #386b42; }
+.danger-button { border: 1px solid #c8857c; border-radius: 10px; background: transparent; color: #a23b32; font: inherit; font-weight: 650; cursor: pointer; padding: 13px 16px; }
+.danger-button:disabled { cursor: wait; opacity: 0.5; }
 
 .install-card {
   display: grid;

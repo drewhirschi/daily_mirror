@@ -454,7 +454,12 @@ pub struct DeletedAccount {
     pub devices_released: u32,
 }
 
-/// Deletes the signed-in account. See the note above for the household rules.
+/// Deletes an account. See the note above for the household rules.
+///
+/// This is the operator side of a deletion request: no route calls it. The
+/// app and the website only record a request (`account_deletion_requests`),
+/// and `daily-mirror-onboarding delete-account` runs this for one of them.
+/// The request row is closed at the end so the audit trail survives.
 pub async fn delete_account(
     queue: &ProcessingQueue,
     auth: &AuthStore,
@@ -489,8 +494,11 @@ pub async fn delete_account(
             .await
             .map_err(other)?;
     }
-    // Sessions, passkeys and half-finished ceremonies all cascade from `users`.
+    // Sessions, passkeys and half-finished ceremonies go with the user row.
     auth.delete_user(&user.id).await.map_err(storage)?;
+    auth.mark_deletion_fulfilled(&user.id)
+        .await
+        .map_err(storage)?;
     Ok(deleted)
 }
 

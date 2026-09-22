@@ -12,9 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { ApiError } from "@daily-mirror/api";
 import { useSession, type ActiveSession } from "../session";
 import { IMAGE_CACHE_BUDGET } from "../cache/disk-cache";
 import { NATIVE_PASSKEYS_ENABLED } from "../auth-features";
@@ -34,6 +33,7 @@ export function Account({
 }) {
   const c = useColors();
   const { signOut } = useSession();
+  const client = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [stats, setStats] = useState(session.cache.stats);
   const passkeys = useQuery({
@@ -75,22 +75,56 @@ export function Account({
       setBusy(false);
     }
   };
-  const deleteAccount = async () => {
-    setBusy(true);
-    try {
-      await session.api.deleteAccount();
-      // The session died with the account, so there is nothing left to revoke.
-      await signOut(true);
-    } catch (error) {
+  const openPage = (path: string) => {
+    void Linking.openURL(`${session.api.origin}${path}`).catch(() =>
+      Alert.alert("Could not open browser"),
+    );
+  };
+  // App Review guideline 5.1.1(v): an app people can create an account in
+  // must let them delete it in the app. Here that is a request: the server
+  // records it, an operator carries it out within 30 days, and this screen
+  // shows it as pending until then. The household summary says whether other
+  // accounts share the household, which decides how much goes with it.
+  const otherAccounts = household.data
+    ? household.data.people.filter(
+        (person) =>
+          person.account === "linked" &&
+          person.id !== household.data.self_person_id,
+      ).length
+    : null;
+  const deletion = useQuery({
+    queryKey: ["deletion-request"],
+    queryFn: ({ signal }) => session.api.accountDeletionRequest(signal),
+    staleTime: 60_000,
+  });
+  const requestDeletion = useMutation({
+    mutationFn: () => session.api.requestAccountDeletion(),
+    onSuccess: (request) => client.setQueryData(["deletion-request"], request),
+    onError: () =>
       Alert.alert(
-        "Could not delete your account",
-        error instanceof ApiError && error.message
-          ? error.message
-          : "The server could not be reached. Please try again.",
-      );
-    } finally {
-      setBusy(false);
-    }
+        "Your request could not be sent",
+        "The server could not be reached. Nothing was changed. Please try again.",
+      ),
+  });
+  const confirmDeletion = () => {
+    const consequence =
+      otherAccounts === 0
+        ? "You are the only account in your household, so your household, its cameras and every photograph they took will be deleted as well."
+        : otherAccounts === null
+          ? "If you are the only account in your household, its cameras and every photograph they took are deleted too. Otherwise the other accounts keep the household."
+          : "The other accounts keep the household and its photographs.";
+    Alert.alert(
+      "Request account deletion?",
+      `We delete accounts by hand within 30 days of a request, and it cannot be undone once done. Your sign-in, passkeys and enrollment photographs are removed. ${consequence}`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Request deletion",
+          style: "destructive",
+          onPress: () => requestDeletion.mutate(),
+        },
+      ],
+    );
   };
   return (
     <SafeAreaView
@@ -257,11 +291,7 @@ export function Account({
           <Button
             title="Open web account"
             quiet
-            onPress={() => {
-              void Linking.openURL(`${session.api.origin}/account`).catch(() =>
-                Alert.alert("Could not open browser"),
-              );
-            }}
+            onPress={() => openPage("/account")}
           />
         </View>
         <Button
@@ -271,41 +301,46 @@ export function Account({
           busy={busy}
           onPress={() => void logout()}
         />
-        {/*
-          App Review guideline 5.1.1(v): an app people can create an account in
-          must let them delete it in the app. Two taps, the second one saying
-          plainly what goes, and the server decides what happens to a shared
-          household.
-        */}
         <View style={[styles.card, { backgroundColor: c.card }]}>
           <Text style={[styles.subtitle, { color: c.text }]}>
-            Delete account
+            Privacy and your data
           </Text>
           <Text style={{ color: c.secondary, lineHeight: 23 }}>
-            Removes your sign-in, your password and your passkeys. If nobody
-            else shares your household, its photographs, the faces recognised in
-            them and its cameras are erased too. This cannot be undone.
+            Your photographs, the names in your household and the face data that
+            recognises them stay private to your household. The privacy policy
+            explains what is stored and for how long.
           </Text>
           <Button
-            title="Delete account"
+            title="Read the privacy policy"
             quiet
-            danger
-            busy={busy}
-            onPress={() =>
-              Alert.alert(
-                "Delete your account?",
-                "Your sign-in and passkeys are removed. If you are the only person in your household, every photograph in it and the faces recognised in them are permanently deleted. This cannot be undone.",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: () => void deleteAccount(),
-                  },
-                ],
-              )
-            }
+            onPress={() => openPage("/privacy")}
           />
+          {deletion.data ? (
+            <Text
+              accessibilityRole="alert"
+              style={{ color: c.text, lineHeight: 23 }}
+            >
+              You asked for this account to be deleted on{" "}
+              {new Date(deletion.data.requested_at).toLocaleDateString()}. It
+              will be deleted, with your photographs and face data, within 30
+              days. You can keep using the app until then.
+            </Text>
+          ) : (
+            <>
+              <Text style={{ color: c.secondary, lineHeight: 23 }}>
+                You can ask for your account, your enrollment photographs and
+                the face data derived from them to be deleted. Requests are
+                carried out within 30 days.
+              </Text>
+              <Button
+                title="Request account deletion"
+                quiet
+                danger
+                busy={requestDeletion.isPending || deletion.isPending}
+                onPress={confirmDeletion}
+              />
+            </>
+          )}
         </View>
         <Text
           style={{

@@ -158,6 +158,10 @@ mod tests {
         ));
         assert!(!bypasses_authentication(&Method::POST, "/api/auth/logout"));
         assert!(!bypasses_authentication(
+            &Method::POST,
+            "/api/auth/account/deletion-request"
+        ));
+        assert!(!bypasses_authentication(
             &Method::GET,
             "/api/photos/20260829T071500Z-def67890"
         ));

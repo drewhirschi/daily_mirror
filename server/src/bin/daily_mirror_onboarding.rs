@@ -1,10 +1,15 @@
 //! Household onboarding from a server shell. The HTTP routes and this binary
 //! call the same `server::onboarding` functions.
+use std::fs;
 use std::io;
+use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::{Path, PathBuf};
 
 use server::auth::{AuthStore, User};
 use server::catalog::PhotoCatalog;
-use server::devices::DeviceRegistry;
+use server::devices::{DeviceError, DeviceRegistry, RegisterDeviceRequest};
 use server::onboarding::{self, LinkRequest, PlannedPerson, SignupRequest};
 use server::photos::PhotoStore;
 use server::processing::ProcessingQueue;
@@ -121,6 +126,11 @@ async fn main() -> io::Result<()> {
                     "kept for its other accounts"
                 }
             );
+        }
+        "register-device" => {
+            let user = resolve(&auth, args.next()).await?;
+            let options = register_options(args)?;
+            register_device(&auth, &queue, &user, &options).await?;
         }
         _ => return usage(),
     }
@@ -278,6 +288,198 @@ async fn link_household(
     Ok(())
 }
 
+/// Everything `register-device` was asked to do, including where the token
+/// may be written. The token file is a flag rather than stdout on purpose:
+/// terminal scrollback and shell history are not places for a credential.
+#[derive(Debug, Default)]
+struct RegisterOptions {
+    device_id: Option<String>,
+    device_name: Option<String>,
+    hardware: Option<String>,
+    firmware_version: Option<String>,
+    token_file: Option<PathBuf>,
+    rotate_token: bool,
+    apply: bool,
+}
+
+fn register_options(mut args: impl Iterator<Item = String>) -> io::Result<RegisterOptions> {
+    let mut options = RegisterOptions::default();
+    while let Some(flag) = args.next() {
+        let mut value = || {
+            args.next()
+                .ok_or_else(|| invalid(format!("{flag} needs a value")))
+        };
+        match flag.as_str() {
+            "--device-id" => options.device_id = Some(value()?),
+            "--name" => options.device_name = Some(value()?),
+            "--hardware" => options.hardware = Some(value()?),
+            "--firmware-version" => options.firmware_version = Some(value()?),
+            "--token-file" => options.token_file = Some(PathBuf::from(value()?)),
+            "--rotate-token" => options.rotate_token = true,
+            "--apply" => options.apply = true,
+            other => return Err(invalid(format!("unknown option {other}"))),
+        }
+    }
+    Ok(options)
+}
+
+/// Register a camera that cannot run the interactive claim flow.
+///
+/// Like `link-household`, this writes nothing without `--apply`: the dry run
+/// prints the account, its household, the cameras already there, and the plan.
+async fn register_device(
+    auth: &AuthStore,
+    queue: &ProcessingQueue,
+    user: &User,
+    options: &RegisterOptions,
+) -> io::Result<()> {
+    let device_name = options
+        .device_name
+        .clone()
+        .ok_or_else(|| invalid("--name is required"))?;
+    let hardware = options
+        .hardware
+        .clone()
+        .ok_or_else(|| invalid("--hardware is required"))?;
+    let firmware_version = options
+        .firmware_version
+        .clone()
+        .unwrap_or_else(|| "0.0.0".to_owned());
+
+    // The account's own household decides, exactly as pairing does; this
+    // command never guesses one.
+    let household_id = user.household_id.clone().ok_or_else(|| {
+        invalid(format!(
+            "{} {}",
+            user.username,
+            server::devices::NO_HOUSEHOLD
+        ))
+    })?;
+    let household = onboarding::household_for_user(queue, auth, user).await?;
+
+    println!("account {} ({})", user.username, user.id);
+    println!(
+        "  household: {} \"{}\"",
+        household_id, household.display_name
+    );
+    println!("  role:      {}", household.role);
+
+    let registry = DeviceRegistry::new(queue.clone());
+    let existing = registry.list(&household_id).await?;
+    println!("\ndevices already in this household:");
+    if existing.is_empty() {
+        println!("  (none)");
+    }
+    for device in &existing {
+        println!(
+            "  {}  \"{}\"  {}  firmware {}  last seen {}",
+            device.device_id,
+            device.device_name,
+            device.hardware,
+            device.firmware_version,
+            device.last_seen_at.as_deref().unwrap_or("(never)"),
+        );
+    }
+
+    // A device ID is a stable machine identifier. The paired ESP32 uses the
+    // twelve lowercase hex digits of its MAC; a Pi has no equivalent the
+    // server can see, so one is generated in the same shape and then pinned
+    // by writing the token to that device.
+    let device_id = options
+        .device_id
+        .clone()
+        .unwrap_or_else(generated_device_id);
+    let request = RegisterDeviceRequest {
+        device_id: device_id.clone(),
+        device_name: device_name.clone(),
+        hardware: hardware.clone(),
+        firmware_version: firmware_version.clone(),
+        rotate_token: options.rotate_token,
+    };
+
+    let already = registry.active_device(&device_id).await?;
+    println!("\nplan:");
+    println!("  device_id:        {device_id}");
+    println!("  device_name:      \"{device_name}\"");
+    println!("  hardware:         {hardware}");
+    println!("  firmware_version: {firmware_version}");
+    match &already {
+        Some(device) => println!(
+            "  action:           rotate the token of the existing \"{}\"",
+            device.device_name
+        ),
+        None => println!("  action:           create a new device and mint its token"),
+    }
+
+    if !options.apply {
+        println!("\ndry run; nothing was written.");
+        println!("re-run with --apply --token-file <path> to execute this plan.");
+        return Ok(());
+    }
+
+    // Refusing before the insert keeps a failed run from leaving a device
+    // registered with a token nobody holds.
+    let token_file = options.token_file.clone().ok_or_else(|| {
+        invalid("--token-file <path> is required with --apply: the device token is never printed")
+    })?;
+
+    let registered = registry
+        .register_device(&household_id, &request)
+        .await
+        .map_err(|error| match error {
+            DeviceError::Storage(error) => error,
+            DeviceError::HouseholdConflict => invalid(
+                "that device is registered to a different household; release it there first",
+            ),
+            DeviceError::InvalidClaimToken => invalid("invalid claim token"),
+            DeviceError::InvalidInput(message) => invalid(message),
+        })?;
+
+    write_token_file(&token_file, &registered.device_token)?;
+
+    println!("\napplied:");
+    println!(
+        "  {} \"{}\" ({}) is registered to household {} \"{}\"",
+        registered.device.device_id,
+        registered.device.device_name,
+        registered.device.hardware,
+        household_id,
+        household.display_name,
+    );
+    if registered.rotated {
+        println!("  the token it was using before no longer authenticates.");
+    }
+    println!("  token written to {} (mode 0600)", token_file.display());
+    println!("  install it on the device as DAILY_MIRROR_DEVICE_TOKEN, then delete that file.");
+    Ok(())
+}
+
+/// Create the token file readable only by its owner, and never widen an
+/// existing file's mode by writing through it.
+fn write_token_file(path: &Path, token: &str) -> io::Result<()> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    options.mode(0o600);
+    let mut file = options.open(path).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "could not create {} for the device token: {error}",
+                path.display()
+            ),
+        )
+    })?;
+    file.write_all(token.as_bytes())?;
+    file.write_all(b"\n")?;
+    file.sync_all()
+}
+
+/// Twelve lowercase hex digits, the shape the paired cameras already use.
+fn generated_device_id() -> String {
+    uuid::Uuid::new_v4().simple().to_string()[..12].to_owned()
+}
+
 /// Signup is CLI-gated the same way the route is, so a server with signup off
 /// still allows an operator to create the first account.
 fn confirmed_password() -> io::Result<String> {
@@ -304,7 +506,10 @@ fn usage<T>() -> io::Result<T> {
         "           [--person-id ID] [--new-person] [--role admin|member] [--name NAME]\n",
         "           [--members \"A,B,C\"] [--create-missing] [--apply]\n",
         "       daily-mirror-onboarding deletion-requests\n",
-        "       daily-mirror-onboarding delete-account <username> [--apply]"
+        "       daily-mirror-onboarding delete-account <username> [--apply]\n",
+        "       daily-mirror-onboarding register-device <username> --name NAME\n",
+        "           --hardware HARDWARE [--device-id ID] [--firmware-version VERSION]\n",
+        "           [--rotate-token] [--token-file PATH] [--apply]"
     )))
 }
 

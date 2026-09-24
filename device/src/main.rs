@@ -28,7 +28,9 @@ use tokio::sync::watch;
 use uuid::Uuid;
 
 mod camera_profile;
+mod capture_metadata;
 mod capture_mode;
+use capture_metadata::{CaptureMetadata, CaptureSidecar, CaptureTrigger};
 mod photo_settings;
 use photo_settings::PhotoSettings;
 mod lab;
@@ -71,7 +73,12 @@ enum DeviceCommand {
 #[derive(Clone, Debug)]
 struct Config {
     server_url: Option<String>,
+    /// The legacy shared Pi upload token. Photographs sent with it land as
+    /// `capture_source: legacy` with no device attached.
     upload_token: Option<String>,
+    /// This camera's own token, issued when it paired. Preferred over the
+    /// shared token for every server call when it is configured.
+    device_token: Option<String>,
     queue_dir: PathBuf,
     camera_command: String,
     camera_args: Vec<String>,
@@ -134,7 +141,8 @@ impl Config {
             photo_settings_path,
             local_dir,
             server_url: std::env::var("DAILY_MIRROR_SERVER_URL").ok(),
-            upload_token: std::env::var("DAILY_MIRROR_UPLOAD_TOKEN").ok(),
+            upload_token: non_empty("DAILY_MIRROR_UPLOAD_TOKEN"),
+            device_token: non_empty("DAILY_MIRROR_DEVICE_TOKEN"),
             queue_dir,
             camera_command,
             camera_args,
@@ -180,7 +188,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         DeviceCommand::CaptureOnce { no_upload } => {
-            let capture = device.camera.capture()?;
+            let capture = device.camera.capture(CaptureTrigger::Cli)?;
             println!("captured {}", capture.display());
             if !no_upload && device.config.capture_mode() == CaptureMode::Upload {
                 match device.uploader.upload(&capture) {
@@ -324,7 +332,7 @@ impl Device {
             "countdown",
             "Get ready — camera starting",
         );
-        let pending = match self.camera.start_capture() {
+        let pending = match self.camera.start_capture(CaptureTrigger::Button) {
             Ok(pending) => pending,
             Err(error) => {
                 eprintln!("capture failed: {error:#}");
@@ -475,11 +483,11 @@ impl Camera {
         })
     }
 
-    fn capture(&self) -> Result<PathBuf> {
-        self.start_capture()?.finish()
+    fn capture(&self, trigger: CaptureTrigger) -> Result<PathBuf> {
+        self.start_capture(trigger)?.finish()
     }
 
-    fn start_capture(&self) -> Result<PendingCapture<'_>> {
+    fn start_capture(&self, trigger: CaptureTrigger) -> Result<PendingCapture<'_>> {
         let _camera = self
             .camera_lock
             .lock()
@@ -531,6 +539,8 @@ impl Camera {
                 .map(str::to_owned)
                 .or_else(|| std::env::var("LIBCAMERA_RPI_TUNING_FILE").ok()),
             sensor: self.profile.name(),
+            profile: self.profile,
+            trigger,
             settings,
             args,
             orientation,
@@ -632,6 +642,8 @@ struct PendingCapture<'a> {
     metadata_path: PathBuf,
     tuning_file: Option<String>,
     sensor: &'static str,
+    profile: CameraProfile,
+    trigger: CaptureTrigger,
     settings: PhotoSettings,
     args: Vec<String>,
     orientation: CameraOrientation,
@@ -662,6 +674,23 @@ impl PendingCapture<'_> {
                     "captured_at": Utc::now().to_rfc3339(),
                 }),
             )?;
+        } else {
+            // The uploader may run minutes later or after a restart, so what
+            // the sensor reported is recorded now, beside the queued JPEG.
+            // Best effort: a photograph without its metadata still beats a
+            // capture that failed over a sidecar write.
+            let sidecar = CaptureSidecar {
+                capture: Some(CaptureMetadata::for_capture(
+                    self.profile,
+                    &self.args,
+                    self.trigger,
+                    metadata.as_ref(),
+                )),
+                sensor_metadata: metadata,
+            };
+            if let Err(error) = save_json(&CaptureSidecar::path_for(&path), &sidecar) {
+                eprintln!("queued photo without capture metadata: {error:#}");
+            }
         }
         Ok(path)
     }
@@ -736,6 +765,7 @@ struct Uploader {
     client: Client,
     upload_url: Option<String>,
     upload_token: Option<String>,
+    device_token: Option<String>,
     queue_dir: PathBuf,
 }
 
@@ -744,6 +774,12 @@ struct UploadGrantRequest<'a> {
     capture_id: &'a str,
     content_type: &'static str,
     content_length: u64,
+    /// Omitted entirely for a photo queued before this firmware, which the
+    /// server then stores with no capture metadata rather than refusing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    capture: Option<&'a CaptureMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sensor_metadata: Option<&'a serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -765,8 +801,18 @@ impl Uploader {
                 .build()?,
             upload_url: config.upload_url().ok(),
             upload_token: config.upload_token.clone(),
+            device_token: config.device_token.clone(),
             queue_dir: config.queue_dir.clone(),
         })
+    }
+
+    /// The bearer credential for every server call. A paired camera's own
+    /// token wins; without one the legacy shared token is used exactly as
+    /// before, so an un-paired Pi keeps working unchanged.
+    fn auth_token(&self) -> Option<&str> {
+        self.device_token
+            .as_deref()
+            .or(self.upload_token.as_deref())
     }
 
     fn upload(&self, path: &Path) -> Result<()> {
@@ -793,6 +839,9 @@ impl Uploader {
             .and_then(|value| value.to_str())
             .ok_or_else(|| anyhow!("queued photo has an invalid filename: {}", path.display()))?;
         let size = path.metadata()?.len();
+        // Written at capture time, because the queue may be drained long after
+        // the shutter fired — or by a different process after a restart.
+        let sidecar = CaptureSidecar::read(path).unwrap_or_default();
         let mut grant_request =
             self.client
                 .post(grant_endpoint.clone())
@@ -800,8 +849,10 @@ impl Uploader {
                     capture_id,
                     content_type: "image/jpeg",
                     content_length: size,
+                    capture: sidecar.capture.as_ref(),
+                    sensor_metadata: sidecar.sensor_metadata.as_ref(),
                 });
-        if let Some(token) = &self.upload_token {
+        if let Some(token) = self.auth_token() {
             grant_request = grant_request.header(AUTHORIZATION, format!("Bearer {token}"));
         }
 
@@ -843,7 +894,7 @@ impl Uploader {
             upload_request = upload_request.header(name, value);
         }
         if target_is_server {
-            if let Some(token) = &self.upload_token {
+            if let Some(token) = self.auth_token() {
                 upload_request = upload_request.header(AUTHORIZATION, format!("Bearer {token}"));
             }
         }
@@ -862,7 +913,7 @@ impl Uploader {
                 .join(&complete_url)
                 .context("resolve the upload completion endpoint")?;
             let mut complete_request = self.client.post(complete_endpoint);
-            if let Some(token) = &self.upload_token {
+            if let Some(token) = self.auth_token() {
                 complete_request =
                     complete_request.header(AUTHORIZATION, format!("Bearer {token}"));
             }
@@ -878,6 +929,9 @@ impl Uploader {
         }
         fs::remove_file(path)
             .with_context(|| format!("remove uploaded queue file {}", path.display()))?;
+        // The sidecar exists only to carry metadata to this call, so it leaves
+        // with the photograph rather than accumulating in the queue.
+        let _ = fs::remove_file(CaptureSidecar::path_for(path));
         sync_directory(&self.queue_dir)?;
         Ok(())
     }
@@ -1094,7 +1148,7 @@ impl AdminState {
             "countdown",
             "Get ready — camera starting",
         );
-        let pending = self.camera.start_capture()?;
+        let pending = self.camera.start_capture(CaptureTrigger::Admin)?;
         self.leds
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -2359,6 +2413,15 @@ fn wait_for_release(button: &InputPin) {
     thread::sleep(DEBOUNCE_INTERVAL);
 }
 
+/// Read a credential from the environment or `.env`, treating a variable that
+/// is set but blank as absent so commenting a token out is enough to fall back.
+fn non_empty(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
 fn env_pin(name: &str, default: u8) -> Result<u8> {
     std::env::var(name)
         .ok()
@@ -2461,6 +2524,7 @@ mod tests {
                 listener.local_addr().unwrap()
             )),
             upload_token: Some("must-not-leave-device".into()),
+            device_token: None,
             queue_dir: root.clone(),
         };
         uploader.upload(&photo).unwrap();
@@ -2473,6 +2537,161 @@ mod tests {
         uploader.retry_all().unwrap();
         assert!(listener.accept().is_err());
         assert_eq!(std::fs::read(&photo).unwrap(), b"retained photo");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Accept exactly one request, hand back `400` so the caller keeps the
+    /// photograph, and return the raw request for inspection.
+    fn capture_one_request(listener: std::net::TcpListener) -> std::thread::JoinHandle<String> {
+        std::thread::spawn(move || {
+            let mut stream = listener.accept().unwrap().0;
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 4096];
+            loop {
+                let read = std::io::Read::read(&mut stream, &mut buffer).unwrap();
+                request.extend_from_slice(&buffer[..read]);
+                let text = String::from_utf8_lossy(&request).into_owned();
+                let Some((head, body)) = text.split_once("\r\n\r\n") else {
+                    if read == 0 {
+                        break;
+                    }
+                    continue;
+                };
+                let length = head
+                    .lines()
+                    .find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("content-length:")
+                            .and_then(|value| value.trim().parse::<usize>().ok())
+                    })
+                    .unwrap_or(0);
+                if read == 0 || body.len() >= length {
+                    break;
+                }
+            }
+            stream
+                .write_all(
+                    b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
+                .unwrap();
+            String::from_utf8_lossy(&request).into_owned()
+        })
+    }
+
+    fn uploader_for(root: &std::path::Path, url: &str) -> super::Uploader {
+        super::Uploader {
+            photo_settings: std::sync::Arc::new(std::sync::RwLock::new(super::PhotoSettings {
+                test_mode: false,
+                profile: "configured".into(),
+            })),
+            local_dir: root.join("local"),
+            client: reqwest::blocking::Client::new(),
+            upload_url: Some(url.to_owned()),
+            upload_token: Some("legacy-shared-token".into()),
+            device_token: None,
+            queue_dir: root.to_owned(),
+        }
+    }
+
+    #[test]
+    fn the_per_device_token_wins_and_the_legacy_token_still_works_without_one() {
+        let root = std::env::temp_dir().join(format!("device-token-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("local")).unwrap();
+        let mut uploader = uploader_for(&root, "http://127.0.0.1:1/api/uploads");
+
+        assert_eq!(uploader.auth_token(), Some("legacy-shared-token"));
+        uploader.device_token = Some("per-device-token".into());
+        assert_eq!(uploader.auth_token(), Some("per-device-token"));
+        uploader.upload_token = None;
+        assert_eq!(uploader.auth_token(), Some("per-device-token"));
+        uploader.device_token = None;
+        assert_eq!(uploader.auth_token(), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_queued_photo_sends_its_sidecar_metadata_and_its_device_token() {
+        let root = std::env::temp_dir().join(format!("grant-body-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("local")).unwrap();
+        let photo = root.join("20260919T140311Z-1a2b3c4d.jpg");
+        std::fs::write(&photo, b"jpeg-bytes").unwrap();
+        let sidecar = super::CaptureSidecar {
+            capture: Some(super::CaptureMetadata::for_capture(
+                super::CameraProfile::Imx519,
+                &super::CameraProfile::Imx519.capture_args(),
+                super::CaptureTrigger::Button,
+                Some(&serde_json::json!({ "ExposureTime": 19994, "AfState": 2 })),
+            )),
+            sensor_metadata: Some(serde_json::json!({ "ExposureTime": 19994, "AfState": 2 })),
+        };
+        std::fs::write(
+            super::CaptureSidecar::path_for(&photo),
+            serde_json::to_vec(&sidecar).unwrap(),
+        )
+        .unwrap();
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/api/uploads", listener.local_addr().unwrap());
+        let server = capture_one_request(listener);
+        let mut uploader = uploader_for(&root, &url);
+        uploader.device_token = Some("per-device-token".into());
+        assert!(uploader.upload(&photo).is_err(), "the stub replies 400");
+        let request = server.join().unwrap();
+
+        assert!(
+            request.contains("authorization: Bearer per-device-token")
+                || request.contains("Authorization: Bearer per-device-token"),
+            "{request}"
+        );
+        assert!(!request.contains("legacy-shared-token"), "{request}");
+        let body: serde_json::Value =
+            serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+        assert_eq!(body["capture_id"], "20260919T140311Z-1a2b3c4d");
+        assert_eq!(body["content_type"], "image/jpeg");
+        assert_eq!(body["content_length"], 10);
+        assert_eq!(body["capture"]["sensor"], "imx519");
+        assert_eq!(body["capture"]["capture_source"], "device");
+        assert_eq!(body["capture"]["trigger"], "button");
+        assert_eq!(body["capture"]["exposure_us"], 19994);
+        assert_eq!(body["capture"]["af_state"], "focused");
+        assert_eq!(body["capture"]["width"], 4656);
+        assert_eq!(body["capture"]["jpeg_quality"], 95);
+        assert_eq!(
+            body["capture"]["firmware_version"],
+            env!("CARGO_PKG_VERSION")
+        );
+        assert_eq!(body["sensor_metadata"]["ExposureTime"], 19994);
+        // A failed upload keeps both the photograph and its metadata.
+        assert!(photo.exists());
+        assert!(super::CaptureSidecar::path_for(&photo).exists());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_photo_queued_by_an_older_binary_omits_the_capture_object() {
+        let root = std::env::temp_dir().join(format!("no-sidecar-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("local")).unwrap();
+        let photo = root.join("20260919T140311Z-1a2b3c4d.jpg");
+        std::fs::write(&photo, b"jpeg-bytes").unwrap();
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/api/uploads", listener.local_addr().unwrap());
+        let server = capture_one_request(listener);
+        assert!(uploader_for(&root, &url).upload(&photo).is_err());
+        let request = server.join().unwrap();
+
+        assert!(
+            request.contains("Bearer legacy-shared-token")
+                || request
+                    .to_lowercase()
+                    .contains("bearer legacy-shared-token"),
+            "{request}"
+        );
+        let body: serde_json::Value =
+            serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+        assert_eq!(body.get("capture"), None);
+        assert_eq!(body.get("sensor_metadata"), None);
+        assert_eq!(body["capture_id"], "20260919T140311Z-1a2b3c4d");
         std::fs::remove_dir_all(root).unwrap();
     }
 

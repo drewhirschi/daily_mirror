@@ -411,6 +411,204 @@ impl DeviceRegistry {
             .map_err(io::Error::other)?;
         Ok(())
     }
+
+    /// The active device row with this ID, if any. `register-device` uses it
+    /// to decide between "create", "rotate" and "refuse".
+    pub async fn active_device(&self, device_id: &str) -> io::Result<Option<RegisteredDevice>> {
+        self.find_active("device_id", device_id).await
+    }
+
+    /// The active device in a household carrying this name. A household names
+    /// its cameras to tell them apart, so a second "V1 Pi" is a mistake worth
+    /// refusing rather than a second camera.
+    pub async fn active_device_named(
+        &self,
+        household_id: &str,
+        device_name: &str,
+    ) -> io::Result<Option<RegisteredDevice>> {
+        self.ensure_schema().await?;
+        let connection = self.queue.catalog.connection().await?;
+        let mut rows = connection
+            .query(
+                "SELECT device_id, household_id, device_name, hardware, firmware_version
+                 FROM devices
+                 WHERE household_id = ?1 AND device_name = ?2 AND released_at IS NULL",
+                params![household_id, device_name],
+            )
+            .await
+            .map_err(io::Error::other)?;
+        registered_device(&mut rows).await
+    }
+
+    async fn find_active(&self, column: &str, value: &str) -> io::Result<Option<RegisteredDevice>> {
+        self.ensure_schema().await?;
+        let connection = self.queue.catalog.connection().await?;
+        let statement = format!(
+            "SELECT device_id, household_id, device_name, hardware, firmware_version
+             FROM devices WHERE {column} = ?1 AND released_at IS NULL"
+        );
+        let mut rows = connection
+            .query(&statement, params![value])
+            .await
+            .map_err(io::Error::other)?;
+        registered_device(&mut rows).await
+    }
+
+    /// Register a camera that cannot run the interactive claim flow, such as
+    /// the original Pi rig, which predates pairing and has no way to redeem a
+    /// claim token.
+    ///
+    /// This is deliberately the *same* credential the claim flow issues:
+    /// [`random_token`] for the secret and [`secret_hash`] for what is stored,
+    /// so an administratively registered device is indistinguishable from a
+    /// paired one everywhere else in the server. The plaintext token is
+    /// returned exactly once; only its hash is persisted.
+    ///
+    /// Unlike [`Self::claim`], the name is explicit rather than derived from
+    /// the device ID, because these devices are named by the person adding
+    /// them ("V1 Pi"), not by their MAC address.
+    pub async fn register_device(
+        &self,
+        household_id: &str,
+        request: &RegisterDeviceRequest,
+    ) -> Result<RegisteredToken, DeviceError> {
+        let device_id = validate_field("device ID", &request.device_id, 128)?;
+        let hardware = validate_field("hardware", &request.hardware, 100)?;
+        let firmware_version = validate_field("firmware version", &request.firmware_version, 100)?;
+        let device_name = validate_device_name(&request.device_name)?;
+
+        // Refusing here rather than in the binary keeps the safety rule with
+        // the table it protects, so a future caller cannot skip it.
+        let existing = match self.active_device(&device_id).await? {
+            Some(device) => Some(device),
+            None => self.active_device_named(household_id, &device_name).await?,
+        };
+        if let Some(existing) = &existing {
+            if existing.household_id != household_id {
+                return Err(DeviceError::HouseholdConflict);
+            }
+            if existing.device_id != device_id {
+                return Err(DeviceError::InvalidInput(format!(
+                    "household {household_id} already has a device named \"{device_name}\" \
+                     with ID {}; re-run with --device-id {} to rotate it, or choose \
+                     another name",
+                    existing.device_id, existing.device_id
+                )));
+            }
+            if !request.rotate_token {
+                return Err(DeviceError::InvalidInput(format!(
+                    "device {device_id} (\"{}\") is already registered to this household; \
+                     re-run with --rotate-token to replace its token, which immediately \
+                     stops the token it is using today",
+                    existing.device_name
+                )));
+            }
+        }
+
+        self.ensure_schema().await?;
+        let connection = self.queue.catalog.connection().await?;
+        let device_token = random_token();
+        connection
+            .execute(
+                "INSERT INTO devices (
+                    device_id, household_id, device_name, hardware,
+                    firmware_version, device_token_hash
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(device_id) DO UPDATE SET
+                    household_id = excluded.household_id,
+                    device_name = excluded.device_name,
+                    hardware = excluded.hardware,
+                    firmware_version = excluded.firmware_version,
+                    device_token_hash = excluded.device_token_hash,
+                    claimed_at = CURRENT_TIMESTAMP,
+                    released_at = NULL",
+                params![
+                    device_id.clone(),
+                    household_id.to_owned(),
+                    device_name.clone(),
+                    hardware.clone(),
+                    firmware_version.clone(),
+                    secret_hash(&device_token)
+                ],
+            )
+            .await
+            .map_err(|error| DeviceError::Storage(io::Error::other(error)))?;
+
+        Ok(RegisteredToken {
+            device_token,
+            rotated: existing.is_some(),
+            device: RegisteredDevice {
+                device_id,
+                household_id: household_id.to_owned(),
+                device_name,
+                hardware,
+                firmware_version: Some(firmware_version),
+            },
+        })
+    }
+}
+
+/// What `register-device` was asked to create.
+#[derive(Clone, Debug, Default)]
+pub struct RegisterDeviceRequest {
+    pub device_id: String,
+    pub device_name: String,
+    pub hardware: String,
+    pub firmware_version: String,
+    /// Replace the token of a device that is already registered. Without it,
+    /// re-running the command refuses rather than minting a second camera.
+    pub rotate_token: bool,
+}
+
+/// A device row as the administrative commands need to show it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RegisteredDevice {
+    pub device_id: String,
+    pub household_id: String,
+    pub device_name: String,
+    pub hardware: String,
+    pub firmware_version: Option<String>,
+}
+
+/// The one and only time the plaintext device token exists server-side.
+/// Callers must write it somewhere a device can read and nowhere else.
+#[derive(Clone, Debug)]
+pub struct RegisteredToken {
+    pub device_token: String,
+    /// True when an existing registration had its token replaced.
+    pub rotated: bool,
+    pub device: RegisteredDevice,
+}
+
+async fn registered_device(rows: &mut libsql::Rows) -> io::Result<Option<RegisteredDevice>> {
+    let Some(row) = rows.next().await.map_err(io::Error::other)? else {
+        return Ok(None);
+    };
+    Ok(Some(RegisteredDevice {
+        device_id: row.get(0).map_err(io::Error::other)?,
+        household_id: row.get(1).map_err(io::Error::other)?,
+        device_name: row.get(2).map_err(io::Error::other)?,
+        hardware: row.get(3).map_err(io::Error::other)?,
+        firmware_version: row.get(4).map_err(io::Error::other)?,
+    }))
+}
+
+/// Device names are shown to a household, so they allow spaces and accents
+/// that [`validate_field`] refuses for machine identifiers. Control
+/// characters are still refused: a name is a single line of text.
+fn validate_device_name(value: &str) -> Result<String, DeviceError> {
+    let value = value.trim();
+    if value.is_empty() || value.chars().count() > 100 {
+        return Err(DeviceError::InvalidInput(
+            "device name must be 1-100 characters".to_owned(),
+        ));
+    }
+    if value.chars().any(char::is_control) {
+        return Err(DeviceError::InvalidInput(
+            "device name must not contain control characters".to_owned(),
+        ));
+    }
+    Ok(value.to_owned())
 }
 
 /// Resolve the caller's household for a route, turning "no household" into a

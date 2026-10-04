@@ -16,6 +16,7 @@ is in [firmware-roadmap.md](firmware-roadmap.md).
 | Button | GPIO 20 to GND | GPIO 1 to GND |
 
 Wiring drawings: [S3](../hardware/wiring/s3_button_led.svg),
+[S3 photo lights](../hardware/wiring/s3_photo_lights.svg),
 [P4](../hardware/wiring/p4_rgb_led.svg).
 
 ## Traps, in the order they bit

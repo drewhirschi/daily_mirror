@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560" font-family="system-ui, sans-serif" font-size="14">
+  <rect width="900" height="560" fill="#fff"/>
+  <text x="20" y="30" font-size="18" font-weight="bold">ESP32-S3 (Freenove S3-WROOM CAM): 12V COB LED strip, switched by GPIO 47</text>
+  <!-- PD source -->
+  <rect x="40" y="70" width="170" height="60" rx="6" fill="#f4f4f4" stroke="#333"/>
+  <text x="125" y="96" text-anchor="middle" font-weight="bold">USB-C PD charger</text>
+  <text x="125" y="116" text-anchor="middle" font-size="12" fill="#555">must list 12V output</text>
+  <rect x="280" y="70" width="170" height="100" rx="6" fill="#fff3e0" stroke="#333"/>
+  <text x="365" y="96" text-anchor="middle" font-weight="bold">PD trigger board</text>
+  <text x="365" y="114" text-anchor="middle" font-size="12" fill="#555">set to 12V</text>
+  <text x="440" y="135" text-anchor="end" font-size="12">OUT+</text>
+  <text x="440" y="160" text-anchor="end" font-size="12">OUT−</text>
+  <!-- S3 board -->
+  <rect x="40" y="250" width="220" height="200" rx="8" fill="#e8f0e8" stroke="#333"/>
+  <text x="60" y="278" font-weight="bold">ESP32-S3 board</text>
+  <text x="60" y="298" font-size="12" fill="#555">powered by its own USB cable</text>
+  <text x="250" y="355" text-anchor="end">GPIO 47</text>
+  <text x="250" y="425" text-anchor="end">GND</text>
+  <!-- strip -->
+  <rect x="660" y="70" width="200" height="60" rx="6" fill="#fff8d0" stroke="#333"/>
+  <text x="760" y="96" text-anchor="middle" font-weight="bold">12V COB LED strip</text>
+  <text x="760" y="116" text-anchor="middle" font-size="12" fill="#555">no resistors needed</text>
+  <text x="672" y="152" font-size="12">+</text>
+  <text x="840" y="152" font-size="12">−</text>
+  <g stroke="#333" stroke-width="2" fill="none">
+    <line x1="210" y1="100" x2="280" y2="100"/>
+    <!-- 12V to strip + -->
+    <path d="M450 130H680V130"/>
+    <!-- strip - down to drain -->
+    <path d="M840 130V290H700V320"/>
+    <!-- MOSFET -->
+    <rect x="660" y="320" width="80" height="60" fill="#eef"/>
+    <!-- gate -->
+    <line x1="260" y1="350" x2="320" y2="350"/>
+    <rect x="320" y="342" width="50" height="16" fill="#fff"/>
+    <line x1="370" y1="350" x2="660" y2="350"/>
+    <!-- 10k pulldown -->
+    <line x1="470" y1="350" x2="470" y2="375"/>
+    <rect x="462" y="375" width="16" height="30" fill="#fff"/>
+    <line x1="470" y1="405" x2="470" y2="420"/>
+    <!-- source and common ground -->
+    <line x1="700" y1="380" x2="700" y2="420"/>
+    <line x1="260" y1="420" x2="700" y2="420"/>
+    <path d="M450 155H560V420"/>
+  </g>
+  <g fill="#333">
+    <circle cx="470" cy="350" r="4"/><circle cx="470" cy="420" r="4"/><circle cx="560" cy="420" r="4"/>
+  </g>
+  <text x="325" y="337" font-size="12">100Ω</text>
+  <text x="484" y="395" font-size="12">10k</text>
+  <text x="700" y="345" text-anchor="middle" font-size="12" font-weight="bold">N-MOSFET</text>
+  <text x="700" y="362" text-anchor="middle" font-size="12">IRLZ44N</text>
+  <text x="708" y="312" font-size="12">D</text>
+  <text x="648" y="345" font-size="12">G</text>
+  <text x="708" y="398" font-size="12">S</text>
+  <text x="570" y="410" font-size="12" fill="#555">common ground</text>
+  <!-- notes -->
+  <text x="40" y="482" fill="#333">Measure 12V at the trigger board before connecting the strip. Cut the strip only on its printed marks.</text>
+  <text x="40" y="504" fill="#333">S3 GND must join the trigger board OUT− or the MOSFET will not switch. IRLZ44N (label facing you): G · D · S.</text>
+  <text x="40" y="526" fill="#333">10k keeps the strip off while the S3 boots. Firmware already set: FLASH_GPIO=47, FLASH_ACTIVE_HIGH=y.</text>
+  <text x="40" y="548" fill="#333">Strip comes on for the last 1.5 s of the countdown, off once the frame is taken; a 6 s watchdog forces it off.</text>
+</svg>

@@ -9,7 +9,6 @@ import {
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -21,9 +20,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ActiveSession } from "../session";
-import { mintClaimToken } from "../pairing/api";
+import { listDevices, mintClaimToken } from "../pairing/api";
+import { SOFTAP_PASSWORD, type ClaimTokenGrant } from "../pairing/contract";
 import {
+  HomeWifiNeeded,
   awaitConfirmation,
+  awaitServerClaim,
+  deviceBaseline,
+  heldGrantUsable,
+  type DeviceBaseline,
   initialPairingState,
   pairingReducer,
   provisionDevice,
@@ -31,7 +36,11 @@ import {
   stepErrorMessage,
   type SendingStage,
 } from "../pairing/machine";
-import { espProvisioner, type Provisioner } from "../pairing/provisioning";
+import {
+  espProvisioner,
+  softApDevice,
+  type Provisioner,
+} from "../pairing/provisioning";
 import { Button, styles, useColors } from "../ui";
 import { STORE_BUILD } from "../store-build";
 
@@ -53,11 +62,20 @@ export function AddMirror({
   const [state, dispatch] = useReducer(pairingReducer, initialPairingState);
   const [password, setPassword] = useState("");
   const [manualSsid, setManualSsid] = useState("");
+  /* Over SoftAP the phone has no internet from the moment it joins the
+   * camera's network, so the claim token is minted on the home Wi-Fi in the
+   * `prepare` step and held here, together with the household's devices as
+   * they were then, until the server shows the camera has redeemed it. It is
+   * never minted from the camera's network. */
+  const heldGrant = useRef<ClaimTokenGrant | null>(null);
+  const baseline = useRef<{ devices: DeviceBaseline | null; since: number }>({
+    devices: null,
+    since: 0,
+  });
   const provisioner = useMemo<Provisioner>(() => espProvisioner(), []);
   const cancelled = useRef({ aborted: false });
 
   useEffect(() => {
-    dispatch({ type: "begin", needsManualJoin: provisioner.needsManualJoin });
     const flag = cancelled.current;
     return () => {
       flag.aborted = true;
@@ -80,7 +98,22 @@ export function AddMirror({
     };
     void (async () => {
       try {
-        if (step === "discover") {
+        if (step === "prepare") {
+          heldGrant.current = null;
+          const since = Date.now();
+          const [grant, devices] = await Promise.all([
+            mintClaimToken(session.api),
+            // Not fatal: without it, "claimed since the code was minted" is
+            // used instead.
+            listDevices(session.api).catch(() => null),
+          ]);
+          heldGrant.current = grant;
+          baseline.current = {
+            devices: devices ? deviceBaseline(devices) : null,
+            since,
+          };
+          if (live) dispatch({ type: "prepared" });
+        } else if (step === "discover") {
           const devices = await provisioner.search();
           if (!devices.length) throw new Error("No camera answered.");
           if (live) dispatch({ type: "found", devices });
@@ -93,10 +126,38 @@ export function AddMirror({
             device,
             ssid,
             passphrase: password,
-            mint: () => mintClaimToken(session.api),
+            mint: async () => {
+              if (device.transport === "softap") {
+                // Kept until the server shows it redeemed, so a resend after a
+                // wrong password reuses it.
+                const held = heldGrant.current;
+                if (heldGrantUsable(held)) return held;
+                throw new HomeWifiNeeded();
+              }
+              return mintClaimToken(session.api);
+            },
             onStage: (stage) => live && dispatch({ type: "stage", stage }),
           });
           if (live) dispatch({ type: "awaiting" });
+        } else if (step === "confirm" && device?.transport === "softap") {
+          const result = await awaitServerClaim({
+            listDevices: () => {
+              // Short, so a request stuck on the network switch is retried.
+              const controller = new AbortController();
+              const timer = setTimeout(() => controller.abort(), 8_000);
+              return listDevices(session.api, controller.signal).finally(() =>
+                clearTimeout(timer),
+              );
+            },
+            baseline: baseline.current.devices,
+            since: baseline.current.since,
+            device,
+            signal: cancelled.current,
+          });
+          if (!live) return;
+          if (result?.status === "claimed") heldGrant.current = null;
+          if (result) dispatch({ type: "result", result });
+          else dispatch({ type: "timeout" });
         } else if (step === "confirm" && device) {
           const result = await awaitConfirmation({
             device,
@@ -109,7 +170,15 @@ export function AddMirror({
       } catch (error) {
         fail(
           error,
-          step === "sending" || step === "confirm" ? "sending" : step,
+          error instanceof HomeWifiNeeded
+            ? "prepare"
+            : step === "sending" || step === "confirm"
+              ? device?.transport === "softap"
+                ? "join"
+                : "sending"
+              : step === "wifi" && device?.transport === "softap"
+                ? "join"
+                : step,
         );
       }
     })();
@@ -141,24 +210,70 @@ export function AddMirror({
             gap: 14,
           }}
         >
-          {step === "join" ? (
-            // Only reachable through the SoftAP fallback provisioner.
+          {step === "choose" ? (
             <>
-              <Lede>
-                Open Settings › Wi-Fi on this phone and join the network that
-                starts with “mirror-”. Come back here once it is connected.
-              </Lede>
-              <Card title="Join the camera's Wi-Fi">
+              <Lede>Which camera do you have?</Lede>
+              <Choice
+                icon="bluetooth"
+                title="The Bluetooth camera"
+                detail="Set up from this app over Bluetooth."
+                onPress={() =>
+                  dispatch({
+                    type: "begin",
+                    needsManualJoin: provisioner.needsManualJoin,
+                  })
+                }
+              />
+              <Choice
+                icon="wifi"
+                title="ESP32-P4 (Wi-Fi setup)"
+                detail="Set up over the camera's own Wi-Fi network."
+                onPress={() => dispatch({ type: "useWifi" })}
+              />
+            </>
+          ) : step === "prepare" ? (
+            <>
+              <WifiSteps current={0} />
+              <Card title="Getting ready">
+                {busy ? (
+                  <Waiting label="Getting a pairing code… Stay on your home Wi-Fi." />
+                ) : (
+                  <Problem state={state} dispatch={dispatch} />
+                )}
                 <Button
-                  title="Open Wi-Fi settings"
+                  title="Choose a different camera"
                   quiet
+                  onPress={() => dispatch({ type: "choose" })}
+                />
+              </Card>
+            </>
+          ) : step === "join" ? (
+            // A camera with no Bluetooth (the ESP32-P4) is set up over its
+            // own Wi-Fi network, which the person joins in Settings.
+            <>
+              <WifiSteps current={1} />
+              <Card title="Join the camera's Wi-Fi">
+                <Text style={{ color: c.secondary, lineHeight: 23 }}>
+                  Pairing code ready. Open Settings › Wi-Fi and join the network
+                  that starts with “mirror-”, then come back here.
+                </Text>
+                <Text style={{ color: c.secondary }}>
+                  Password:{" "}
+                  <Text selectable style={{ color: c.text, fontWeight: "600" }}>
+                    {SOFTAP_PASSWORD}
+                  </Text>
+                </Text>
+                <Problem state={state} dispatch={dispatch} />
+                <Button
+                  title="I've joined it"
                   onPress={() =>
-                    void Linking.openSettings().catch(() => undefined)
+                    dispatch({ type: "select", device: softApDevice() })
                   }
                 />
                 <Button
-                  title="I've joined it"
-                  onPress={() => dispatch({ type: "joined" })}
+                  title="Choose a different camera"
+                  quiet
+                  onPress={() => dispatch({ type: "choose" })}
                 />
               </Card>
             </>
@@ -213,6 +328,11 @@ export function AddMirror({
                     title="Scan again"
                     quiet
                     onPress={() => dispatch({ type: "scan" })}
+                  />
+                  <Button
+                    title="Choose a different camera"
+                    quiet
+                    onPress={() => dispatch({ type: "choose" })}
                   />
                 </>
               )}
@@ -289,6 +409,20 @@ export function AddMirror({
                 <Problem state={state} dispatch={dispatch} />
               )}
             </Card>
+          ) : step === "confirm" && device?.transport === "softap" ? (
+            <>
+              <Lede>
+                Your phone will reconnect to your home Wi-Fi. Press the camera's
+                button once when its light blinks fast amber; you have thirty
+                seconds from then. Keep this screen open.
+              </Lede>
+              <Card title="Press the button on the camera now">
+                {busy ? (
+                  <Waiting label="Waiting for the camera to show up in your household…" />
+                ) : null}
+                <Problem state={state} dispatch={dispatch} />
+              </Card>
+            </>
           ) : step === "confirm" ? (
             <>
               <Lede>
@@ -343,6 +477,66 @@ function Problem({
         />
       ) : null}
     </View>
+  );
+}
+
+const wifiSteps = [
+  "Get a pairing code (stay on your home Wi-Fi).",
+  `Open Settings › Wi-Fi and join “mirror-…” with the password ${SOFTAP_PASSWORD}, then come back.`,
+  "Pick your home Wi-Fi and enter its password.",
+  "When the camera's light blinks fast amber, press its button once.",
+];
+
+/** The four steps of a Wi-Fi setup, with the current one highlighted. */
+function WifiSteps({ current }: { current: number }) {
+  const c = useColors();
+  return (
+    <View style={{ gap: 8 }}>
+      {wifiSteps.map((text, index) => (
+        <Text
+          key={text}
+          style={{
+            color: index === current ? c.text : c.secondary,
+            fontWeight: index === current ? "600" : "400",
+            lineHeight: 22,
+          }}
+        >
+          {index + 1}. {text}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function Choice({
+  icon,
+  title,
+  detail,
+  onPress,
+}: {
+  icon: "bluetooth" | "wifi";
+  title: string;
+  detail: string;
+  onPress(): void;
+}) {
+  const c = useColors();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.card,
+        styles.row,
+        { backgroundColor: c.card, gap: 14, opacity: pressed ? 0.6 : 1 },
+      ]}
+    >
+      <Ionicons name={icon} size={24} color={c.accent} />
+      <View style={{ flex: 1, gap: 4 }}>
+        <Text style={[styles.subtitle, { color: c.text }]}>{title}</Text>
+        <Text style={{ color: c.secondary }}>{detail}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={c.secondary} />
+    </Pressable>
   );
 }
 

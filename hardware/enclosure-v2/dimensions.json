@@ -19,5 +19,7 @@
   "rail_clearance": 0.4,
   "rail_key_clearance": 0.25,
   "brake_pad_diameter": 8.0,
-  "brake_pad_thickness": 1.5
+  "brake_pad_thickness": 1.5,
+  "rail_sections": 2,
+  "rail_key_length": 24.0
 }

@@ -20,15 +20,21 @@ CX, REAR = W / 2, 23.0
 FRONT = REAR + D
 SEG = C['rail_segment_length']
 SEAM = 30.0
-RLOW, RHIGH = SEAM - SEG, SEAM + SEG
+NSEC = int(C['rail_sections'])
+KEYL = C['rail_key_length']
+RLOW = SEAM - SEG
+RHIGH = RLOW + NSEC*SEG
 CLOW, CHIGH = -24.0, 76.0
 GAP = C['rail_clearance']
 assert W >= 136 and H >= 165 and D >= 50, 'Layout requires at least 136 x 165 x 50'
 assert 0.2 <= GAP <= 0.8, 'Use a realistic per-surface sliding allowance'
+assert NSEC >= 2, 'The travel checks need at least one joint'
+assert KEYL/2 + 1 < 18 - 4.5/2, 'Key pockets must stay clear of the wall screw holes'
 DOC = App.newDocument('DailyMirrorRailEnclosureV2')
 PRINT = DOC.addObject('App::DocumentObjectGroup', 'PrintableParts')
 REF = DOC.addObject('App::DocumentObjectGroup', 'HardwareReferences')
 FIT = DOC.addObject('App::DocumentObjectGroup', 'FitCoupons')
+COPIES = DOC.addObject('App::DocumentObjectGroup', 'ExtraRailCopies')
 PARAM = DOC.addObject('App::FeaturePython', 'DesignDimensions')
 PARAM.addProperty('App::PropertyString', 'EditingInstructions')
 PARAM.EditingInstructions = 'Edit dimensions.json and run build.sh; solids are not a live sketch feature tree.'
@@ -36,7 +42,7 @@ for k, value in C.items():
     PARAM.addProperty('App::PropertyLength', k, 'Source dimensions (mm)')
     setattr(PARAM, k, value)
     PARAM.setEditorMode(k, 1)
-parts, refs, coupons = [], [], []
+parts, refs, coupons, copies = [], [], [], []
 
 def box(x, y, z, w, h, d):
     return Part.makeBox(w, h, d, V(x, y, z))
@@ -73,12 +79,12 @@ def add(name, shape, color, group=PRINT, orientation='back', note=''):
     obj.AssemblyNote = note
     group.addObject(obj)
     if hasattr(obj, 'Visibility'):
-        obj.Visibility = group == PRINT
+        obj.Visibility = group in (PRINT, COPIES)
     record = dict(name=name, obj=obj, color=color, orientation=orientation, note=note)
-    (parts if group == PRINT else refs if group == REF else coupons).append(record)
+    {PRINT: parts, REF: refs, FIT: coupons, COPIES: copies}[group].append(record)
     if App.GuiUp:
         obj.ViewObject.ShapeColor = color
-        obj.ViewObject.Visibility = group == PRINT
+        obj.ViewObject.Visibility = group in (PRINT, COPIES)
     return shape
 
 def dovetail_void(y, length):
@@ -139,23 +145,37 @@ cuts += [cylinder(x,y,cam_z-.1,C['camera_pilot'],6.1) for x,y in cam_holes]
 front = add('FrontPanel', subtract(front,cuts), (.91,.90,.85), orientation='front',
             note='Print exterior face on bed, camera posts upward. Four M2 x 6 thread-forming screws from PCB rear into posts.')
 
-# RAIL: two screw-mounted sections, with a shallow rear alignment tongue.
+# RAIL: identical screw-mounted sections, chained end to end. Each end has a
+# shallow rear pocket; a separate flat key bridges every joint, so any number
+# of sections can be joined. Keys are trapped between rail and wall.
 def rail_blank(y, length):
     return union([box(CX-40,y,0,80,length,4),
                   profile([(-12,4),(12,4),(20,12),(-20,12)], y, length)])
 
-rail_lower = rail_blank(RLOW,SEG)
-rail_lower = union([rail_lower,box(CX-8,SEAM-.1,0,16,6.1,2)])
-rail_upper = rail_blank(SEAM,SEG)
 keygap = C['rail_key_clearance']
-rail_upper = rail_upper.cut(box(CX-8-keygap,SEAM-.1,-.1,16+2*keygap,6.1+keygap,2.1+keygap))
-rails=[]
-for name,shape,y0 in [('RailLower',rail_lower,RLOW),('RailUpper',rail_upper,SEAM)]:
+def key_pockets(y0, length):
+    depth = KEYL/2 + keygap
+    return [box(CX-8-keygap,y0-.1,-.1,16+2*keygap,depth+.1,2.1+keygap),
+            box(CX-8-keygap,y0+length-depth,-.1,16+2*keygap,depth+.1,2.1+keygap)]
+
+def rail_section(y0):
     holes=[cylinder(CX+x,y0+yy,-1,4.5,6) for x in (-35,35) for yy in (18,SEG-18)]
-    stop_y=RLOW+4 if name=='RailLower' else RHIGH-4
-    holes += [cylinder(CX+x,stop_y,-1,C['case_pilot'],6) for x in (-27,27)]
-    rails.append(add(name,subtract(shape,holes),(.49,.57,.61),
-                     note='Back against bed/wall. Wall screw heads max 8 mm diameter. Align joint with carriage before tightening wall screws.'))
+    # End-stop pilots at both ends; whichever end finishes the rail gets a stop.
+    holes += [cylinder(CX+x,y0+yy,-1,C['case_pilot'],6) for x in (-27,27) for yy in (4,SEG-4)]
+    return subtract(rail_blank(y0,SEG),holes+key_pockets(y0,SEG))
+
+rails, keys = [], []
+note=('Print as many as needed. Back against bed/wall. Wall screw heads max 8 mm diameter. '
+      'Align each joint with the carriage before tightening wall screws.')
+for i in range(NSEC):
+    y0 = RLOW + i*SEG
+    rails.append(add('RailSection' if i == 0 else 'RailSection%d' % (i+1), rail_section(y0), (.49,.57,.61),
+                     COPIES if i else PRINT, note=note))
+for i in range(NSEC-1):
+    seam = RLOW + (i+1)*SEG
+    keys.append(add('RailKey' if i == 0 else 'RailKey%d' % (i+1), box(CX-8,seam-KEYL/2,0,16,KEYL,2), (.86,.47,.22),
+                    COPIES if i else PRINT,
+                    note='One per joint. Drop into the rear pockets of both sections before screwing them to the wall.'))
 
 # CARRIAGE: full-length female dovetail; forward thumb lock below enclosure.
 carriage = box(CX-30,CLOW,4+GAP,60,CHIGH-CLOW,REAR-4-GAP)
@@ -171,7 +191,7 @@ carriage=add('Carriage',subtract(carriage,cuts),(.86,.47,.22),orientation='end',
 
 # END STOPS are separately installed AFTER carriage insertion.
 stops=[]
-for name,y in [('StopLower',RLOW),('StopUpper',RHIGH-8)]:
+for name,y in [('StopLower',RLOW),('StopUpper',RHIGH-8)]:  # same pilots at every section end
     stop=box(CX-32,y,4,64,8,12).cut(dovetail_void(y-1,10))
     cutters=[cylinder(CX+x,y+4,3,3.4,14) for x in (-27,27)]
     cutters += [cylinder(CX+x,y+4,12,6.4,5) for x in (-27,27)]
@@ -222,6 +242,8 @@ for i,(x,y) in enumerate(pi_holes,1):
 
 # Small trials use IDENTICAL mating profiles / actual camera standoffs.
 add('RailFitMale',rail_blank(0,30),(.49,.57,.61),FIT)
+# Print two of these plus one RailKey to try the joint fit.
+add('RailJointFit',subtract(rail_blank(0,30),key_pockets(0,30)[1:]),(.49,.57,.61),FIT)
 fitfemale=box(CX-30,0,4+GAP,60,24,REAR-4-GAP).cut(dovetail_void(-1,26))
 add('RailFitFemale',fitfemale,(.86,.47,.22),FIT,orientation='end')
 cam_coupon=front.common(box(CX-20,cam_top-29,FRONT-15,40,36,20))
@@ -240,15 +262,15 @@ def print_shape(record):
     return s
 
 scene,manifest=[],[]
-for rec in parts+refs+coupons:
+for rec in parts+copies+refs+coupons:
     obj=rec['obj']
     s=obj.Shape
     mesh=MeshPart.meshFromShape(Shape=s,LinearDeflection=.12,AngularDeflection=.2,Relative=False)
     vertices,faces=mesh.Topology
-    kind='part' if rec in parts else 'reference' if rec in refs else 'coupon'
+    kind='part' if rec in parts+copies else 'reference' if rec in refs else 'coupon'
     scene.append(dict(name=rec['name'],kind=kind,color=rec['color'],note=rec['note'],
                       vertices=[[p.x,p.y,p.z] for p in vertices],faces=[list(f) for f in faces]))
-    if kind=='reference':
+    if kind=='reference' or rec in copies:
         continue
     ps=print_shape(rec)
     pm=MeshPart.meshFromShape(Shape=ps,LinearDeflection=.08,AngularDeflection=.16,Relative=False)
@@ -270,9 +292,16 @@ def clearance(name,a,b,allowance=1e-5):
 
 clearance('Housing / front',shell,front)
 clearance('Housing / carriage',shell,carriage)
-clearance('Rail joint',rails[0],rails[1])
+for i in range(NSEC-1):
+    clearance('Rail joint %d'%(i+1),rails[i],rails[i+1])
+    for r in rails[i:i+2]:
+        clearance('Key %d / rail'%(i+1),keys[i],r)
+    # The key must actually span both pockets to align the joint.
+    assert keys[i].BoundBox.YMin < rails[i+1].BoundBox.YMin < keys[i].BoundBox.YMax
 for i,a in enumerate(parts):
     for b in parts[i+1:]:
+        if {a['name'],b['name']} <= {'RailSection','RailKey','StopLower','StopUpper'}:
+            continue  # these are placed at different joints; checked above
         clearance(a['name']+' / '+b['name'],a['obj'].Shape,b['obj'].Shape)
 for rail in rails:
     clearance('Carriage / rail',carriage,rail)
@@ -284,9 +313,12 @@ for ref in refs:
 # Sweep the unlocked carriage through the entire travel and over the rail seam.
 travel_low=RLOW+8-CLOW
 travel_high=RHIGH-8-CHIGH
-for offset in (travel_low,travel_low+.1,-50,0,50,travel_high-.1,travel_high):
+seams=[RLOW+(i+1)*SEG for i in range(NSEC-1)]
+samples=[travel_low,travel_low+.1,travel_high-.1,travel_high]
+samples+=[seam-(CLOW+CHIGH)/2+d for seam in seams for d in (-50,0,50)]
+for offset in samples:
     moved=carriage.copy(); moved.translate(V(0,offset,0))
-    for i,obstacle in enumerate(rails+stops):
+    for i,obstacle in enumerate(rails+keys+stops):
         clearance('Travel %.2f / obstacle %d'%(offset,i),moved,obstacle)
 # End stops obstruct further travel; dovetail prevents pulling off the wall.
 for offset,stop in ((travel_low-1,stops[0]),(travel_high+1,stops[1])):
@@ -305,7 +337,7 @@ Part.makeCompound([r['obj'].Shape for r in parts]).exportStep(str(OUT/'Assembly.
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 report=dict(status='CAD validated; physical fit, sliding friction and load capacity untested',
             freecad=App.Version()[:3],units='mm',outer_mm=[W,H,D+T],
-            rail_length_mm=SEG*2,travel_mm=travel_high-travel_low,
+            rail_sections=NSEC,rail_length_mm=SEG*NSEC,travel_mm=travel_high-travel_low,
             largest_bed_dimension_mm=max(max(m['print_size_mm'][:2]) for m in manifest),
             checks=checks,retention_checks_passed=True,parts=manifest)
 (OUT/'validation.json').write_text(json.dumps(report,indent=2)+'\n')

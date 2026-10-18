@@ -61,7 +61,7 @@ fig=plt.figure(figsize=(16,9),facecolor=bg)
 views=[
  ('01   ENCLOSURE',{'Housing','FrontPanel','ButtonCap','LEDAllowance','CameraLensAllowance','LockKnob'},18,-65),
  ('02   INTERNAL MOUNTS',{'Housing','Pi4PCB','CameraPCB','CameraLensAllowance','PowerPlugAllowance'},42,-65),
- ('03   ADJUSTABLE RAIL',{'RailLower','RailUpper','Carriage','StopLower','StopUpper','LockKnob','LockScrew'},20,-60)]
+ ('03   ADJUSTABLE RAIL',{'RailSection','RailSection2','RailKey','Carriage','StopLower','StopUpper','LockKnob','LockScrew'},20,-60)]
 for i,(title,names,elev,azim) in enumerate(views):
     ax=fig.add_subplot(1,3,i+1)
     draw(ax,names,elev,azim)

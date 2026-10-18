@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 #include <time.h>
@@ -12,6 +14,7 @@
 #include "mirror_mdns.h"
 #include "mirror_spool.h"
 #include "mirror_log.h"
+#include "mirror_ring.h"
 
 #include "esp_log.h"
 #include "esp_heap_caps.h"
@@ -192,6 +195,35 @@ static esp_err_t upload_block_handler(httpd_req_t *req)
     return httpd_resp_sendstr(req, on ? "upload block ON" : "upload block off");
 }
 
+/*
+ * Wiring check for the status LED:
+ *
+ *   curl -X POST 'http://<device>/debug/led?r=255&g=0&b=0'
+ *   curl -X POST 'http://<device>/debug/led'          # back to the patterns
+ *
+ * The colour holds over every ring pattern until cleared or rebooted.
+ */
+static esp_err_t led_handler(httpd_req_t *req)
+{
+    char query[48] = "";
+    int rgb[3] = { -1, -1, -1 };
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        const char *keys[3] = { "r", "g", "b" };
+        for (int i = 0; i < 3; i++) {
+            char val[8] = "";
+            rgb[i] = httpd_query_key_value(query, keys[i], val, sizeof(val)) == ESP_OK ? atoi(val) : 0;
+        }
+    }
+    mirror_ring_test_color(rgb[0], rgb[1], rgb[2]);
+    char msg[48];
+    if (rgb[0] < 0) {
+        snprintf(msg, sizeof(msg), "led test off\n");
+    } else {
+        snprintf(msg, sizeof(msg), "led %d %d %d\n", rgb[0], rgb[1], rgb[2]);
+    }
+    return httpd_resp_sendstr(req, msg);
+}
+
 esp_err_t mirror_http_start(httpd_handle_t *out)
 {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
@@ -204,9 +236,10 @@ esp_err_t mirror_http_start(httpd_handle_t *out)
     cfg.max_open_sockets = 4;
     cfg.send_wait_timeout = 10;
     cfg.recv_wait_timeout = 10;
-    /* Six here plus whatever mirror_config registers; the default 8 is not
-     * enough, and the overflow shows up as a route that silently 404s. */
-    cfg.max_uri_handlers = 16;
+    /* Eight here, what mirror_log and mirror_config register, and the six
+     * provisioning endpoints mirror_pair adds over SoftAP; the default 8 is
+     * not enough, and the overflow shows up as a route that silently 404s. */
+    cfg.max_uri_handlers = 24;
 
     httpd_handle_t server = NULL;
     esp_err_t err = httpd_start(&server, &cfg);
@@ -223,6 +256,7 @@ esp_err_t mirror_http_start(httpd_handle_t *out)
         { .uri = "/upload",       .method = HTTP_POST, .handler = upload_handler },
         { .uri = "/stats",        .method = HTTP_GET,  .handler = stats_handler },
         { .uri = "/debug/upload-block", .method = HTTP_POST, .handler = upload_block_handler },
+        { .uri = "/debug/led",    .method = HTTP_POST, .handler = led_handler },
     };
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
         httpd_register_uri_handler(server, &uris[i]);

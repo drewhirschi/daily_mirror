@@ -8,13 +8,16 @@ idf_component_register(
          "mirror_upload.c"
          "mirror_spool.c"
          "mirror_log.c"
+         "mirror_serial.c"
     INCLUDE_DIRS "."
     REQUIRES mirror_board mirror_config mirror_mdns
     PRIV_REQUIRES esp_wifi esp_netif esp_event nvs_flash esp_http_server
-                  esp_http_client esp-tls json esp_timer esp_driver_gpio
+                  esp_http_client esp-tls json esp_timer esp_driver_gpio esp_driver_uart
                   # Pairing: the provisioning manager, its BLE scheme, and
                   # protocomm for the security 2 salt/verifier helper.
-                  wifi_provisioning protocomm
+                  # wifi_prov_remote supplies the manager's implementation on
+                  # the P4, where IDF's own component is headers only.
+                  wifi_provisioning wifi_prov_remote protocomm
                   # The upload spool: LittleFS on its own data partition, and
                   # esp_app_desc for the firmware version in capture metadata.
                   joltwallet__littlefs app_update

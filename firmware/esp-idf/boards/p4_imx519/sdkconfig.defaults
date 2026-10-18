@@ -106,6 +106,8 @@ CONFIG_MIRROR_CAM_SCCB_SCL_GPIO=8
 
 # Button: momentary switch to GND, internal pull-up.
 CONFIG_MIRROR_BUTTON_GPIO=20
+# The bench button's other leg is on GPIO 28, not GND; hold it low.
+CONFIG_MIRROR_BUTTON_RETURN_GPIO=28
 
 # Signal LED: a four-leg common-anode RGB LED on three LEDC PWM channels.
 CONFIG_MIRROR_LED_R_GPIO=21

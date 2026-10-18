@@ -25,18 +25,26 @@
 #include "esp_crt_bundle.h"
 #include "cJSON.h"
 /*
- * BLE is the pairing transport, and only the ESP32-S3 has a radio for it. The
- * ESP32-P4's Wi-Fi lives on a companion ESP32-C6 and upstream does not support
- * provisioning through it yet (see docs/firmware-roadmap.md) - the
- * wifi_provisioning component is not even linked into that build - so on that
- * board this module compiles to "pairing is not available here" and the device
- * is configured through /config as before.
+ * Two transports for the same protocol. BLE where the board has a radio for
+ * it (the ESP32-S3). The ESP32-P4's Wi-Fi lives on a companion ESP32-C6 and
+ * upstream cannot provision BLE through it yet (see docs/firmware-roadmap.md),
+ * so there the provisioning manager runs over SoftAP instead: the same
+ * protocomm endpoints, served by the admin HTTP server on the setup network
+ * the device already raises. The person joins that network in Settings and
+ * the app talks to 10.10.0.1 (see softApDevice() in
+ * mobile/src/pairing/provisioning.ts).
  */
-#if CONFIG_BT_ENABLED
 #include "esp_srp.h"
-#include "protocomm_ble.h"
 #include "wifi_provisioning/manager.h"
+#if CONFIG_BT_ENABLED
+#include "protocomm_ble.h"
 #include "wifi_provisioning/scheme_ble.h"
+#define PAIR_TRANSPORT      "BLE"
+#define PAIR_NAME_MAX       MAX_BLE_DEVNAME_LEN
+#else
+#include "wifi_provisioning/scheme_softap.h"
+#define PAIR_TRANSPORT      "SoftAP"
+#define PAIR_NAME_MAX       32      /* an SSID */
 #endif
 
 static const char *TAG = "mirror_pair";
@@ -56,6 +64,15 @@ static const char *TAG = "mirror_pair";
  * read the "claimed" result before the link it is reading it over disappears.
  * The app polls every 1.5 s. */
 #define CLAIMED_LINGER_MS   8000
+
+/* SoftAP only: how long the camera keeps trying to join the household network
+ * after the Wi-Fi credentials arrive before it gives up and says so. The
+ * manager retries indefinitely on reasons it does not classify, so without
+ * this the app would only ever see "awaiting_confirm". SOFTAP_JOIN_TIMEOUT_MS
+ * in mobile/src/pairing/contract.ts covers the same wait from the payload. */
+#define STA_JOIN_TIMEOUT_MS     20000
+/* ...and how long after the payload the credentials may take to follow. */
+#define CRED_WAIT_MS            45000
 
 /* Loop period of the pairing task. Fine enough for a 30 s window. */
 #define TICK_MS             200
@@ -83,18 +100,40 @@ static TaskHandle_t s_task;
 
 static int64_t s_state_since_us;
 
+/*
+ * SoftAP handoff. Over SoftAP the phone is on the camera's own network, and
+ * that network follows the station onto the household channel the moment the
+ * join starts, so the phone falls off it anyway. Rather than keep a network
+ * nobody can stay on, the camera closes it as soon as the station has an
+ * address: the phone then drops back to the household Wi-Fi by itself and the
+ * app confirms the claim with the server. The 30 s button window restarts at
+ * that point, so the person has all of it after the handoff.
+ *
+ * Set from the provisioning manager's event callback (which runs with the
+ * manager's lock held, so nothing there may stop the service) and acted on by
+ * the pairing task.
+ */
+static volatile bool s_sta_joined;
+static volatile bool s_join_failed;
+/* now_ms() when the Wi-Fi credentials arrived for this attempt, or 0. */
+static volatile int64_t s_cred_at_ms;
+/* The setup network has been closed for this attempt. */
+static volatile bool s_handed_off;
+
 /* The claim payload the app sent, and the reply it polls for. */
 static char s_server_url[PAIR_FIELD_MAX];
 static char s_claim_token[PAIR_FIELD_MAX];
 static char s_result[256] = "{\"status\":\"awaiting_confirm\"}";
 
-#if CONFIG_BT_ENABLED
 /* Generated once and handed to the manager, which keeps the pointers. */
 static char *s_salt;
 static char *s_verifier;
 static int   s_verifier_len;
-static char  s_service_name[MAX_BLE_DEVNAME_LEN + 1];
-#endif
+static char  s_service_name[PAIR_NAME_MAX + 1];
+
+/* The admin server, which also carries the protocomm endpoints over SoftAP:
+ * a second server on port 80 would not bind. */
+static httpd_handle_t s_http;
 
 static void lock(void)   { if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY); }
 static void unlock(void) { if (s_lock) xSemaphoreGive(s_lock); }
@@ -303,19 +342,6 @@ static esp_err_t redeem_claim(char *reason, size_t reason_len)
 
 /* ---------------------------------------------------------- the endpoint --- */
 
-#if !CONFIG_BT_ENABLED
-
-static esp_err_t start_service(void)
-{
-    ESP_LOGE(TAG, "this board has no Bluetooth radio - set it up through "
-                  "/config instead");
-    return ESP_ERR_NOT_SUPPORTED;
-}
-
-static void stop_service(void) { }
-
-#else
-
 /*
  * The "daily-mirror" endpoint. Two shapes of request, both from
  * mobile/src/pairing/provisioning.ts:
@@ -377,6 +403,10 @@ static esp_err_t pair_endpoint_handler(uint32_t session_id,
              * not when the Wi-Fi credentials follow, because "press the button
              * now" is already on the user's screen. */
             s_confirmed = false;
+            s_sta_joined = false;
+            s_join_failed = false;
+            s_handed_off = false;
+            s_cred_at_ms = 0;
             enter(MIRROR_PAIR_AWAITING_CONFIRM);
             mirror_ring_set(RING_AMBER_FAST_PULSE);
             report_awaiting_confirm();
@@ -412,6 +442,9 @@ static void on_prov_event(void *arg, esp_event_base_t base, int32_t id, void *da
     case WIFI_PROV_CRED_RECV: {
         wifi_sta_config_t *sta = data;
         ESP_LOGI(TAG, "Wi-Fi credentials received for \"%s\"", (const char *)sta->ssid);
+#if !CONFIG_BT_ENABLED
+        s_cred_at_ms = now_ms();
+#endif
         break;
     }
     case WIFI_PROV_CRED_FAIL: {
@@ -422,18 +455,38 @@ static void on_prov_event(void *arg, esp_event_base_t base, int32_t id, void *da
         /* Let the app try again on the same session rather than making the
          * user start the whole flow over. */
         wifi_prov_mgr_reset_sm_state_on_failure();
+#if !CONFIG_BT_ENABLED
+        /* The setup network stays up; the pairing task drops back to Pairing
+         * so the confirm window cannot overwrite this reason with "not
+         * confirmed". */
+        s_join_failed = true;
+#endif
         break;
     }
     case WIFI_PROV_CRED_SUCCESS:
         ESP_LOGI(TAG, "joined the household network");
+#if !CONFIG_BT_ENABLED
+        s_sta_joined = true;
+#endif
         break;
     case WIFI_PROV_DEINIT:
-        /* FREE_BTDM has just handed the controller's memory back; it cannot be
-         * taken again without a restart. */
         s_service_running = false;
         s_stopping = false;
+#if CONFIG_BT_ENABLED
+        /* FREE_BTDM has just handed the controller's memory back; it cannot be
+         * taken again without a restart. */
         s_bt_released = true;
         ESP_LOGI(TAG, "pairing service down, Bluetooth memory released");
+#else
+        /* The manager drops to WIFI_MODE_STA on the way out, which takes the
+         * setup network down with it. That is right once the device is on the
+         * household network, and wrong when pairing simply timed out: /config
+         * is then the only way left in. */
+        if (!mirror_net_sta_connected()) {
+            mirror_net_restore_ap_mode();
+        }
+        ESP_LOGI(TAG, "pairing service down");
+#endif
         break;
     default:
         break;
@@ -475,6 +528,8 @@ static esp_err_t ensure_srp_credentials(void)
  * Thirteen characters, comfortably inside the 29 the BLE advertisement allows
  * (MAX_BLE_DEVNAME_LEN) - there is no manufacturer data competing for the
  * scan response, so the whole name is advertised and the app can match on it.
+ * Over SoftAP it is the SSID, so it must stay the name mirror_net gave the
+ * setup network: the manager re-applies the AP config under this name.
  */
 static void fill_service_name(void)
 {
@@ -507,10 +562,24 @@ static esp_err_t start_service(void)
      * The service UUID is left at the provisioning default,
      * 0000ffff-0000-1000-8000-00805f9b34fb, because that is the one the
      * ESPProvision SDKs in the app already look for. */
+#if CONFIG_BT_ENABLED
     wifi_prov_mgr_config_t cfg = {
         .scheme = wifi_prov_scheme_ble,
         .scheme_event_handler = WIFI_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM,
     };
+#else
+    /* The protocomm endpoints (/prov-session, /prov-config, /prov-scan,
+     * /proto-ver, /daily-mirror) go on the admin server, next to /config. */
+    if (!s_http) {
+        ESP_LOGE(TAG, "no admin server to carry the pairing endpoints");
+        return ESP_ERR_INVALID_STATE;
+    }
+    wifi_prov_scheme_softap_set_httpd_handle(&s_http);
+    wifi_prov_mgr_config_t cfg = {
+        .scheme = wifi_prov_scheme_softap,
+        .scheme_event_handler = WIFI_PROV_EVENT_HANDLER_NONE,
+    };
+#endif
     err = wifi_prov_mgr_init(cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "wifi_prov_mgr_init failed: %s", esp_err_to_name(err));
@@ -539,10 +608,19 @@ static esp_err_t start_service(void)
         .verifier = s_verifier,
         .verifier_len = (uint16_t)s_verifier_len,
     };
+#if CONFIG_BT_ENABLED
     /* No service key: BLE has no equivalent of a SoftAP password, and the
      * session is encrypted by security 2 regardless of the link. */
+    const char *service_key = NULL;
+#else
+    /* The setup network's own password, so pairing does not open up a network
+     * that guards /config. The app passes the same string
+     * (SOFTAP_PASSWORD in mobile/src/pairing/contract.ts). */
+    const char *service_key =
+        strlen(CONFIG_MIRROR_AP_PASSWORD) >= 8 ? CONFIG_MIRROR_AP_PASSWORD : NULL;
+#endif
     err = wifi_prov_mgr_start_provisioning(WIFI_PROV_SECURITY_2, &sec2,
-                                           s_service_name, NULL);
+                                           s_service_name, service_key);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "wifi_prov_mgr_start_provisioning failed: %s", esp_err_to_name(err));
         wifi_prov_mgr_deinit();
@@ -558,10 +636,11 @@ static esp_err_t start_service(void)
 
     /* The manager forces WIFI_MODE_STA on start, which would take the bench
      * setup network - and /config with it - off the air for the whole pairing
-     * window. BLE does not care what the Wi-Fi mode is. */
+     * window. BLE does not care what the Wi-Fi mode is; the SoftAP scheme has
+     * already put it back to APSTA, so this is a no-op there. */
     mirror_net_restore_ap_mode();
 
-    ESP_LOGW(TAG, "pairing over BLE as \"%s\" - open \"Add a mirror\" in the app "
+    ESP_LOGW(TAG, "pairing over " PAIR_TRANSPORT " as \"%s\" - open \"Add a mirror\" in the app "
                   "(security 2, user \"%s\", pop \"%s\")",
              s_service_name, CONFIG_MIRROR_PROV_USERNAME, CONFIG_MIRROR_PROV_POP);
     return ESP_OK;
@@ -574,11 +653,17 @@ static void stop_service(void)
     }
     ESP_LOGI(TAG, "stopping the pairing service");
     s_stopping = true;
+#if !CONFIG_BT_ENABLED
+    /* The manager takes its own endpoints off the admin server, but not ours:
+     * protocomm only drops application endpoints once it has already let go of
+     * the server, so "/daily-mirror" would stay registered pointing at a freed
+     * protocomm instance - a crash on the next request, and a failed
+     * re-register on the next pairing. Take it off while that still works. */
+    wifi_prov_mgr_endpoint_unregister(PAIR_ENDPOINT);
+#endif
     wifi_prov_mgr_stop_provisioning();
     /* WIFI_PROV_DEINIT clears s_service_running once the cleanup delay is up. */
 }
-
-#endif /* CONFIG_BT_ENABLED */
 
 /* ----------------------------------------------------------- the machine --- */
 
@@ -608,6 +693,42 @@ static void back_to_pairing(const char *reason)
     enter(MIRROR_PAIR_PAIRING);
 }
 
+#if !CONFIG_BT_ENABLED
+/* The station has an address: close the setup network and restart the button
+ * window. See s_sta_joined. */
+static void hand_off(void)
+{
+    s_handed_off = true;
+    enter(MIRROR_PAIR_AWAITING_CONFIRM);
+    mirror_ring_set(RING_AMBER_FAST_PULSE);
+    ESP_LOGW(TAG, "on the household network (%s) - closing the setup network; "
+                  "press the button within %d s", mirror_net_ip(), CONFIRM_TIMEOUT_MS / 1000);
+    /* The manager drops to WIFI_MODE_STA on the way out, and WIFI_PROV_DEINIT
+     * leaves it there because the station is connected. */
+    stop_service();
+}
+#endif
+
+/*
+ * A failure once the setup network has been closed. Nobody can read the
+ * result endpoint any more, and raising the network again could pull the
+ * phone back off its household Wi-Fi, so pairing ends here: the app sees no
+ * claim on the server and tells the person to hold the button to start over.
+ */
+static bool end_after_handoff(const char *reason)
+{
+    if (!s_handed_off) {
+        return false;
+    }
+    report_failed(reason);
+    s_confirmed = false;
+    s_claim_token[0] = '\0';
+    s_handed_off = false;
+    enter(MIRROR_PAIR_IDLE);
+    mirror_ring_play(RING_RED_TRIPLE_PULSE, mirror_pair_ring());
+    return true;
+}
+
 static void do_claim(void)
 {
     enter(MIRROR_PAIR_CLAIMING);
@@ -620,15 +741,20 @@ static void do_claim(void)
         vTaskDelay(pdMS_TO_TICKS(TICK_MS));
     }
     if (!mirror_net_sta_connected()) {
-        back_to_pairing("wifi join failed - no address");
+        if (!end_after_handoff("wifi join failed - no address")) {
+            back_to_pairing("wifi join failed - no address");
+        }
         return;
     }
 
     char reason[160];
     if (redeem_claim(reason, sizeof(reason)) != ESP_OK) {
-        back_to_pairing(reason);
+        if (!end_after_handoff(reason)) {
+            back_to_pairing(reason);
+        }
         return;
     }
+    s_handed_off = false;
 
     /* Ready. The mDNS record is what the app uses to find the device on the
      * household network from here on. */
@@ -656,19 +782,66 @@ static void pair_task(void *arg)
             }
             break;
 
-        case MIRROR_PAIR_AWAITING_CONFIRM:
+        case MIRROR_PAIR_AWAITING_CONFIRM: {
+            int64_t window = CONFIRM_TIMEOUT_MS;
+#if !CONFIG_BT_ENABLED
+            if (s_join_failed) {
+                s_cred_at_ms = 0;
+                /* Already reported by on_prov_event, with the reason. The
+                 * setup network is still up, so the app can read it and the
+                 * person can correct the password. */
+                s_join_failed = false;
+                mirror_ring_play(RING_RED_TRIPLE_PULSE, RING_AMBER_CHASE);
+                s_confirmed = false;
+                s_claim_token[0] = '\0';
+                enter(MIRROR_PAIR_PAIRING);
+                break;
+            }
+            if (s_sta_joined) {
+                s_sta_joined = false;
+                hand_off();
+            }
+            /* Until the station joins, the window is the join's; the button
+             * window proper starts at the handoff. */
+            if (!s_handed_off && !s_confirmed && s_cred_at_ms
+                && now_ms() - s_cred_at_ms >= STA_JOIN_TIMEOUT_MS) {
+                /* Stop the manager retrying and make it accept a fresh set of
+                 * credentials, so the app can resend on the same session. */
+                wifi_prov_mgr_reset_sm_state_for_reprovision();
+                s_cred_at_ms = 0;
+                report_failed("wifi join timed out - the camera got no address from that network");
+                mirror_ring_play(RING_RED_TRIPLE_PULSE, RING_AMBER_CHASE);
+                s_claim_token[0] = '\0';
+                enter(MIRROR_PAIR_PAIRING);
+                break;
+            }
+            if (!s_handed_off) {
+                window = CRED_WAIT_MS + STA_JOIN_TIMEOUT_MS;
+            }
+#endif
             if (s_confirmed) {
                 s_confirmed = false;
                 do_claim();
-            } else if (in_state_ms() >= CONFIRM_TIMEOUT_MS) {
+            } else if (in_state_ms() >= window) {
+                if (end_after_handoff("not confirmed - the button was not pressed")) {
+                    break;
+                }
+#if !CONFIG_BT_ENABLED
+                /* The credentials never came: say so while the setup network is
+                 * still up. */
+                report_failed("wifi details never arrived - send them again");
+                mirror_ring_play(RING_RED_TRIPLE_PULSE, RING_AMBER_CHASE);
+#else
                 /* No press, no claim. Back to discoverable so the app can
                  * simply try again. */
                 report_failed("not confirmed - the button was not pressed");
                 mirror_ring_set(RING_AMBER_CHASE);
+#endif
                 s_claim_token[0] = '\0';
                 enter(MIRROR_PAIR_PAIRING);
             }
             break;
+        }
 
         case MIRROR_PAIR_IDLE:
             /* Claimed, and lingering so the phone can read the result over a
@@ -690,6 +863,8 @@ static void pair_task(void *arg)
 }
 
 /* -------------------------------------------------------------- the API --- */
+
+void mirror_pair_set_http_server(httpd_handle_t server) { s_http = server; }
 
 bool mirror_pair_claimed(void)
 {
@@ -759,18 +934,19 @@ esp_err_t mirror_pair_start(void)
      * attempt, but never touches the stored credentials: they survive until a
      * new claim succeeds. */
     s_confirmed = false;
+    s_sta_joined = false;
+    s_join_failed = false;
+    s_handed_off = false;
+    s_cred_at_ms = 0;
     s_claim_token[0] = '\0';
     report_awaiting_confirm();
     enter(MIRROR_PAIR_PAIRING);
 
-    esp_err_t err;
-#if CONFIG_BT_ENABLED
-    err = esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID,
-                                     &on_prov_event, NULL);
+    esp_err_t err = esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID,
+                                               &on_prov_event, NULL);
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
         ESP_LOGW(TAG, "prov event handler: %s", esp_err_to_name(err));
     }
-#endif
 
     err = start_service();
     if (err != ESP_OK) {

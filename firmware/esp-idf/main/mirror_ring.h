@@ -107,6 +107,12 @@ void mirror_ring_play(ring_pattern_t pattern, ring_pattern_t next);
  */
 void mirror_ring_fill(uint8_t percent);
 
+/**
+ * Hold the LED at one colour (0..255 each) over every pattern, for checking
+ * the wiring. Any negative channel hands the ring back to the patterns.
+ */
+void mirror_ring_test_color(int r, int g, int b);
+
 #ifdef __cplusplus
 }
 #endif

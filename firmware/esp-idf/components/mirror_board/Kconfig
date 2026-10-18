@@ -46,6 +46,15 @@ config MIRROR_BUTTON_GPIO
         here is -1 on purpose: a board that forgets loses its button, which is
         obvious, rather than quietly driving GPIO 0.
 
+config MIRROR_BUTTON_RETURN_GPIO
+    int "GPIO driven low as the button's ground return"
+    default -1
+    range -1 56
+    help
+        For a button wired between MIRROR_BUTTON_GPIO and another header pin
+        instead of GND: this pin is held low so it acts as the ground side.
+        -1 means the button goes to GND and no pin is driven.
+
 config MIRROR_JPEG_QUALITY
     int "JPEG quality (0-100)"
     default 90

@@ -132,7 +132,7 @@ fw-flash-p4 port="/dev/ttyACM0": fw-build-p4
     cd firmware/esp-idf/build_p4 && {{idf_export}} && \
         python -m esptool --chip esp32p4 -p {{port}} -b 921600 \
             --before default_reset --after hard_reset write_flash "@flash_args" \
-        | tee /dev/stderr | grep -q "Hash of data verified" \
+        | tee /dev/stderr | awk '/Hash of data verified/ { n++ } END { exit n < 4 }' \
         || { echo "flash NOT verified - the board is still running the old firmware" >&2; exit 1; }
 
 # Flash the ESP32-S3 over its CH340 bridge, failing loudly if a write is not verified.
@@ -140,7 +140,7 @@ fw-flash-s3 port="/dev/ttyUSB0": fw-build-s3
     cd firmware/esp-idf/build_s3 && {{idf_export}} && \
         python -m esptool --chip esp32s3 -p {{port}} -b 921600 \
             --before default_reset --after hard_reset write_flash "@flash_args" \
-        | tee /dev/stderr | grep -q "Hash of data verified" \
+        | tee /dev/stderr | awk '/Hash of data verified/ { n++ } END { exit n < 4 }' \
         || { echo "flash NOT verified - the board is still running the old firmware" >&2; exit 1; }
 
 # Watch the ESP32-P4 console (2 Mbaud; Ctrl-] to quit).

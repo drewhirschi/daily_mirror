@@ -63,6 +63,22 @@ config MIRROR_JPEG_QUALITY
         On the P4 this is the hardware encoder's quality. On the S3 it is
         mapped onto esp32-camera's inverted 0-63 scale.
 
+config MIRROR_FACE_AE
+    bool "Steer auto-exposure and autofocus to a detected face"
+    depends on MIRROR_BOARD_P4_IMX519
+    default n
+    help
+        A low-priority task runs ESP-DL's face detector on a 320x180 copy of
+        the live frame about twice a second and moves the ISP's AE and
+        AF statistics windows onto the largest face, falling back to the
+        tuning file's centre-weighted windows two seconds after the last face.
+        AWB stays on the whole frame.
+
+        Costs ~1.5 MB of flash (ESP-DL plus ~190 KB of model), ~430 KB of
+        PSRAM, ~40 ms of one core per detection, and ~15 KB of internal RAM
+        for ESP-DL's object graph; the task stack and image buffers are PSRAM.
+        On for the P4 in its sdkconfig.defaults.
+
 menu "Capture flash"
 
 config MIRROR_FLASH_GPIO

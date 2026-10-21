@@ -39,6 +39,9 @@
 #include "esp_video_ioctl.h"
 
 #include "mirror_board.h"
+#if CONFIG_MIRROR_FACE_AE
+#include "face_ae.h"
+#endif
 
 static const char *TAG = "board_p4";
 
@@ -99,6 +102,7 @@ static int s_cam_fd = -1;
 static int32_t s_exposure_us = -1;
 static float s_analog_gain = -1.0f;
 static int s_mean_luma = -1;
+static int s_face_steered = -1;
 
 struct capture_ctx {
     int fd;
@@ -127,6 +131,29 @@ static void capture_task(void *arg)
         ioctl(ctx->fd, VIDIOC_QBUF, &buf);
     }
 }
+
+#if CONFIG_MIRROR_FACE_AE
+/* The face task's view of the frame: every step-th pixel of every step-th row,
+ * from the middle of each step x step cell. A strided read of ~58 thousand
+ * pixels, a few milliseconds under the lock - the capture task's next memcpy
+ * waits that long at most. */
+static bool face_grab(uint16_t *dst, uint32_t dw, uint32_t dh, uint32_t step)
+{
+    if (!s_frame || dw * step > s_w || dh * step > s_h ||
+            xSemaphoreTake(s_frame_lock, pdMS_TO_TICKS(200)) != pdTRUE) {
+        return false;
+    }
+    const uint16_t *px = (const uint16_t *)s_frame;
+    for (uint32_t y = 0; y < dh; y++) {
+        const uint16_t *row = px + (size_t)(y * step + step / 2) * s_w + step / 2;
+        for (uint32_t x = 0; x < dw; x++) {
+            dst[y * dw + x] = row[x * step];
+        }
+    }
+    xSemaphoreGive(s_frame_lock);
+    return true;
+}
+#endif
 
 const char *board_name(void) { return "ESP32-P4 + IMX519"; }
 const char *board_id(void)   { return "esp32p4-imx519"; }
@@ -190,6 +217,22 @@ esp_err_t board_camera_init(void)
 
     snprintf(s_status, sizeof(s_status), "IMX519 %" PRIu32 "x%" PRIu32 ", ISP AE/AWB/AF continuous", s_w, s_h);
     ESP_LOGI(TAG, "%s (%u bytes/frame)", s_status, (unsigned)s_frame_len);
+
+#if CONFIG_MIRROR_FACE_AE
+    /* The ISP's statistics windows are in sensor-mode coordinates, so the
+     * face task needs those as well as the frame's. Not fatal: without it AE
+     * and AF simply stay on the tuning file's windows. */
+    esp_cam_sensor_format_t sf;
+    uint32_t isp_w = s_w, isp_h = s_h;
+    if (ioctl(fd, VIDIOC_G_SENSOR_FMT, &sf) == 0) {
+        isp_w = sf.width;
+        isp_h = sf.height;
+    }
+    err = face_ae_start(s_w, s_h, isp_w, isp_h, face_grab);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "face AE/AF not started: %s", esp_err_to_name(err));
+    }
+#endif
     return ESP_OK;
 }
 
@@ -267,6 +310,9 @@ esp_err_t board_camera_capture(bool autofocus, uint8_t **jpeg, size_t *len)
 
     jpeg_encoder_handle_t enc = NULL;
     latch_exposure();
+#if CONFIG_MIRROR_FACE_AE
+    s_face_steered = face_ae_steering() ? 1 : 0;
+#endif
     jpeg_encode_engine_cfg_t eng = { .timeout_ms = 5000 };
     if (jpeg_new_encoder_engine(&eng, &enc) != ESP_OK) {
         return ESP_FAIL;
@@ -302,8 +348,8 @@ esp_err_t board_camera_capture(bool autofocus, uint8_t **jpeg, size_t *len)
         ret = jpeg_encoder_process(enc, &cfg, s_frame, s_frame_len, out, alloc, &out_len);
         xSemaphoreGive(s_frame_lock);
     }
-    ESP_LOGI(TAG, "capture: exposure %" PRIi32 " us, gain %.2fx, mean luma %d",
-             s_exposure_us, s_analog_gain, s_mean_luma);
+    ESP_LOGI(TAG, "capture: exposure %" PRIi32 " us, gain %.2fx, mean luma %d, face-steered %d",
+             s_exposure_us, s_analog_gain, s_mean_luma, s_face_steered);
     jpeg_del_encoder_engine(enc);
 
     if (ret != ESP_OK) {
@@ -350,7 +396,8 @@ const char *board_camera_status(void) { return s_status; }
 
 /*
  * Capture provenance, P4 edition: size, quality, and the exposure, gain and
- * mean luma latched by the last board_camera_capture(). The AF state is still
+ * mean luma latched by the last board_camera_capture(), and whether a face was
+ * steering AE/AF when it was taken. The AF state is still
  * an honest "unknown": it lives in esp_ipa's closed-loop AF on the AK7375
  * rather than in anything readable, and reporting a made-up value would be
  * worse than reporting nothing - the upload omits fields left at these values.
@@ -372,7 +419,32 @@ void board_camera_capture_info(board_camera_capture_info_t *out)
         .af_state = "unknown",
         .focus_score = -1,
         .flash = false,
+        .face_steered = s_face_steered,
     };
+}
+
+int board_camera_face_stats(char *out, size_t cap)
+{
+#if CONFIG_MIRROR_FACE_AE
+    return face_ae_stats(out, cap);
+#else
+    (void)out;
+    (void)cap;
+    return 0;
+#endif
+}
+
+esp_err_t board_camera_face_test(const uint8_t *jpeg, size_t len, bool steer, char *out, size_t cap)
+{
+#if CONFIG_MIRROR_FACE_AE
+    return face_ae_test_jpeg(jpeg, len, steer, out, cap);
+#else
+    (void)jpeg;
+    (void)len;
+    (void)steer;
+    snprintf(out, cap, "face detection is not built in (CONFIG_MIRROR_FACE_AE)\n");
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
 }
 
 /* ---- RGB LED on three LEDC PWM channels -------------------------------- */

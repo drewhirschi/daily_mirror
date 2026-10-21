@@ -17,12 +17,19 @@ set(reqs esp_driver_gpio esp_timer)
 
 if(CONFIG_MIRROR_BOARD_P4_IMX519)
     list(APPEND srcs "src/board_p4_imx519.c")
+    if(CONFIG_MIRROR_FACE_AE)
+        list(APPEND srcs "src/face_ae_p4.c" "src/face_detect.cpp")
+    endif()
 elseif(CONFIG_MIRROR_BOARD_S3_OV5640)
     list(APPEND srcs "src/board_s3_ov5640.c")
 endif()
 
 if(mirror_target STREQUAL "esp32p4")
-    list(APPEND reqs esp_video esp_cam_sensor_imx esp_driver_jpeg esp_driver_ledc)
+    list(APPEND reqs esp_video esp_cam_sensor_imx esp_driver_jpeg esp_driver_ledc
+                     human_face_detect
+                     # esp_video_isp_pipeline.h includes esp_ipa.h, which esp_video
+                     # only has as a private requirement.
+                     esp_ipa)
 elseif(mirror_target STREQUAL "esp32s3")
     list(APPEND reqs esp32-camera led_strip)
 endif()

@@ -356,6 +356,12 @@ static int build_meta(char *out, size_t cap, mirror_trigger_t trigger)
     if (board_flash_available()) {
         n += snprintf(out + n, cap - n, ",\"flash\":%s", info.flash ? "true" : "false");
     }
+    /* Not in the server's capture schema yet, which ignores fields it does
+     * not know (see upload_flow.rs): it is here so the photo's own record says
+     * whether a face set its exposure and focus. */
+    if (info.face_steered >= 0) {
+        n += snprintf(out + n, cap - n, ",\"face_steered\":%s", info.face_steered ? "true" : "false");
+    }
     n += snprintf(out + n, cap - n, ",\"trigger\":\"%s\",\"capture_source\":\"device\"}",
                   mirror_trigger_name(trigger));
     return n;

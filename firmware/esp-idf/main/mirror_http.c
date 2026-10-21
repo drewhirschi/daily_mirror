@@ -140,7 +140,7 @@ static esp_err_t stats_handler(httpd_req_t *req)
         "idle", "pairing", "awaiting_confirm", "claiming",
     };
 
-    char body[1280];
+    char body[1792];
     int n = snprintf(body, sizeof(body),
         "board=%s\n" "board_id=%s\n" "device_id=%s\n" "fw=%s\n"
         "camera=%s\n" "frame=%" PRIu32 "x%" PRIu32 "\n"
@@ -165,6 +165,7 @@ static esp_err_t stats_handler(httpd_req_t *req)
         board_flash_available() ? CONFIG_MIRROR_FLASH_GPIO : -1,
         board_flash_on() ? 1 : 0);
 
+    n += board_camera_face_stats(body + n, sizeof(body) - n);
     n += mirror_spool_stats(body + n, sizeof(body) - n);
 
     httpd_resp_set_type(req, "text/plain");
@@ -193,6 +194,65 @@ static esp_err_t upload_block_handler(httpd_req_t *req)
     }
     mirror_upload_set_blocked(on);
     return httpd_resp_sendstr(req, on ? "upload block ON" : "upload block off");
+}
+
+/*
+ * The face detector on a supplied image, for testing face-steered AE/AF with
+ * nobody in front of the camera:
+ *
+ *   curl --data-binary @face.jpg 'http://<device>/debug/face'
+ *   curl --data-binary @face.jpg 'http://<device>/debug/face?steer=1'
+ *
+ * The first only reports what was found. With steer=1 the largest face also
+ * steers AE/AF as if the camera had seen it, scaled to the frame, and the
+ * steering times out as usual about two seconds later; /stats shows the
+ * windows the ISP is then holding.
+ */
+#define FACE_TEST_MAX_BYTES (4 * 1024 * 1024)
+
+static esp_err_t face_test_handler(httpd_req_t *req)
+{
+    char query[32] = "";
+    bool steer = false;
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        char val[8] = "";
+        if (httpd_query_key_value(query, "steer", val, sizeof(val)) == ESP_OK) {
+            steer = val[0] == '1';
+        }
+    }
+    if (req->content_len == 0 || req->content_len > FACE_TEST_MAX_BYTES) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_sendstr(req, "POST a JPEG of at most 4 MB as the body\n");
+    }
+    /* PSRAM: the body is an image, and the internal heap is the upload's. */
+    uint8_t *jpeg = heap_caps_malloc(req->content_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!jpeg) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "no memory");
+        return ESP_FAIL;
+    }
+    size_t got = 0;
+    while (got < req->content_len) {
+        int r = httpd_req_recv(req, (char *)jpeg + got, req->content_len - got);
+        if (r == HTTPD_SOCK_ERR_TIMEOUT) {
+            continue;
+        }
+        if (r <= 0) {
+            free(jpeg);
+            return ESP_FAIL;
+        }
+        got += r;
+    }
+
+    char out[512];
+    esp_err_t err = board_camera_face_test(jpeg, got, steer, out, sizeof(out));
+    if (err != ESP_ERR_TIMEOUT) {
+        free(jpeg);   /* on a timeout the detector may still read it; leak it */
+    }
+    if (err == ESP_ERR_NOT_SUPPORTED) {
+        httpd_resp_set_status(req, "501 Not Implemented");
+    }
+    httpd_resp_set_type(req, "text/plain");
+    return httpd_resp_sendstr(req, out);
 }
 
 /*
@@ -236,7 +296,7 @@ esp_err_t mirror_http_start(httpd_handle_t *out)
     cfg.max_open_sockets = 4;
     cfg.send_wait_timeout = 10;
     cfg.recv_wait_timeout = 10;
-    /* Eight here, what mirror_log and mirror_config register, and the six
+    /* Nine here, what mirror_log and mirror_config register, and the six
      * provisioning endpoints mirror_pair adds over SoftAP; the default 8 is
      * not enough, and the overflow shows up as a route that silently 404s. */
     cfg.max_uri_handlers = 24;
@@ -257,6 +317,7 @@ esp_err_t mirror_http_start(httpd_handle_t *out)
         { .uri = "/stats",        .method = HTTP_GET,  .handler = stats_handler },
         { .uri = "/debug/upload-block", .method = HTTP_POST, .handler = upload_block_handler },
         { .uri = "/debug/led",    .method = HTTP_POST, .handler = led_handler },
+        { .uri = "/debug/face",   .method = HTTP_POST, .handler = face_test_handler },
     };
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {
         httpd_register_uri_handler(server, &uris[i]);

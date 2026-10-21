@@ -9,6 +9,29 @@ dependencies:
     rules:
       - if: "target == esp32p4"
 
+  # Face detection for face-steered AE/AF (CONFIG_MIRROR_FACE_AE): ESP-DL's
+  # two-stage MSR+MNP int8 face model, which supports esp32p4 and IDF >= 5.3.
+  # Pinned exactly, with ESP-DL and its two dependencies, because
+  # dependencies.lock is git-ignored here and human_face_detect only asks for
+  # esp-dl ~3.3.0 - a fresh solve would otherwise pick up whatever ESP-DL
+  # shipped that week, and its kernels and the model format move together.
+  espressif/human_face_detect:
+    version: "==0.5.0"
+    rules:
+      - if: "target == esp32p4"
+  espressif/esp-dl:
+    version: "==3.3.9"
+    rules:
+      - if: "target == esp32p4"
+  espressif/dl_fft:
+    version: "==0.7.0"
+    rules:
+      - if: "target == esp32p4"
+  espressif/esp_new_jpeg:
+    version: "==1.0.2"
+    rules:
+      - if: "target == esp32p4"
+
   # The P4 has no radio. esp_wifi_remote routes the esp_wifi API to an
   # ESP32-C6 and esp_hosted carries it over SDIO; the P4<->C6 pins are
   # esp_hosted's built-in ESP32-P4 defaults and match the Waveshare board, so

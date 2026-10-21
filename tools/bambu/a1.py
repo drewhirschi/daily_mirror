@@ -208,8 +208,12 @@ def main():
     pr.add_argument('name', help='file name on the card, e.g. Housing.gcode.3mf')
     pr.add_argument('--plate', type=int, default=1)
     pr.add_argument('--no-level', action='store_true', help='skip auto bed levelling')
+    pr.add_argument('--no-vibration', action='store_true', help='skip the vibration compensation run')
     pr.add_argument('--timelapse', action='store_true')
     pr.add_argument('--slot', type=int, help='AMS Lite slot 1-4 to feed from; omit for the external spool')
+    ld = sub.add_parser('load', help='load an AMS Lite slot into the toolhead')
+    ld.add_argument('slot', type=int, help='AMS Lite slot 1-4')
+    ld.add_argument('--temp', type=int, default=220)
     for name in ('pause', 'resume', 'stop'):
         sub.add_parser(name)
     li = sub.add_parser('light', help='work light on/off')
@@ -262,6 +266,10 @@ def main():
                 time.sleep(args.every)
         elif args.cmd in ('pause', 'resume', 'stop'):
             p.send({'print': {'command': args.cmd}})
+        elif args.cmd == 'load':
+            p.send({'print': {'command': 'ams_change_filament', 'target': args.slot - 1,
+                              'curr_temp': args.temp, 'tar_temp': args.temp}})
+            print(f'load requested for slot {args.slot}; check with `status`')
         elif args.cmd == 'light':
             p.send({'system': {'command': 'ledctrl', 'led_node': 'chamber_light', 'led_mode': args.mode,
                                'led_on_time': 500, 'led_off_time': 500, 'loop_times': 0, 'interval_time': 0}})
@@ -279,7 +287,7 @@ def main():
                 'url': f'file:///sdcard/{args.name}', 'subtask_name': args.name,
                 'project_id': '0', 'profile_id': '0', 'task_id': '0', 'subtask_id': '0',
                 'md5': '', 'timelapse': args.timelapse, 'bed_type': 'auto',
-                'bed_levelling': not args.no_level, 'flow_cali': False, 'vibration_cali': True,
+                'bed_levelling': not args.no_level, 'flow_cali': False, 'vibration_cali': not args.no_vibration,
                 'layer_inspect': False, 'use_ams': args.slot is not None,
                 'ams_mapping': [args.slot - 1] if args.slot else '',
                 # Firmware 01.08 also reads the per-unit form Bambu Studio sends.

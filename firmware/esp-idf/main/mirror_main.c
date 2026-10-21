@@ -7,7 +7,7 @@
  *
  * Start-up order is deliberate:
  *   log ring -> settings -> LED -> camera -> network -> server -> mDNS
- *   -> upload spool -> button
+ *   -> upload spool -> link watchdog -> button
  * The LED comes up early so a failure has somewhere to show itself; the camera
  * comes up before the network so the ISP's AE/AWB/AF convergence, which takes
  * a few seconds of frames, overlaps the Wi-Fi association instead of following
@@ -16,7 +16,8 @@
  *
  * Nothing here calls esp_restart() on a failure. A camera that did not answer
  * still has to serve /config, because /config is how someone fixes the thing
- * that is wrong.
+ * that is wrong. The one exception is mirror_link on the P4. There a dead
+ * SDIO link to the C6 takes /config down too, so a restart is the only way back.
  */
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -31,6 +32,7 @@
 #include "mirror_press.h"
 #include "mirror_ring.h"
 #include "mirror_spool.h"
+#include "mirror_link.h"
 #include "mirror_log.h"
 #include "mirror_serial.h"
 
@@ -100,6 +102,12 @@ void app_main(void)
      * there is a queue to put the photo in. */
     if (mirror_spool_start() != ESP_OK) {
         ESP_LOGE(TAG, "no upload spool - a failed upload will lose the photo");
+    }
+
+    /* After the spool, which it watches. On the P4 this is what notices the
+     * C6 going quiet and restarts the board. */
+    if (mirror_link_start() != ESP_OK) {
+        ESP_LOGE(TAG, "co-processor link watchdog did not start");
     }
 
     mirror_press_start();

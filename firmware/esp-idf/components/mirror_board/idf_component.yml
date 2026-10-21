@@ -12,10 +12,16 @@ dependencies:
   # The P4 has no radio. esp_wifi_remote routes the esp_wifi API to an
   # ESP32-C6 and esp_hosted carries it over SDIO; the P4<->C6 pins are
   # esp_hosted's built-in ESP32-P4 defaults and match the Waveshare board, so
-  # nothing is overridden. Pinned to 2.x: 3.x moves the transport around and
-  # has not been on this bench.
+  # nothing is overridden.
+  #
+  # Pinned exactly, not to a range. The host half here and the slave firmware
+  # on the C6 speak one RPC protocol and have to be the same release; with a
+  # range, a fresh dependency solve can float the host ahead of what the C6 is
+  # running, and a mismatched pair does not fail at boot - it fails hours later
+  # as RPC timeouts and a Wi-Fi link that silently goes away. Moving this means
+  # building and OTA-ing the matching network_adapter.bin onto the C6 too.
   espressif/esp_hosted:
-    version: "^2.12.12"
+    version: "==2.13.0"
     rules:
       - if: "target == esp32p4"
   espressif/esp_wifi_remote:

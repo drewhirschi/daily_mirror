@@ -19,7 +19,7 @@ menu "Camera Sensor (IMX add-on)"
             default 0
             range 0 2
             help
-              0 - 1920x1080 RAW10 30fps, 2x2 binned crop of a 3840x2160 window (82% FOV)
+              0 - 1920x1080 RAW10 15fps, 2x2 binned crop of a 3840x2160 window (82% FOV)
               1 - 1280x720 RAW10 30fps, 2x2 binned crop of a 2560x1440 window (55% FOV)
               2 - 2328x1748 RAW10 30fps, 2x2 binned full field. Wider than the
                   P4 datapath limit (~1920); experimental.

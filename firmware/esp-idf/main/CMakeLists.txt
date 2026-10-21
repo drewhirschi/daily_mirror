@@ -1,3 +1,13 @@
+# esp_hosted exists only in the P4 build (mirror_board pulls it in for that
+# target); mirror_link.c compiles to a stub everywhere else. Like
+# mirror_board's REQUIRES, this follows IDF_TARGET because Kconfig is not
+# loaded yet when requirements are expanded.
+idf_build_get_property(mirror_target IDF_TARGET)
+set(mirror_link_reqs)
+if(mirror_target STREQUAL "esp32p4")
+    list(APPEND mirror_link_reqs esp_hosted)
+endif()
+
 idf_component_register(
     SRCS "mirror_main.c"
          "mirror_net.c"
@@ -9,6 +19,7 @@ idf_component_register(
          "mirror_spool.c"
          "mirror_log.c"
          "mirror_serial.c"
+         "mirror_link.c"
     INCLUDE_DIRS "."
     REQUIRES mirror_board mirror_config mirror_mdns
     PRIV_REQUIRES esp_wifi esp_netif esp_event nvs_flash esp_http_server
@@ -21,4 +32,6 @@ idf_component_register(
                   # The upload spool: LittleFS on its own data partition, and
                   # esp_app_desc for the firmware version in capture metadata.
                   joltwallet__littlefs app_update
+                  # The co-processor link watchdog (P4 only).
+                  ${mirror_link_reqs}
 )

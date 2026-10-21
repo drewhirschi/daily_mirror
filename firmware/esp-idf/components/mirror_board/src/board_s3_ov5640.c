@@ -38,6 +38,7 @@ static int  s_prep_af_status = -1;
 static board_camera_capture_info_t s_info = {
     .jpeg_quality = -1, .exposure_us = -1, .analog_gain = -1.0f,
     .mean_luma = -1, .af_state = "unknown", .focus_score = -1,
+    .face_steered = -1,
 };
 
 const char *board_name(void) { return "ESP32-S3 + OV5640"; }
@@ -305,6 +306,24 @@ void board_camera_capture_info(board_camera_capture_info_t *out)
     if (out) {
         *out = s_info;
     }
+}
+
+/* No face detection on this board: the OV5640 meters and focuses on its own,
+ * and the S3 has neither the PSRAM bandwidth nor the time to spare for it. */
+int board_camera_face_stats(char *out, size_t cap)
+{
+    (void)out;
+    (void)cap;
+    return 0;
+}
+
+esp_err_t board_camera_face_test(const uint8_t *jpeg, size_t len, bool steer, char *out, size_t cap)
+{
+    (void)jpeg;
+    (void)len;
+    (void)steer;
+    snprintf(out, cap, "no face detection on this board\n");
+    return ESP_ERR_NOT_SUPPORTED;
 }
 
 esp_err_t board_camera_init(void)

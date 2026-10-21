@@ -36,8 +36,12 @@
 #include "linux/videodev2.h"
 #include "esp_video_init.h"
 #include "esp_video_device.h"
+#include "esp_video_ioctl.h"
 
 #include "mirror_board.h"
+#if CONFIG_MIRROR_FACE_AE
+#include "face_ae.h"
+#endif
 
 static const char *TAG = "board_p4";
 
@@ -93,6 +97,13 @@ static SemaphoreHandle_t s_frame_lock;
 static uint32_t s_w, s_h;
 static char s_status[72] = "camera not started";
 
+/* The CSI device, for reading back what AE chose, and the latch of it. */
+static int s_cam_fd = -1;
+static int32_t s_exposure_us = -1;
+static float s_analog_gain = -1.0f;
+static int s_mean_luma = -1;
+static int s_face_steered = -1;
+
 struct capture_ctx {
     int fd;
     uint8_t **buffer;   /* the mmap'd V4L2 buffer table, indexed by buf.index */
@@ -120,6 +131,29 @@ static void capture_task(void *arg)
         ioctl(ctx->fd, VIDIOC_QBUF, &buf);
     }
 }
+
+#if CONFIG_MIRROR_FACE_AE
+/* The face task's view of the frame: every step-th pixel of every step-th row,
+ * from the middle of each step x step cell. A strided read of ~58 thousand
+ * pixels, a few milliseconds under the lock - the capture task's next memcpy
+ * waits that long at most. */
+static bool face_grab(uint16_t *dst, uint32_t dw, uint32_t dh, uint32_t step)
+{
+    if (!s_frame || dw * step > s_w || dh * step > s_h ||
+            xSemaphoreTake(s_frame_lock, pdMS_TO_TICKS(200)) != pdTRUE) {
+        return false;
+    }
+    const uint16_t *px = (const uint16_t *)s_frame;
+    for (uint32_t y = 0; y < dh; y++) {
+        const uint16_t *row = px + (size_t)(y * step + step / 2) * s_w + step / 2;
+        for (uint32_t x = 0; x < dw; x++) {
+            dst[y * dw + x] = row[x * step];
+        }
+    }
+    xSemaphoreGive(s_frame_lock);
+    return true;
+}
+#endif
 
 const char *board_name(void) { return "ESP32-P4 + IMX519"; }
 const char *board_id(void)   { return "esp32p4-imx519"; }
@@ -169,6 +203,7 @@ esp_err_t board_camera_init(void)
     }
 
     ioctl(fd, VIDIOC_STREAMON, &type);
+    s_cam_fd = fd;
 
     /* static, not a stack local: the task outlives this function. */
     static struct capture_ctx ctx;
@@ -182,7 +217,74 @@ esp_err_t board_camera_init(void)
 
     snprintf(s_status, sizeof(s_status), "IMX519 %" PRIu32 "x%" PRIu32 ", ISP AE/AWB/AF continuous", s_w, s_h);
     ESP_LOGI(TAG, "%s (%u bytes/frame)", s_status, (unsigned)s_frame_len);
+
+#if CONFIG_MIRROR_FACE_AE
+    /* The ISP's statistics windows are in sensor-mode coordinates, so the
+     * face task needs those as well as the frame's. Not fatal: without it AE
+     * and AF simply stay on the tuning file's windows. */
+    esp_cam_sensor_format_t sf;
+    uint32_t isp_w = s_w, isp_h = s_h;
+    if (ioctl(fd, VIDIOC_G_SENSOR_FMT, &sf) == 0) {
+        isp_w = sf.width;
+        isp_h = sf.height;
+    }
+    err = face_ae_start(s_w, s_h, isp_w, isp_h, face_grab);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "face AE/AF not started: %s", esp_err_to_name(err));
+    }
+#endif
     return ESP_OK;
+}
+
+/*
+ * What esp_ipa's AE last wrote to the IMX519, read back through the same V4L2
+ * controls it writes: exposure in lines (x the mode's line time) and gain as a
+ * menu index (whose menu value is milli-x). This is the setting in force for
+ * the frame being encoded give or take the sensor's two-frame latency, which
+ * is noise once AE has settled.
+ */
+static void latch_exposure(void)
+{
+    s_exposure_us = -1;
+    s_analog_gain = -1.0f;
+
+    struct v4l2_ext_control ctrl[2] = {
+        { .id = V4L2_CID_EXPOSURE },
+        { .id = V4L2_CID_GAIN },
+    };
+    struct v4l2_ext_controls ctrls = { .ctrl_class = V4L2_CID_CAMERA_CLASS, .count = 1, .controls = &ctrl[0] };
+    esp_cam_sensor_format_t sf;
+    if (ioctl(s_cam_fd, VIDIOC_G_EXT_CTRLS, &ctrls) == 0 &&
+            ioctl(s_cam_fd, VIDIOC_G_SENSOR_FMT, &sf) == 0 && sf.isp_info) {
+        s_exposure_us = (int32_t)(((uint64_t)ctrl[0].value * sf.isp_info->isp_v1_info.tline_ns) / 1000);
+    }
+
+    ctrls = (struct v4l2_ext_controls){ .ctrl_class = V4L2_CID_USER_CLASS, .count = 1, .controls = &ctrl[1] };
+    if (ioctl(s_cam_fd, VIDIOC_G_EXT_CTRLS, &ctrls) == 0) {
+        struct v4l2_querymenu qm = { .id = V4L2_CID_GAIN, .index = ctrl[1].value };
+        if (ioctl(s_cam_fd, VIDIOC_QUERYMENU, &qm) == 0) {
+            s_analog_gain = (float)qm.value / 1000.0f;
+        }
+    }
+}
+
+/* Mean luma (0-255) of the published RGB565 frame, from every 8th pixel of
+ * every 8th row: 32 thousand samples, well under a millisecond. Caller holds
+ * s_frame_lock. */
+static int frame_mean_luma(void)
+{
+    const uint16_t *px = (const uint16_t *)s_frame;
+    uint64_t sum = 0;
+    uint32_t n = 0;
+    for (uint32_t y = 4; y < s_h; y += 8) {
+        for (uint32_t x = 4; x < s_w; x += 8) {
+            uint16_t p = px[y * s_w + x];
+            uint32_t r = (p >> 11) << 3, g = ((p >> 5) & 0x3f) << 2, b = (p & 0x1f) << 3;
+            sum += (77 * r + 150 * g + 29 * b) >> 8;
+            n++;
+        }
+    }
+    return n ? (int)(sum / n) : -1;
 }
 
 esp_err_t board_camera_capture(bool autofocus, uint8_t **jpeg, size_t *len)
@@ -207,6 +309,10 @@ esp_err_t board_camera_capture(bool autofocus, uint8_t **jpeg, size_t *len)
     }
 
     jpeg_encoder_handle_t enc = NULL;
+    latch_exposure();
+#if CONFIG_MIRROR_FACE_AE
+    s_face_steered = face_ae_steering() ? 1 : 0;
+#endif
     jpeg_encode_engine_cfg_t eng = { .timeout_ms = 5000 };
     if (jpeg_new_encoder_engine(&eng, &enc) != ESP_OK) {
         return ESP_FAIL;
@@ -238,9 +344,12 @@ esp_err_t board_camera_capture(bool autofocus, uint8_t **jpeg, size_t *len)
     /* Encode under the lock - tens of milliseconds, so at most a dropped
      * frame. Everything slower happens after it is released. */
     if (xSemaphoreTake(s_frame_lock, pdMS_TO_TICKS(3000)) == pdTRUE) {
+        s_mean_luma = frame_mean_luma();
         ret = jpeg_encoder_process(enc, &cfg, s_frame, s_frame_len, out, alloc, &out_len);
         xSemaphoreGive(s_frame_lock);
     }
+    ESP_LOGI(TAG, "capture: exposure %" PRIi32 " us, gain %.2fx, mean luma %d, face-steered %d",
+             s_exposure_us, s_analog_gain, s_mean_luma, s_face_steered);
     jpeg_del_encoder_engine(enc);
 
     if (ret != ESP_OK) {
@@ -286,18 +395,12 @@ void board_camera_last_size(uint32_t *w, uint32_t *h)
 const char *board_camera_status(void) { return s_status; }
 
 /*
- * Capture provenance, P4 edition: the size and the firmware version, and
- * honest "unknown"s for the rest.
- *
- * The readings the S3 gets by talking to the OV5640 directly are, here, inside
- * the ISP and esp_ipa's closed-loop 3A - exposure and gain are chosen by the
- * IPA and written to the IMX519 behind esp_video's back, and the AF state
- * lives in the AK7375 control loop rather than in a sensor status register.
- * Pulling them out means going through V4L2 controls and esp_ipa's stats
- * structure, which is a piece of work of its own. Reporting zeros in the
- * meantime would be worse than reporting nothing: the server cannot tell a
- * real 0 lux reading from a field this board never filled in, and the upload
- * omits anything left at these values.
+ * Capture provenance, P4 edition: size, quality, and the exposure, gain and
+ * mean luma latched by the last board_camera_capture(), and whether a face was
+ * steering AE/AF when it was taken. The AF state is still
+ * an honest "unknown": it lives in esp_ipa's closed-loop AF on the AK7375
+ * rather than in anything readable, and reporting a made-up value would be
+ * worse than reporting nothing - the upload omits fields left at these values.
  */
 void board_camera_capture_info(board_camera_capture_info_t *out)
 {
@@ -310,13 +413,38 @@ void board_camera_capture_info(board_camera_capture_info_t *out)
         .width = s_w,
         .height = s_h,
         .jpeg_quality = CONFIG_MIRROR_JPEG_QUALITY,
-        .exposure_us = -1,
-        .analog_gain = -1.0f,
-        .mean_luma = -1,
+        .exposure_us = s_exposure_us,
+        .analog_gain = s_analog_gain,
+        .mean_luma = s_mean_luma,
         .af_state = "unknown",
         .focus_score = -1,
         .flash = false,
+        .face_steered = s_face_steered,
     };
+}
+
+int board_camera_face_stats(char *out, size_t cap)
+{
+#if CONFIG_MIRROR_FACE_AE
+    return face_ae_stats(out, cap);
+#else
+    (void)out;
+    (void)cap;
+    return 0;
+#endif
+}
+
+esp_err_t board_camera_face_test(const uint8_t *jpeg, size_t len, bool steer, char *out, size_t cap)
+{
+#if CONFIG_MIRROR_FACE_AE
+    return face_ae_test_jpeg(jpeg, len, steer, out, cap);
+#else
+    (void)jpeg;
+    (void)len;
+    (void)steer;
+    snprintf(out, cap, "face detection is not built in (CONFIG_MIRROR_FACE_AE)\n");
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
 }
 
 /* ---- RGB LED on three LEDC PWM channels -------------------------------- */

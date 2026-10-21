@@ -77,6 +77,15 @@ uint32_t mirror_spool_count(void);
 /** True while an upload is actually on the wire. */
 bool mirror_spool_uploading(void);
 
+/**
+ * esp_timer time of the first of an unbroken run of upload attempts that got
+ * no HTTP response at all - the server was never reached - or 0 if the last
+ * attempt reached it, or nothing is queued. An HTTP error (401, 5xx...) is not
+ * "unreachable": the network delivered it. mirror_link uses this to tell a
+ * dead co-processor link from a server that is merely saying no.
+ */
+int64_t mirror_spool_unreachable_since_us(void);
+
 /** Append the spool's `key=value` lines to a /stats buffer. Returns bytes written. */
 int mirror_spool_stats(char *buf, size_t cap);
 

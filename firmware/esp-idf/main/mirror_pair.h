@@ -7,7 +7,12 @@
  *
  *   transport      BLE (NimBLE here). The phone scans Bluetooth and shows the
  *                  device in a list; nobody has to join a Wi-Fi network to set
- *                  a camera up
+ *                  a camera up. A board without a Bluetooth radio (the P4)
+ *                  runs the same protocol over SoftAP instead: the endpoints
+ *                  are served on the setup network, the person joins it in
+ *                  Settings with CONFIG_MIRROR_AP_PASSWORD, and the app is
+ *                  told its address (10.10.0.1) through the WifiBaseUrl
+ *                  Info.plist key
  *   device name    "mirror-<last 3 MAC bytes>" - the app scans for the
  *                  "mirror-" prefix, so the case matters
  *   service UUID   the provisioning default, 0000ffff-0000-1000-8000-
@@ -47,6 +52,7 @@
 
 #include <stdbool.h>
 #include "esp_err.h"
+#include "esp_http_server.h"
 
 #include "mirror_ring.h"
 
@@ -60,6 +66,12 @@ typedef enum {
     MIRROR_PAIR_AWAITING_CONFIRM, /* payload received; waiting for the press */
     MIRROR_PAIR_CLAIMING,       /* pressed; talking to the server */
 } mirror_pair_state_t;
+
+/**
+ * The admin server. Over SoftAP the provisioning endpoints are registered on
+ * it, so it must be set before mirror_pair_start(); over BLE it is unused.
+ */
+void mirror_pair_set_http_server(httpd_handle_t server);
 
 /** True when a device token is stored, i.e. a household owns this device. */
 bool mirror_pair_claimed(void);

@@ -7,7 +7,7 @@
  *
  * Start-up order is deliberate:
  *   log ring -> settings -> LED -> camera -> network -> server -> mDNS
- *   -> upload spool -> button
+ *   -> upload spool -> link watchdog -> button
  * The LED comes up early so a failure has somewhere to show itself; the camera
  * comes up before the network so the ISP's AE/AWB/AF convergence, which takes
  * a few seconds of frames, overlaps the Wi-Fi association instead of following
@@ -16,7 +16,8 @@
  *
  * Nothing here calls esp_restart() on a failure. A camera that did not answer
  * still has to serve /config, because /config is how someone fixes the thing
- * that is wrong.
+ * that is wrong. The one exception is mirror_link on the P4. There a dead
+ * SDIO link to the C6 takes /config down too, so a restart is the only way back.
  */
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -31,7 +32,9 @@
 #include "mirror_press.h"
 #include "mirror_ring.h"
 #include "mirror_spool.h"
+#include "mirror_link.h"
 #include "mirror_log.h"
+#include "mirror_serial.h"
 
 static const char *TAG = "mirror";
 
@@ -63,6 +66,7 @@ void app_main(void)
 
     if (board_led_init() == ESP_OK) {
         mirror_ring_start();
+        mirror_serial_start();
     }
     mirror_ring_set(RING_BLUE_SLOW_PULSE);   /* joining */
 
@@ -85,6 +89,7 @@ void app_main(void)
         mirror_ring_set(RING_SOLID_RED);
         return;
     }
+    mirror_pair_set_http_server(server);
 
     mirror_mdns_start(&(mirror_mdns_info_t){
         .board = board_id(),
@@ -99,11 +104,18 @@ void app_main(void)
         ESP_LOGE(TAG, "no upload spool - a failed upload will lose the photo");
     }
 
+    /* After the spool, which it watches. On the P4 this is what notices the
+     * C6 going quiet and restarts the board. */
+    if (mirror_link_start() != ESP_OK) {
+        ESP_LOGE(TAG, "co-processor link watchdog did not start");
+    }
+
     mirror_press_start();
 
     /* Pairing last, and only when it is wanted: an unclaimed device, or one
      * whose button asked for it before the last restart. It raises the BLE
-     * service the app's "Add a mirror" flow scans for, and owns the ring while
+     * (or, on a board without Bluetooth, SoftAP) provisioning service the
+     * app's "Add a mirror" flow talks to, and owns the ring while
      * it runs. Everything above stays up underneath it, so a device that is
      * mid-pairing still answers /config and /snapshot.jpg. */
     if (mirror_pair_wanted_at_boot()) {

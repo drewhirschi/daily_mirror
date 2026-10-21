@@ -33,8 +33,8 @@ the earlier 180 x 180 x 73 mm enclosure concept.
 | Camera mounts | Four 9 mm raised posts on the front panel; 21 x 12.5 mm hole centers; 1.6 mm pilots |
 | Front openings | 18 mm lens, 5.2 mm status LED, 12.2 mm button |
 | Power | One 14 mm bottom cable passage, internal zip-tie saddles; no exposed USB/Ethernet/HDMI ports |
-| Rail | Two 208 mm sections, 416 mm assembled; 80 mm wide, 12 mm maximum wall depth |
-| Rail joint | 6 mm rear alignment tongue; each section independently screws to the wall |
+| Rail | Identical 208 mm sections, chain as many as you like (2 = 416 mm, 300 mm travel; each extra section adds 208 mm); 80 mm wide, 12 mm maximum wall depth |
+| Rail joint | Separate 16 x 24 x 2 mm `RailKey` drops into rear pockets on both sections; each section independently screws to the wall |
 | Carriage | 60 x 100 mm, captive dovetail, 0.4 mm horizontal side and top allowances |
 | Adjustment | 300 mm continuous travel between separately installed end stops |
 | Lock | M4 thumb screw, captive nut, 8 mm rubber/TPU brake pad; knob accessible below the box |
@@ -47,7 +47,13 @@ that reaches both travel limits without tugging on the plug.
 
 This design assumes a **new printed rail**, not compatibility with a purchased
 rail. It uses wall screws, not adhesive strips. Each rail section must be fixed
-to the wall; the small tongue aligns the joint and does not carry the wall load.
+to the wall; the key aligns the joint and does not carry the wall load.
+
+**Longer rail:** every `RailSection` is the same part, with a key pocket and
+end-stop pilots at both ends. For N sections print N `RailSection` and N-1
+`RailKey`; the two stops go on the outer ends. Set `rail_sections` in
+`dimensions.json` and rebuild to see the assembly and run the travel checks
+for that length (verified for 2 and 4).
 
 ## Files and slicer basics
 
@@ -75,7 +81,7 @@ Do not send STEP/FCStd files directly to the printer.
 
 ## Print these small pieces first
 
-1. `RailFitMale.stl` and `RailFitFemale.stl`: matching short sections of the
+1. `RailFitMale.stl` and `RailFitFemale.stl` (plus two `RailJointFit` and one `RailKey` to try the joint): matching short sections of the
    exact dovetail. They should slide by hand without being forced and without
    excessive rocking. Remove elephant's foot first. Change `rail_clearance`
    in 0.1 mm increments and rebuild if needed; do not globally scale the parts.
@@ -93,8 +99,8 @@ Do not send STEP/FCStd files directly to the printer.
 | --- | --- | --- | --- |
 | Housing | 1 | Flat rear on bed, cavity up | Vents bridge 3 mm; tie saddles bridge 3 mm |
 | FrontPanel | 1 | Exterior face on bed, camera posts up | Keep lens hole and posts clean |
-| RailLower | 1 | Flat back on bed | 80 x 214 mm footprint including alignment tongue |
-| RailUpper | 1 | Flat back on bed | 80 x 208 mm; small rear key pocket bridges 16.5 mm |
+| RailSection | 2 (or N) | Flat back on bed | 80 x 208 mm; rear key pockets at both ends bridge 16.5 mm |
+| RailKey | 1 (or N-1) | Flat | One per joint |
 | Carriage | 1 | Standing on short end | 60 x 18.6 mm footprint, 100 mm tall; use brim |
 | StopLower / StopUpper | 1 each | Standing on short end | These are separately installed pieces |
 | LockKnob | 1 | Flat back on bed, hex pocket up | Captures M4 hex-head screw |
@@ -133,7 +139,7 @@ intended for thread-forming screws for plastic; do not force unsuitable screws.
 | M4 x 16 hex-head machine screw | 1 | Thumb lock; nominal 7 mm across-flats head |
 | M4 hex nut | 1 | Captive carriage nut, nominal 7 mm across flats x 3.2 mm thick |
 | Rubber/TPU disc, 8 mm diameter x 1.5 mm | 1 | Brake contact pad; may use BrakePad STL |
-| Wall screws and suitable anchors | 8 | Rail holes are 4.5 mm; heads must be <=8 mm diameter |
+| Wall screws and suitable anchors | 4 per section | Rail holes are 4.5 mm; heads must be <=8 mm diameter |
 | Small zip ties | 2 | Internal power cable restraint |
 | 5 mm LED + wiring, 12 mm panel button | 1 each | Placeholder control sizes; choose exact parts before full panel print |
 
@@ -165,9 +171,9 @@ a 3 mm panel and its internal body/nut must fit within the 18 mm diameter,
    relaxed service bend. No repeated ribbon flex is needed during rail motion.
    Support the lid when opening it: it carries the camera and is tethered by the
    ribbon. Use the four M3 x 12 screws to close the panel.
-7. Align the two rail sections vertically on a flat mounting surface with the
-   tongue engaged. **Use the carriage straddling the joint as an alignment gauge**
-   before final tightening. Fix both sections with the eight wall screws. Keep
+7. Align the rail sections vertically on a flat mounting surface with the
+   key seated in both pockets. **Use the carriage straddling the joint as an alignment gauge**
+   before final tightening. Fix every section with its four wall screws. Keep
    the screw heads outside the carriage path; the model allows <=8 mm heads.
 8. Fit the lower stop. Slide the carriage onto the rail from the open upper end,
    then screw on the upper stop. The separate stops make insertion and servicing

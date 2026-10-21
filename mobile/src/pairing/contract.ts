@@ -52,8 +52,35 @@ export const DEVICE_PREFIX = "mirror-";
 export const PROVISIONING_USERNAME = "mirror";
 export const PROVISIONING_POP = "daily-mirror";
 
+/**
+ * The WPA2 password of a camera's own setup network, CONFIG_MIRROR_AP_PASSWORD
+ * in the firmware. Like the proof of possession it is not a secret; it only
+ * has to match. Used when a camera without Bluetooth (the ESP32-P4) is paired
+ * over SoftAP: the person joins that network in Settings with it, so the app
+ * shows it on the join step. The address the app then
+ * talks to, 10.10.0.1, is the `WifiBaseUrl` Info.plist key in app.config.ts.
+ */
+export const SOFTAP_PASSWORD = "dailymirror";
+
 /** The device waits this long for the confirming button press. */
 export const CONFIRM_WINDOW_MS = 30_000;
+
+/**
+ * SoftAP only: how long the camera tries to join the home Wi-Fi after the
+ * credentials before it reports the join as failed and keeps its own network
+ * up. Once it has an address on the home Wi-Fi it closes its network and the
+ * 30 s button window starts.
+ */
+export const SOFTAP_JOIN_TIMEOUT_MS = 20_000;
+
+/**
+ * The hex suffix of a camera's advertised name (`mirror-04807c` -> `04807c`),
+ * which is the tail of its device_id. Null for a name without one.
+ */
+export function deviceIdSuffix(name: string): string | null {
+  const match = /^mirror-([0-9a-f]{4,12})$/i.exec(name);
+  return match ? match[1].toLowerCase() : null;
+}
 
 export function isProvisioningResult(
   value: unknown,

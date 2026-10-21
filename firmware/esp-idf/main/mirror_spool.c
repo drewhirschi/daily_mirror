@@ -123,6 +123,7 @@ static int64_t  s_next_retry_us;      /* esp_timer value, 0 = now */
 static uint32_t s_backoff_ms;
 static char     s_last_meta[384];
 static uint32_t s_failed_seq;         /* the entry the red triple was last shown for */
+static int64_t  s_unreachable_since_us; /* first of a run of no-response failures, 0 = none */
 
 static SemaphoreHandle_t s_lock;      /* guards the filesystem and the counters */
 static TaskHandle_t s_task;
@@ -354,6 +355,12 @@ static int build_meta(char *out, size_t cap, mirror_trigger_t trigger)
     }
     if (board_flash_available()) {
         n += snprintf(out + n, cap - n, ",\"flash\":%s", info.flash ? "true" : "false");
+    }
+    /* Not in the server's capture schema yet, which ignores fields it does
+     * not know (see upload_flow.rs): it is here so the photo's own record says
+     * whether a face set its exposure and focus. */
+    if (info.face_steered >= 0) {
+        n += snprintf(out + n, cap - n, ",\"face_steered\":%s", info.face_steered ? "true" : "false");
     }
     n += snprintf(out + n, cap - n, ",\"trigger\":\"%s\",\"capture_source\":\"device\"}",
                   mirror_trigger_name(trigger));
@@ -737,6 +744,15 @@ static bool drain_one(void)
 
     s_last_http_status = status;
 
+    /* Any HTTP status at all means the server was reached, so the link is
+     * fine whatever the answer was. Only a run of attempts that got no
+     * response counts towards mirror_link's watchdog. */
+    if (err == ESP_OK || status != 0) {
+        s_unreachable_since_us = 0;
+    } else if (!s_unreachable_since_us) {
+        s_unreachable_since_us = t0;
+    }
+
     if (err == ESP_OK) {
         s_uploads_ok++;
         s_failed_seq = 0;
@@ -918,6 +934,12 @@ esp_err_t mirror_spool_start(void)
 
 uint32_t mirror_spool_count(void)  { return s_count; }
 bool mirror_spool_uploading(void)  { return s_uploading; }
+
+int64_t mirror_spool_unreachable_since_us(void)
+{
+    /* An empty queue has nothing it is failing to deliver. */
+    return s_count ? s_unreachable_since_us : 0;
+}
 
 int mirror_spool_stats(char *buf, size_t cap)
 {

@@ -35,6 +35,9 @@
 static volatile ring_pattern_t s_pattern = RING_OFF;   /* the BASE layer */
 static volatile uint32_t s_epoch;   /* bumped on every set, to restart animations */
 static volatile uint8_t s_fill_percent;
+/* A fixed colour from /debug/led, packed 0xRRGGBB, that paints over every
+ * layer until cleared; -1 when off. For checking the LED wiring. */
+static volatile int32_t s_test = -1;
 
 /* The layers above BASE. RING_OFF here means "nothing to say", not "go dark" -
  * a layer that wants darkness simply does not claim the ring. */
@@ -196,7 +199,13 @@ static void ring_task(void *arg)
             epoch = s_epoch;
             t = 0;
         }
-        render(shown, t++);
+        int32_t test = s_test;
+        if (test >= 0) {
+            board_led_set_rgb(test >> 16, (test >> 8) & 0xff, test & 0xff);
+        } else {
+            render(shown, t);
+        }
+        t++;
         vTaskDelay(pdMS_TO_TICKS(TICK_MS));
     }
 }
@@ -277,4 +286,14 @@ void mirror_ring_fill(uint8_t percent)
      * poll, and bumping the epoch each time would hold every animation at
      * t = 0 for as long as the button is held. */
     s_pattern = RING_AMBER_FILL;
+}
+
+void mirror_ring_test_color(int r, int g, int b)
+{
+    if (r < 0 || g < 0 || b < 0) {
+        s_test = -1;
+        s_epoch++;
+        return;
+    }
+    s_test = ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
 }

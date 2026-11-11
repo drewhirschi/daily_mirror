@@ -1,0 +1,58 @@
+[
+  {
+    "name": "Tray",
+    "kind": "part",
+    "solid_count": 1,
+    "valid": true,
+    "closed_mesh": true,
+    "volume_mm3": 54277.983,
+    "print_size_mm": [
+      76.6,
+      124.36,
+      34.5
+    ],
+    "note": "Print back face on the bed, no supports (windows bridge 13.5 mm). Pi: four M2.5 x 6 thread-forming screws. Lid: six M3 x 10 thread-forming screws into the ears."
+  },
+  {
+    "name": "Lid",
+    "kind": "part",
+    "solid_count": 1,
+    "valid": true,
+    "closed_mesh": true,
+    "volume_mm3": 21208.202,
+    "print_size_mm": [
+      76.6,
+      124.36,
+      7.8
+    ],
+    "note": "Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws."
+  },
+  {
+    "name": "PiFitCoupon",
+    "kind": "coupon",
+    "solid_count": 1,
+    "valid": true,
+    "closed_mesh": true,
+    "volume_mm3": 14653.574,
+    "print_size_mm": [
+      76.6,
+      73.0,
+      15.0
+    ],
+    "note": "Bottom 15 mm of the Tray up to the upper Pi posts: hole pattern, USB-C and HDMI windows, microSD slot."
+  },
+  {
+    "name": "LidFitCoupon",
+    "kind": "coupon",
+    "solid_count": 1,
+    "valid": true,
+    "closed_mesh": true,
+    "volume_mm3": 5050.003,
+    "print_size_mm": [
+      76.599,
+      31.36,
+      7.8
+    ],
+    "note": "Camera end of the Lid: camera posts, lens bore and collar, button hole."
+  }
+]

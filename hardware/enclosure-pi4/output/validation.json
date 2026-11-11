@@ -1,0 +1,579 @@
+{
+  "status": "CAD validated; physical fit untested",
+  "freecad": [
+    "1",
+    "1",
+    "4"
+  ],
+  "units": "mm",
+  "layout": {
+    "outer_mm": [
+      65.0,
+      124.36,
+      37.0
+    ],
+    "outer_with_ears_mm": [
+      76.6,
+      124.36,
+      37.0
+    ],
+    "rim_z": 34.5,
+    "inner_mm": [
+      60.0,
+      119.36,
+      32.0
+    ],
+    "pi_origin": [
+      59.5,
+      4.0,
+      8.0
+    ],
+    "pi_holes": [
+      [
+        56.0,
+        7.5
+      ],
+      [
+        56.0,
+        65.5
+      ],
+      [
+        7.0,
+        7.5
+      ],
+      [
+        7.0,
+        65.5
+      ]
+    ],
+    "pi_end_y": 92.0,
+    "headroom_over_pcb": 26.5,
+    "headroom_over_usb": 10.5,
+    "usb_c_centre": [
+      65.0,
+      15.2,
+      9.6
+    ],
+    "hdmi_centres": [
+      [
+        65.0,
+        30.0,
+        9.5
+      ],
+      [
+        65.0,
+        43.5,
+        9.5
+      ]
+    ],
+    "sd_slot_centre": [
+      31.5,
+      0,
+      5.2
+    ],
+    "camera_centre_x": 48.0,
+    "camera_board_y": [
+      96.0,
+      119.86
+    ],
+    "camera_pcb_z": [
+      27.53,
+      29.2
+    ],
+    "camera_holes": [
+      [
+        37.5,
+        117.86
+      ],
+      [
+        37.5,
+        105.36
+      ],
+      [
+        58.5,
+        117.86
+      ],
+      [
+        58.5,
+        105.36
+      ]
+    ],
+    "camera_post_height": 5.3,
+    "lens_centre": [
+      48.0,
+      105.75
+    ],
+    "lens_barrel_top_z": 35.2,
+    "lens_recess_below_face": 1.8,
+    "button_centre": [
+      18.5,
+      105.75
+    ],
+    "button_tip_z": 4.0,
+    "button_room_behind_tips": 3.0,
+    "fpc": {
+      "length": 149.98,
+      "bend_radius": 3.5,
+      "lower_run_z": 19.03,
+      "upper_run_z": 26.03,
+      "fold_back_to_y": 5.762,
+      "fold_back_to_px": 1.762,
+      "min_length": 67.5,
+      "max_length": 154.5,
+      "path_yz": [
+        [
+          50.5,
+          9.5
+        ],
+        [
+          50.5,
+          19.03
+        ],
+        [
+          5.762,
+          19.03
+        ],
+        [
+          5.762,
+          26.03
+        ],
+        [
+          99.0,
+          26.03
+        ]
+      ]
+    },
+    "ears": [
+      [
+        -1.8,
+        4.0
+      ],
+      [
+        -1.8,
+        70.62
+      ],
+      [
+        -1.8,
+        118.86
+      ],
+      [
+        66.8,
+        4.0
+      ],
+      [
+        66.8,
+        70.62
+      ],
+      [
+        66.8,
+        118.86
+      ]
+    ],
+    "section_x": 48.0
+  },
+  "checks": [
+    {
+      "name": "Tray / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiPCB / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiPCB / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiPorts / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiPorts / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiHeaders / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiHeaders / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiChips / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiChips / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiSDCard / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiSDCard / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiUndersideAllowance / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiUndersideAllowance / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "GPIOJumperAllowance / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "GPIOJumperAllowance / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PowerPlugAllowance / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PowerPlugAllowance / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "HDMIPlugAllowance / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "HDMIPlugAllowance / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraPCB / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraPCB / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraLens / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraLens / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraFrontParts / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraFrontParts / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraConnector / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraConnector / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraPCB / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraPCB / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraPCB / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraPCB / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraPCB / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraLens / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraLens / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraLens / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraLens / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraLens / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraFrontParts / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraFrontParts / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraFrontParts / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraFrontParts / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraFrontParts / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraConnector / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraConnector / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraConnector / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraConnector / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraConnector / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / CameraPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / CameraLens",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / CameraFrontParts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / CameraPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / CameraLens",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / CameraFrontParts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / CameraConnector",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Button / CSIRibbon",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / GPIO, DSI, PoE",
+      "overlap_mm3": 0.0,
+      "passed": true
+    }
+  ],
+  "parts": [
+    {
+      "name": "Tray",
+      "kind": "part",
+      "solid_count": 1,
+      "valid": true,
+      "closed_mesh": true,
+      "volume_mm3": 54277.983,
+      "print_size_mm": [
+        76.6,
+        124.36,
+        34.5
+      ],
+      "note": "Print back face on the bed, no supports (windows bridge 13.5 mm). Pi: four M2.5 x 6 thread-forming screws. Lid: six M3 x 10 thread-forming screws into the ears."
+    },
+    {
+      "name": "Lid",
+      "kind": "part",
+      "solid_count": 1,
+      "valid": true,
+      "closed_mesh": true,
+      "volume_mm3": 21208.202,
+      "print_size_mm": [
+        76.6,
+        124.36,
+        7.8
+      ],
+      "note": "Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws."
+    },
+    {
+      "name": "PiFitCoupon",
+      "kind": "coupon",
+      "solid_count": 1,
+      "valid": true,
+      "closed_mesh": true,
+      "volume_mm3": 14653.574,
+      "print_size_mm": [
+        76.6,
+        73.0,
+        15.0
+      ],
+      "note": "Bottom 15 mm of the Tray up to the upper Pi posts: hole pattern, USB-C and HDMI windows, microSD slot."
+    },
+    {
+      "name": "LidFitCoupon",
+      "kind": "coupon",
+      "solid_count": 1,
+      "valid": true,
+      "closed_mesh": true,
+      "volume_mm3": 5050.003,
+      "print_size_mm": [
+        76.599,
+        31.36,
+        7.8
+      ],
+      "note": "Camera end of the Lid: camera posts, lens bore and collar, button hole."
+    }
+  ]
+}

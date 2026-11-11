@@ -32,3 +32,9 @@ hardware/**/*.kicad_prl
 hardware/**/fp-info-cache
 hardware/**/__pycache__/
 outputs/
+hardware/**/sliced/
+# The Pi 4 enclosure keeps its printable files and renders in git.
+!hardware/enclosure-pi4/output/
+hardware/enclosure-pi4/output/scene.json
+hardware/enclosure-pi4/output/*.FCStd
+hardware/enclosure-pi4/output/*.FCBak

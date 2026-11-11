@@ -73,9 +73,9 @@ PI = ['PiPCB', 'PiPorts', 'PiHeaders', 'PiChips', 'PiSDCard']
 CAM = ['CameraPCB', 'CameraLens', 'CameraFrontParts', 'CameraConnector']
 w, l, h = lay['outer_mm']
 head = 'DAILY MIRROR  /  Raspberry Pi 4 tray + lid'
-sub = (f'{w:g} x {l:g} x {h:g} mm  /  Pi 4 Model B, Arducam IMX519 behind the lid, Adafruit #5236 button  /  '
+sub = (f'{w:g} x {l:g} x {h:g} mm  /  Pi 4 Model B, Arducam IMX519 behind the lid, 12 mm tactile switch + 3 mm LED  /  '
        f'{lay["fpc"]["length"]:.0f} mm ribbon, {lay["fpc"]["bend_radius"]:g} mm bends')
-foot = 'Rendered from the exported CAD geometry. The Pi, camera, ribbon and button are dimensioned stand-ins.'
+foot = 'Rendered from the exported CAD geometry. The Pi, camera, ribbon, switch and LED are dimensioned stand-ins.'
 
 def sheet(filename, panels, size=(16, 9)):
     fig = plt.figure(figsize=size, facecolor=bg)
@@ -91,17 +91,19 @@ def sheet(filename, panels, size=(16, 9)):
     fig.savefig(OUT / filename, dpi=120, facecolor=bg)
     plt.close(fig)
 
-closed = at(['Tray', 'Lid', 'Button', 'CameraLens'])
-inside = at(['Tray', 'CSIRibbon'] + PI + CAM + ['Button'])
-cutaway = at(['Tray', 'Lid', 'CSIRibbon', 'Button'] + PI + CAM, cut=True)
+BTN = ['ButtonCap', 'ButtonCarrier', 'Switch', 'StatusLED']
+closed = at(['Tray', 'Lid', 'ButtonCap', 'StatusLED', 'CameraLens'])
+inside = at(['Tray', 'CSIRibbon'] + PI + CAM + BTN)
+cutaway = at(['Tray', 'Lid', 'CSIRibbon'] + BTN + PI + CAM, cut=True)
 exploded = (at(['Tray'] + PI) + at(['CSIRibbon'], (0, 0, 12)) +
-            at(['Lid', 'Button'] + CAM, (0, 0, 55)))
+            at(['Lid', 'StatusLED'] + CAM, (0, 0, 55)) + at(['Switch', 'ButtonCarrier'], (0, 0, 40)) +
+            at(['ButtonCap'], (0, 0, 70)))
 sheet('exterior.png', [('01   FRONT, PORT SIDE', closed, 35, -55), ('02   FRONT, VENT SIDE', closed, 35, -125),
                        ('03   BACK AND microSD END', closed, -35, -60)])
 sheet('cutaway.png', [('SECTION ON THE RIBBON / LENS CENTRELINE', cutaway, 12, 0),
                       ('SAME SECTION, FROM ABOVE', cutaway, 40, -25)])
 sheet('exploded.png', [('EXPLODED', exploded, 25, -55), ('LID OFF', inside, 50, -55),
-                       ('LID UNDERSIDE', at(['Lid'] + CAM), -50, -120)])
+                       ('LID UNDERSIDE', at(['Lid'] + CAM + BTN), -50, -120)])
 sheet('lid-off.png', [('LID OFF, PORT SIDE', inside, 40, -40), ('LID OFF, GPIO SIDE', inside, 40, -140)])
 sheet('enclosure-preview.png', [('01   ASSEMBLED', closed, 35, -55), ('02   SECTION', cutaway, 20, -15),
                                 ('03   LID OFF', inside, 50, -55)])

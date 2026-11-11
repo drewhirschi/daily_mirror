@@ -109,8 +109,28 @@
       18.5,
       105.75
     ],
-    "button_tip_z": 4.0,
-    "button_room_behind_tips": 3.0,
+    "switch_seat_z": 26.4,
+    "switch_post_height": 8.1,
+    "switch_posts": [
+      [
+        18.5,
+        96.25
+      ],
+      [
+        18.5,
+        115.25
+      ]
+    ],
+    "switch_depth_behind_lid": 11.6,
+    "switch_depth_behind_lid_face": 14.1,
+    "cap_proud": 1.2,
+    "cap_rest_gap": 0.3,
+    "led_centre": [
+      30.5,
+      105.75
+    ],
+    "led_collar_height": 1.2,
+    "led_depth_behind_lid": 6.2,
     "fpc": {
       "length": 149.98,
       "bend_radius": 3.5,
@@ -318,12 +338,22 @@
       "passed": true
     },
     {
-      "name": "Button / Tray",
+      "name": "Switch / Tray",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / Lid",
+      "name": "Switch / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / Lid",
       "overlap_mm3": 0.0,
       "passed": true
     },
@@ -348,27 +378,102 @@
       "passed": true
     },
     {
-      "name": "Button / PiPCB",
+      "name": "Switch / PiPCB",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / PiPorts",
+      "name": "Switch / PiPorts",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / PiHeaders",
+      "name": "Switch / PiHeaders",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / PiChips",
+      "name": "Switch / PiChips",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / GPIOJumperAllowance",
+      "name": "Switch / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / GPIOJumperAllowance",
       "overlap_mm3": 0.0,
       "passed": true
     },
@@ -488,27 +593,152 @@
       "passed": true
     },
     {
-      "name": "Button / CameraPCB",
+      "name": "Switch / CameraPCB",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / CameraLens",
+      "name": "Switch / CameraLens",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / CameraFrontParts",
+      "name": "Switch / CameraFrontParts",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / CameraConnector",
+      "name": "Switch / CameraConnector",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / CSIRibbon",
+      "name": "Switch / CSIRibbon",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / CameraPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / CameraLens",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / CameraFrontParts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / CameraConnector",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / CSIRibbon",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / CameraPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / CameraLens",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / CameraFrontParts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / CameraConnector",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / CSIRibbon",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / CameraPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / CameraLens",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / CameraFrontParts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / CameraConnector",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / CSIRibbon",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / Switch",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / Switch",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / ButtonCarrier",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / Switch",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / ButtonCarrier",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / ButtonCap",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / Lid",
       "overlap_mm3": 0.0,
       "passed": true
     },
@@ -525,7 +755,7 @@
       "solid_count": 1,
       "valid": true,
       "closed_mesh": true,
-      "volume_mm3": 54277.983,
+      "volume_mm3": 54956.567,
       "print_size_mm": [
         76.6,
         124.36,
@@ -539,13 +769,41 @@
       "solid_count": 1,
       "valid": true,
       "closed_mesh": true,
-      "volume_mm3": 21208.202,
+      "volume_mm3": 21940.199,
       "print_size_mm": [
         76.6,
         124.36,
-        7.8
+        10.6
       ],
-      "note": "Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws."
+      "note": "Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws. Switch carrier: two M2 x 6. The LED pushes into its collar from inside."
+    },
+    {
+      "name": "ButtonCap",
+      "kind": "part",
+      "solid_count": 1,
+      "valid": true,
+      "closed_mesh": true,
+      "volume_mm3": 509.507,
+      "print_size_mm": [
+        13.495,
+        13.497,
+        5.5
+      ],
+      "note": "Print flange on the bed, no supports. Drop it into the lid hole from inside before the switch goes on."
+    },
+    {
+      "name": "ButtonCarrier",
+      "kind": "part",
+      "solid_count": 1,
+      "valid": true,
+      "closed_mesh": true,
+      "volume_mm3": 621.817,
+      "print_size_mm": [
+        17.0,
+        25.0,
+        1.6
+      ],
+      "note": "Print flat, no supports. Switch terminals go through the four slots; two M2 x 6 screws into the lid posts."
     },
     {
       "name": "PiFitCoupon",
@@ -567,13 +825,13 @@
       "solid_count": 1,
       "valid": true,
       "closed_mesh": true,
-      "volume_mm3": 5050.003,
+      "volume_mm3": 5782.0,
       "print_size_mm": [
         76.599,
         31.36,
-        7.8
+        10.6
       ],
-      "note": "Camera end of the Lid: camera posts, lens bore and collar, button hole."
+      "note": "Camera end of the Lid: camera posts, lens bore and collar, cap hole, switch posts, LED collar."
     }
   ]
 }

@@ -170,13 +170,49 @@
       "passed": true
     },
     {
-      "name": "Button / Tray",
+      "name": "Switch / Tray",
       "kind": "interference",
       "overlap_mm3": 0.0,
       "passed": true
     },
     {
-      "name": "Button / Lid",
+      "name": "Switch / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / Lid",
       "kind": "interference",
       "overlap_mm3": 0.0,
       "passed": true
@@ -211,7 +247,7 @@
     {
       "name": "Pi parts to Lid (lip included)",
       "kind": "gap",
-      "gap_mm": 9.173,
+      "gap_mm": 5.312,
       "required_mm": 1.0,
       "passed": true
     },
@@ -391,9 +427,9 @@
       "passed": true
     },
     {
-      "name": "Ribbon to Button",
+      "name": "Ribbon to switch, carrier and LED",
       "kind": "gap",
-      "gap_mm": 11.358,
+      "gap_mm": 10.508,
       "required_mm": 3.0,
       "passed": true
     },
@@ -412,38 +448,161 @@
       "passed": true
     },
     {
-      "name": "Button to Pi parts",
+      "name": "ButtonCap / Switch",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / Switch",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / ButtonCarrier",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Switch depth behind the lid underside, to the terminal tips (15 max)",
+      "kind": "margin",
+      "value_mm": 3.4,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "LED depth behind the lid underside, leads bent (15 max)",
+      "kind": "margin",
+      "value_mm": 8.8,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Switch, carrier and LED to Pi parts",
       "kind": "gap",
-      "gap_mm": 4.25,
+      "gap_mm": 1.577,
       "required_mm": 1.0,
       "passed": true
     },
     {
-      "name": "Button to camera",
+      "name": "Switch, carrier and LED to camera",
       "kind": "gap",
-      "gap_mm": 5.054,
+      "gap_mm": 3.48,
       "required_mm": 1.0,
       "passed": true
     },
     {
-      "name": "Button terminals to thinned floor",
-      "kind": "margin",
-      "value_mm": 3.0,
-      "required_mm": 2.5,
+      "name": "Switch and carrier to Tray",
+      "kind": "gap",
+      "gap_mm": 3.61,
+      "required_mm": 1.0,
       "passed": true
     },
     {
-      "name": "Button hole over the M19 thread (diametral)",
+      "name": "Cap stem to lid hole (radial)",
+      "kind": "gap",
+      "gap_mm": 0.3,
+      "required_mm": 0.25,
+      "passed": true
+    },
+    {
+      "name": "Cap flange overlaps the lid hole (radial)",
       "kind": "margin",
-      "value_mm": 0.4,
+      "value_mm": 1.45,
+      "required_mm": 1.2,
+      "passed": true
+    },
+    {
+      "name": "Cap stays proud of the lid when pressed",
+      "kind": "margin",
+      "value_mm": 0.9,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "Cap free play at rest (flange to lid)",
+      "kind": "margin",
+      "value_mm": 0.3,
       "required_mm": 0.2,
       "passed": true
     },
     {
-      "name": "Bezel covers the hole (radial)",
+      "name": "Cap flange to the switch (4.3 mm level) beyond the pretravel",
       "kind": "margin",
-      "value_mm": 1.2,
+      "value_mm": 1.7,
       "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Cap socket sits on the plunger (error)",
+      "kind": "alignment",
+      "value_mm": 0.02,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Cap socket over the plunger (radial)",
+      "kind": "margin",
+      "value_mm": 0.3,
+      "required_mm": 0.2,
+      "passed": true
+    },
+    {
+      "name": "Switch body between its posts (per side)",
+      "kind": "margin",
+      "value_mm": 1.3,
+      "required_mm": 0.4,
+      "passed": true
+    },
+    {
+      "name": "Carrier slot over the terminal (smallest side margin)",
+      "kind": "margin",
+      "value_mm": 0.6,
+      "required_mm": 0.3,
+      "passed": true
+    },
+    {
+      "name": "Terminal tails below the carrier, for soldering",
+      "kind": "margin",
+      "value_mm": 1.9,
+      "required_mm": 1.2,
+      "passed": true
+    },
+    {
+      "name": "LED hole over the LED body (diametral)",
+      "kind": "margin",
+      "value_mm": 0.3,
+      "required_mm": 0.1,
+      "passed": true
+    },
+    {
+      "name": "LED window narrower than the LED body (radial)",
+      "kind": "margin",
+      "value_mm": 0.35,
+      "required_mm": 0.2,
+      "passed": true
+    },
+    {
+      "name": "LED dome to the window lip",
+      "kind": "gap",
+      "gap_mm": 0.0,
+      "required_mm": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Carrier hole over the locating boss (diametral)",
+      "kind": "margin",
+      "value_mm": 0.4,
+      "required_mm": 0.3,
+      "passed": true
+    },
+    {
+      "name": "LED tip not proud of the lid face",
+      "kind": "margin",
+      "value_mm": 0.1,
+      "required_mm": 0.0,
       "passed": true
     }
   ],

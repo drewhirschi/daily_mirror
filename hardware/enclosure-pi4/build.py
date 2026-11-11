@@ -1,7 +1,8 @@
 """FreeCADCmd build.py. All dimensions mm; dimensions.json is the single source.
 
 Closed tray + full lid for the Raspberry Pi 4 Model B, an Arducam IMX519 behind
-the lid (lens out through a bore) and an Adafruit #5236 19 mm NeoPixel button.
+the lid (lens out through a bore), and beside it a 12 mm tactile switch under a
+printed cap plus a 3 mm status LED.
 Axes as in enclosure-p4-open: X across, Y along (microSD end at Y=0, camera end
 at Y=L), Z out from the flat back (Z=0). Seen from the front, USB-C and the
 lens are on the right.
@@ -102,8 +103,22 @@ hy = cam_y1 - C['camera_hole_from_far_edge']
 cam_holes = [(cam_x+sx*C['camera_hole_spacing_x']/2, y) for sx in (-1, 1)
              for y in (hy, hy-C['camera_hole_spacing_y'])]
 L = round(cam_y1 + C['camera_end_margin'] + T, 2)
+# Button: a 12 mm tactile switch on a screwed-on carrier under the lid, pressed
+# through the lid by a printed cap whose flange keeps it captive.
 btn_x, btn_y = C['button_x'], lens_y
-btn_tip = H - C['button_length_behind_panel']   # Z of the terminal tips
+cap_top = RIM - C['cap_rest_gap']               # flange top, cap at rest
+cap_bottom = cap_top - C['cap_flange_thickness']
+sw_top = cap_bottom + C['cap_socket_depth']     # plunger top
+sw_seat = sw_top - C['switch_height']           # switch seating plane = carrier top
+sw_tip = sw_seat - C['switch_terminal_length']  # terminal tips
+sw_post_h = RIM - sw_seat
+sw_posts = [(btn_x, btn_y+s*C['switch_post_spacing']/2) for s in (-1, 1)]
+sw_pins = [(btn_x+a*C['switch_terminal_pitch_wide']/2, btn_y+b*C['switch_terminal_pitch_narrow']/2)
+           for a in (-1, 1) for b in (-1, 1)]
+sw_bosses = [(btn_x, btn_y+s*C['switch_boss_spacing']/2) for s in (-1, 1)]
+led_x, led_y = C['led_x'], lens_y
+led_collar_h = round(C['led_height'] - C['led_flange_thickness'] - LT + C['led_tip_recess'], 3)
+led_seat = RIM - led_collar_h                   # the LED's flange stops here
 ear_d, ear_off = C['lid_ear_diameter'], C['lid_ear_offset']
 ear_ys = (C['lid_ear_bottom_y'], round((Y0 + 45.25 + pi_end) / 2, 2), L - C['lid_ear_inset_from_end'])
 ears = [(x, y) for x in (-ear_off, W + ear_off) for y in ear_ys]
@@ -144,10 +159,15 @@ assert fpc_z0 - R > ZP + CSI['h'], 'first ribbon bend starts inside the CSI sock
 assert fpc_z1 > ZP + USB_A[0]['h'] + .8, ('ribbon rubs the USB stack', fpc_z1, ZP + USB_A[0]['h'])
 assert R >= 3.0, 'bend radius below 3 mm'
 assert cam_back - C['camera_connector_height'] > ZP + 2.0, 'camera connector too low'
-assert btn_tip > T - C['button_relief_depth'] + 1.0, ('button terminals hit the back', btn_tip)
-assert C['button_nut_diameter']/2 + .3 < min(btn_x - T - C['lid_lip_clearance'] - C['lid_lip_width'],
-                                             L - T - C['lid_lip_clearance'] - C['lid_lip_width'] - btn_y), 'button nut hits the lid lip'
-assert cam_x - CBW/2 - (btn_x + C['button_nut_diameter']/2) > 1.0, 'button nut hits the camera'
+assert RIM - sw_tip <= 15.0, ('switch reaches more than 15 mm behind the lid', RIM - sw_tip)
+assert cap_bottom - (sw_seat + C['switch_body_height']) > C['switch_travel'] + 1.0, 'cap flange bottoms out on the switch body'
+assert C['cap_proud'] > C['switch_travel'] + .5, 'cap goes below the lid face when pressed'
+assert (C['cap_flange_diameter'] - C['cap_hole'])/2 >= 1.2, 'cap flange too small to stay captive'
+assert C['switch_post_spacing']/2 - C['camera_post_diameter']/2 > max(C['switch_body'], C['cap_flange_diameter'])/2 + .4, 'switch posts too close'
+assert led_x - C['led_collar_diameter']/2 > btn_x + C['carrier_width']/2, 'LED collar hits the switch carrier'
+assert cam_x - CBW/2 - (led_x + C['led_collar_diameter']/2) > 1.0, 'LED hits the camera'
+assert led_collar_h >= 0, 'LED shorter than the lid is thick'
+assert C['led_window'] < C['led_diameter'] - .4, 'LED window too wide to stop the dome'
 assert RIM - (ZP + C['gpio_jumper_height']) > C['lid_lip_depth'], 'GPIO jumpers reach the lid'
 
 # TRAY: flat back on the bed, four Pi posts, three screw ears per side.
@@ -175,8 +195,6 @@ vw, (vz0, vz1) = C['vent_width'], C['vent_z']
 cuts += [box(-1, Y0+px-vw/2, vz0, T+2, vw, vz1-vz0) for px in C['vent_side_px']]
 cuts += [box(x-vw/2, L-T-1, vz0, vw, T+2, vz1-vz0) for x in C['vent_top_x']]
 cuts += [box(x-vw/2, -1, vz0, vw, T+2, vz1-vz0) for x in C['vent_bottom_x']]
-# Thin the floor behind the button so its terminals and wires have room.
-cuts += [cylinder(btn_x, btn_y, T-C['button_relief_depth'], C['button_relief_diameter'], T)]
 tray = add('Tray', subtract(tray, cuts), (.28, .34, .38),
     note='Print back face on the bed, no supports (windows bridge 13.5 mm). Pi: four M2.5 x 6 '
          'thread-forming screws. Lid: six M3 x 10 thread-forming screws into the ears.')
@@ -190,15 +208,36 @@ co, chh = ci + 2*C['camera_collar_wall'], C['camera_collar_height']
 collar = box(cam_x-co/2, lens_y-co/2, RIM-chh, co, co, chh+.01).cut(box(cam_x-ci/2, lens_y-ci/2, RIM-chh-1, ci, ci, chh+1))
 lid = union([roundbox(0, 0, RIM, W, L, LT, r), lip, collar] +
             [cylinder(x, y, RIM, ear_d, LT) for x, y in ears] +
-            [cylinder(x, y, cam_front, C['camera_post_diameter'], cam_post_h+.01) for x, y in cam_holes])
+            [cylinder(x, y, cam_front, C['camera_post_diameter'], cam_post_h+.01) for x, y in cam_holes] +
+            [cylinder(x, y, sw_seat, C['camera_post_diameter'], sw_post_h+.01) for x, y in sw_posts] +
+            ([cylinder(led_x, led_y, led_seat, C['led_collar_diameter'], led_collar_h+.01)] if led_collar_h > 0 else []))
 bore, cham = C['camera_lens_bore'], C['camera_lens_chamfer']
 cuts = [cylinder(x, y, RIM-1, C['lid_screw_clearance'], LT+2) for x, y in ears]
 cuts += [cylinder(x, y, cam_front-.1, C['camera_pilot'], cam_post_h+LT-.8+.1) for x, y in cam_holes]
 cuts += [cylinder(cam_x, lens_y, RIM-.1, bore, LT+.2),
          Part.makeCone(bore/2, bore/2+cham+.01, cham+.01, V(cam_x, lens_y, H-cham)),
-         cylinder(btn_x, btn_y, RIM-1, C['button_hole'], LT+2)]
+         cylinder(btn_x, btn_y, RIM-1, C['cap_hole'], LT+2),
+         cylinder(led_x, led_y, led_seat-1, C['led_hole'], led_collar_h+LT-C['led_window_lip']+1),
+         cylinder(led_x, led_y, RIM, C['led_window'], LT+1)]
+cuts += [cylinder(x, y, sw_seat-.1, C['camera_pilot'], sw_post_h+LT-.8+.1) for x, y in sw_posts]
 lid = add('Lid', subtract(lid, cuts), (.91, .90, .85), flip=True,
-    note='Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws.')
+    note='Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws. '
+         'Switch carrier: two M2 x 6. The LED pushes into its collar from inside.')
+
+# BUTTON CAP: stem through the lid, flange under it, shallow socket over the plunger.
+pl = C['switch_plunger_head'] + 2*C['cap_socket_clearance']
+cap = cylinder(btn_x, btn_y, cap_bottom, C['cap_flange_diameter'], C['cap_flange_thickness']).fuse(
+      cylinder(btn_x, btn_y, cap_top-.01, C['cap_diameter'], H+C['cap_proud']-cap_top+.01))
+cap = add('ButtonCap', subtract(cap, [box(btn_x-pl/2, btn_y-pl/2, cap_bottom-1, pl, pl, C['cap_socket_depth']+1)]), (.91, .90, .85),
+    note='Print flange on the bed, no supports. Drop it into the lid hole from inside before the switch goes on.')
+# SWITCH CARRIER: plate under the switch, screwed to two lid posts; terminals pass through slots.
+cw, cl, ct = C['carrier_width'], C['switch_post_spacing'] + C['carrier_end_margin']*2, C['carrier_thickness']
+sx, sy = C['carrier_slot']
+carrier = roundbox(btn_x-cw/2, btn_y-cl/2, sw_seat-ct, cw, cl, ct, 2.0)
+carrier = add('ButtonCarrier', subtract(carrier, [cylinder(x, y, sw_seat-ct-1, C['carrier_screw_clearance'], ct+2) for x, y in sw_posts] +
+    [box(x-sx/2, y-sy/2, sw_seat-ct-1, sx, sy, ct+2) for x, y in sw_pins] +
+    [cylinder(x, y, sw_seat-ct-1, C['carrier_boss_hole'], ct+2) for x, y in sw_bosses]), (.28, .34, .38),
+    note='Print flat, no supports. Switch terminals go through the four slots; two M2 x 6 screws into the lid posts.')
 
 # REFERENCES -----------------------------------------------------------------
 GREEN, SILVER, BLACK, DARK = (.10, .42, .24), (.72, .73, .74), (.10, .10, .10), (.22, .22, .24)
@@ -261,13 +300,28 @@ wire = Part.makePolygon([V(cam_x-C['fpc_width']/2, y, z) for y, z in loop + loop
 add('CSIRibbon', Part.Face(wire).extrude(V(C['fpc_width'], 0, 0)), (.92, .90, .82), REF,
     note='15-pin 1.0 mm FPC, drawn 0.3 mm thick along its real path.')
 
-bz, bt = C['button_bezel_height'], C['button_thread_diameter']
-button = union([cylinder(btn_x, btn_y, H, C['button_bezel_diameter'], bz),
-                cylinder(btn_x, btn_y, H-26.0, bt, 26.0+.01),
-                cylinder(btn_x, btn_y, RIM-C['button_nut_thickness'], C['button_nut_diameter'], C['button_nut_thickness'], ),
-                box(btn_x-7.0, btn_y-5.5, btn_tip, 14.0, 11.0, 7.0+.01)])
-add('Button', button, (.80, .81, .83), REF,
-    note='Adafruit #5236: 19 mm NeoPixel button, M19 x 1 thread, 33 mm behind the bezel to the blade tips.')
+sb = C['switch_body']
+tw, tt = C['switch_terminal_section']
+ph, pt = C['switch_plunger_head'], C['switch_plunger_head_height']
+switch = union([box(btn_x-sb/2, btn_y-sb/2, sw_seat, sb, sb, C['switch_body_height']),
+                cylinder(btn_x, btn_y, sw_seat+C['switch_body_height']-.01, C['switch_plunger_base_diameter'],
+                         C['switch_plunger_base_height']-C['switch_body_height']+.01),
+                cylinder(btn_x, btn_y, sw_seat+C['switch_plunger_base_height']-.01, 3.0, C['switch_height']-pt-C['switch_plunger_base_height']+.02),
+                box(btn_x-ph/2, btn_y-ph/2, sw_top-pt, ph, ph, pt)] +
+               [box(x-tt/2, y-tw/2, sw_tip, tt, tw, C['switch_terminal_length']+.5) for x, y in sw_pins] +
+               [cylinder(x, y, sw_seat-1.0, C['switch_boss_diameter'], 1.01) for x, y in sw_bosses])
+add('Switch', switch, DARK, REF,
+    note='Omron B3F-4055: 12 x 12 mm tactile switch, 3.8 mm square projected plunger, 7.3 mm tall, four terminals 3.5 mm long. '
+         'Boss length (1 mm) and neck width (3 mm) are not on the drawing.')
+lr = C['led_diameter']/2
+led_tip = led_seat + C['led_height'] - C['led_flange_thickness']
+add('StatusLED', union([cylinder(led_x, led_y, led_seat, C['led_diameter'], led_tip-lr-led_seat+.01),
+                        Part.makeSphere(lr, V(led_x, led_y, led_tip-lr)),
+                        cylinder(led_x, led_y, led_seat-C['led_flange_thickness'], C['led_flange_diameter'], C['led_flange_thickness']+.01)] +
+                       [box(led_x+a*C['led_lead_spacing']/2-.25, led_y-.25, led_seat-C['led_flange_thickness']-C['led_lead_allowance'],
+                            .5, .5, C['led_lead_allowance']+.01) for a in (-1, 1)]), (.25, .75, .35), REF,
+    note='Kingbright WP710A10SGD 3 mm LED pushed into the lid from inside until the dome meets the 2.2 mm window; '
+         'leads bent over within led_lead_allowance. The dome is drawn as a hemisphere; its radius is not on the drawing.')
 
 # COUPONS: slices of the real parts.
 c1 = tray.common(box(-10, -5, 0, W+20, Y0+69+5, ZP+7.0)).cut(box(13, 13, -1, W-26, Y0+47, T+2))
@@ -275,7 +329,7 @@ add('PiFitCoupon', c1, (.28, .34, .38), FIT,
     note='Bottom 15 mm of the Tray up to the upper Pi posts: hole pattern, USB-C and HDMI windows, microSD slot.')
 c2 = lid.common(box(-10, pi_end+1.0, RIM-10, W+20, L, LT+10))
 add('LidFitCoupon', c2, (.91, .90, .85), FIT, flip=True,
-    note='Camera end of the Lid: camera posts, lens bore and collar, button hole.')
+    note='Camera end of the Lid: camera posts, lens bore and collar, cap hole, switch posts, LED collar.')
 
 DOC.recompute()
 
@@ -356,14 +410,22 @@ for n in named:
     clearance(n+' / Lid', named[n], lid)
 pi_names = ('PiPCB', 'PiPorts', 'PiHeaders', 'PiChips', 'GPIOJumperAllowance')
 cam_names = ('CameraPCB', 'CameraLens', 'CameraFrontParts', 'CameraConnector')
-for a in ('CSIRibbon', 'Button') + cam_names:
+for a in ('CSIRibbon', 'Switch', 'StatusLED', 'ButtonCarrier', 'ButtonCap') + cam_names:
     for b in pi_names:
+        named.setdefault('ButtonCarrier', carrier); named.setdefault('ButtonCap', cap)
         if (a, b) != ('CSIRibbon', 'PiHeaders'):           # the ribbon starts inside the CSI socket
             clearance(a+' / '+b, named[a], named[b])
 for b in ('CameraPCB', 'CameraLens', 'CameraFrontParts'):
     clearance('CSIRibbon / '+b, named['CSIRibbon'], named[b])
-for b in cam_names + ('CSIRibbon',):
-    clearance('Button / '+b, named['Button'], named[b])
+for a in ('Switch', 'StatusLED', 'ButtonCarrier', 'ButtonCap'):
+    for b in cam_names + ('CSIRibbon',):
+        clearance(a+' / '+b, named[a], named[b])
+for a, b in (('ButtonCap', 'Switch'), ('ButtonCarrier', 'Switch'), ('ButtonCap', 'ButtonCarrier'), ('StatusLED', 'Switch'),
+             ('StatusLED', 'ButtonCarrier'), ('StatusLED', 'ButtonCap')):
+    clearance(a+' / '+b, named[a], named[b])
+for a in ('ButtonCap', 'ButtonCarrier'):
+    clearance(a+' / Tray', named[a], tray)
+    clearance(a+' / Lid', named[a], lid)
 # The ribbon may only touch the CSI socket itself among the headers.
 others = Part.makeCompound(named['PiHeaders'].Solids[:1] + named['PiHeaders'].Solids[2:])
 clearance('CSIRibbon / GPIO, DSI, PoE', named['CSIRibbon'], others)
@@ -378,8 +440,12 @@ layout = dict(outer_mm=[W, L, H], outer_with_ears_mm=[round(W+2*(ear_off+ear_d/2
               camera_holes=[[round(x, 3), round(y, 3)] for x, y in cam_holes], camera_post_height=cam_post_h,
               lens_centre=[cam_x, round(lens_y, 3)], lens_barrel_top_z=round(lens_top+C['camera_lens_barrel_height'], 3),
               lens_recess_below_face=round(H-lens_top-C['camera_lens_barrel_height'], 3),
-              button_centre=[btn_x, round(btn_y, 3)], button_tip_z=btn_tip,
-              button_room_behind_tips=round(btn_tip-(T-C['button_relief_depth']), 3),
+              button_centre=[btn_x, round(btn_y, 3)], switch_seat_z=round(sw_seat, 3), switch_post_height=round(sw_post_h, 3),
+              switch_posts=[[round(x, 3), round(y, 3)] for x, y in sw_posts],
+              switch_depth_behind_lid=round(RIM-sw_tip, 3), switch_depth_behind_lid_face=round(H-sw_tip, 3),
+              cap_proud=C['cap_proud'], cap_rest_gap=C['cap_rest_gap'],
+              led_centre=[led_x, round(led_y, 3)], led_collar_height=led_collar_h,
+              led_depth_behind_lid=round(led_collar_h+C['led_flange_thickness']+C['led_lead_allowance'], 3),
               fpc=dict(length=round(fpc_len, 2), bend_radius=R, lower_run_z=round(fpc_z0, 3), upper_run_z=round(fpc_z1, 3),
                        fold_back_to_y=round(fpc_yb, 3), fold_back_to_px=round(fpc_yb-Y0, 3),
                        min_length=round(fixed+2*R, 1), max_length=round(fixed+2*(fpc_ys-T-1.0), 1),
@@ -395,5 +461,5 @@ report = dict(status='CAD validated; physical fit untested', freecad=App.Version
 (OUT/'validation.json').write_text(json.dumps(report, indent=2)+'\n')
 print('BUILD_OK', len(parts), 'printable parts;', len(coupons), 'coupons;', len(checks), 'clearance checks')
 print('LAYOUT', json.dumps({k: layout[k] for k in ('outer_mm', 'outer_with_ears_mm', 'inner_mm', 'headroom_over_pcb',
-      'headroom_over_usb', 'lens_centre', 'button_centre', 'button_room_behind_tips', 'fpc')}))
+      'headroom_over_usb', 'lens_centre', 'button_centre', 'switch_depth_behind_lid', 'led_centre', 'led_collar_height', 'fpc')}))
 App.closeDocument(DOC.Name)

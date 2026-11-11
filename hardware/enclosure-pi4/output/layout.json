@@ -101,8 +101,28 @@
     18.5,
     105.75
   ],
-  "button_tip_z": 4.0,
-  "button_room_behind_tips": 3.0,
+  "switch_seat_z": 26.4,
+  "switch_post_height": 8.1,
+  "switch_posts": [
+    [
+      18.5,
+      96.25
+    ],
+    [
+      18.5,
+      115.25
+    ]
+  ],
+  "switch_depth_behind_lid": 11.6,
+  "switch_depth_behind_lid_face": 14.1,
+  "cap_proud": 1.2,
+  "cap_rest_gap": 0.3,
+  "led_centre": [
+    30.5,
+    105.75
+  ],
+  "led_collar_height": 1.2,
+  "led_depth_behind_lid": 6.2,
   "fpc": {
     "length": 149.98,
     "bend_radius": 3.5,

@@ -1,7 +1,7 @@
 """FreeCADCmd verify.py. Reopen the saved CAD, STEP and STL files; check export
 integrity, then measure the fits that matter: Pi ports against their windows,
 Pi parts against the lid, camera against the lid, the ribbon's bends and gaps,
-and the button's depth. Writes output/verify.json.
+and the switch, cap and LED stack under the lid. Writes output/verify.json.
 """
 from pathlib import Path
 import json, math
@@ -50,7 +50,7 @@ def value(name, got, need, kind='margin'):
 
 refs = ['PiPCB', 'PiPorts', 'PiHeaders', 'PiChips', 'PiSDCard', 'PiUndersideAllowance', 'GPIOJumperAllowance',
         'PowerPlugAllowance', 'HDMIPlugAllowance', 'CameraPCB', 'CameraLens', 'CameraFrontParts',
-        'CameraConnector', 'CSIRibbon', 'Button']
+        'CameraConnector', 'CSIRibbon', 'Switch', 'StatusLED', 'ButtonCap', 'ButtonCarrier']
 for n in refs:
     overlap(n + ' / Tray', obj(n), tray)
     overlap(n + ' / Lid', obj(n), lid)
@@ -108,17 +108,43 @@ gap('Ribbon to USB/Ethernet stacks', ribbon, Part.makeCompound(obj('PiPorts').So
 gap('Ribbon to GPIO jumpers', ribbon, obj('GPIOJumperAllowance'), 3.0)
 gap('Ribbon to Lid', ribbon, lid, 1.0)
 gap('Ribbon to Tray', ribbon, tray, 1.0)
-gap('Ribbon to Button', ribbon, obj('Button'), 3.0)
+gap('Ribbon to switch, carrier and LED', ribbon, Part.makeCompound([obj('Switch'), obj('ButtonCarrier'), obj('StatusLED')]), 3.0)
 value('Ribbon fold-back to microSD-end wall', f['fold_back_to_y'] - T, 1.0)
 value('Ribbon first bend starts above the CSI socket', f['lower_run_z'] - f['bend_radius'] - (ZP + 5.5), 0.5)
 
-# Button.
-button = obj('Button')
-gap('Button to Pi parts', button, pi, 1.0)
-gap('Button to camera', button, Part.makeCompound([obj('CameraPCB'), obj('CameraConnector')]), 1.0)
-value('Button terminals to thinned floor', lay['button_room_behind_tips'], 2.5)
-value('Button hole over the M19 thread (diametral)', C['button_hole'] - C['button_thread_diameter'], 0.2)
-value('Bezel covers the hole (radial)', (C['button_bezel_diameter'] - C['button_hole']) / 2, 1.0)
+# Button: tactile switch on its carrier, printed cap through the lid, LED beside it.
+switch, cap, carrier, led = obj('Switch'), obj('ButtonCap'), obj('ButtonCarrier'), obj('StatusLED')
+overlap('ButtonCap / Switch', cap, switch)
+overlap('ButtonCarrier / Switch', carrier, switch)
+overlap('StatusLED / ButtonCarrier', led, carrier)
+stack = Part.makeCompound([switch, carrier, led])
+value('Switch depth behind the lid underside, to the terminal tips (15 max)', 15.0 - lay['switch_depth_behind_lid'], 0)
+value('LED depth behind the lid underside, leads bent (15 max)', 15.0 - lay['led_depth_behind_lid'], 0)
+gap('Switch, carrier and LED to Pi parts', stack, pi, 1.0)
+gap('Switch, carrier and LED to camera', stack, Part.makeCompound([obj('CameraPCB'), obj('CameraConnector')]), 1.0)
+gap('Switch and carrier to Tray', Part.makeCompound([switch, carrier]), tray, 1.0)
+gap('Cap stem to lid hole (radial)', cap, lid, 0.25)
+value('Cap flange overlaps the lid hole (radial)', (C['cap_flange_diameter'] - C['cap_hole']) / 2, 1.2)
+value('Cap stays proud of the lid when pressed', C['cap_proud'] - C['switch_travel'], 0.5)
+value('Cap free play at rest (flange to lid)', C['cap_rest_gap'], 0.2)
+body_top = lay['switch_seat_z'] + C['switch_plunger_base_height']
+value('Cap flange to the switch (4.3 mm level) beyond the pretravel', cap.BoundBox.ZMin - body_top - C['switch_travel'], 1.0)
+value('Cap socket sits on the plunger (error)', 0.02 - abs(switch.BoundBox.ZMax - (cap.BoundBox.ZMin + C['cap_socket_depth'])), 0, 'alignment')
+value('Cap socket over the plunger (radial)', C['cap_socket_clearance'], 0.2)
+for i, (x, y) in enumerate(lay['switch_posts']):
+    probe = Part.makeCylinder(.3, 1, V(x, y, lay['switch_seat_z']))
+    assert lid.common(probe).Volume < 1e-6 and abs(lid.distToShape(probe)[0] - (C['camera_pilot']/2 - .3)) < .05, ('switch post misses', i)
+    hole = Part.makeCylinder(.3, 5, V(x, y, lay['switch_seat_z'] - 3))
+    assert carrier.common(hole).Volume < 1e-6, ('carrier hole misses the post', i)
+value('Switch body between its posts (per side)', C['switch_post_spacing']/2 - C['camera_post_diameter']/2 - C['switch_body']/2, 0.4)
+value('Carrier slot over the terminal (smallest side margin)', min(C['carrier_slot'][0] - C['switch_terminal_section'][1],
+      C['carrier_slot'][1] - C['switch_terminal_section'][0]) / 2, 0.3)
+value('Terminal tails below the carrier, for soldering', C['switch_terminal_length'] - C['carrier_thickness'], 1.2)
+value('LED hole over the LED body (diametral)', C['led_hole'] - C['led_diameter'], 0.1)
+value('LED window narrower than the LED body (radial)', (C['led_diameter'] - C['led_window']) / 2, 0.2)
+gap('LED dome to the window lip', led, lid, 0.0)
+value('Carrier hole over the locating boss (diametral)', C['carrier_boss_hole'] - C['switch_boss_diameter'], 0.3)
+value('LED tip not proud of the lid face', H - (RIM - lay['led_collar_height'] + C['led_height'] - C['led_flange_thickness']), 0.0)
 
 failed = [c for c in checks if not c['passed']]
 notes = dict(outer_mm=lay['outer_mm'], headroom_over_pcb=lay['headroom_over_pcb'], fpc=f,

@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<export version="E">
+  <design>
+    <source>/home/drew/.herdr/worktrees/daily_mirror/enclosure-v2/hardware/pcb-pi4-controls/pi4-controls.kicad_sch</source>
+    <date>2026-11-17T08:28:54</date>
+    <tool>Eeschema 10.0.8</tool>
+    <textvar name="DESIGN_STATUS">DRAFT - NOT ORDER-READY</textvar>
+    <sheet number="1" name="/" tstamps="/">
+      <title_block>
+        <title>Daily Mirror - Pi 4 case control board</title>
+        <company>Daily Mirror</company>
+        <rev>0.4 DRAFT</rev>
+        <date>2026-11-17</date>
+        <source>pi4-controls.kicad_sch</source>
+        <comment number="1" value="Draft for review - not order-ready"/>
+        <comment number="2" value=""/>
+        <comment number="3" value=""/>
+        <comment number="4" value=""/>
+        <comment number="5" value=""/>
+        <comment number="6" value=""/>
+        <comment number="7" value=""/>
+        <comment number="8" value=""/>
+        <comment number="9" value=""/>
+      </title_block>
+    </sheet>
+  </design>
+  <components>
+    <comp ref="D1">
+      <value>EBOOT 5mm RGB common anode</value>
+      <footprint>PiControls:LED_D5.0mm-4_RGB_P2.0mm_Splayed</footprint>
+      <fields>
+        <field name="Footprint">PiControls:LED_D5.0mm-4_RGB_P2.0mm_Splayed</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="PiControls" part="LED_BGAR" description="RGB LED, blue/green/anode/red"/>
+      <property name="Sheetname" value="pi4-controls"/>
+      <property name="Sheetfile" value="pi4-controls.kicad_sch"/>
+      <property name="ki_keywords" value="LED RGB diode"/>
+      <property name="ki_fp_filters" value="LED* LED_SMD:* LED_THT:*"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>cf47960d-e63e-5ce0-b1e6-def61310fb6d</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="4"/>
+            <pin num="2"/>
+            <pin num="1"/>
+            <pin num="3"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="J1">
+      <value>Pi header 1x6</value>
+      <footprint>PiControls:PinHeader_1x06_P2.54mm_Vertical</footprint>
+      <fields>
+        <field name="Footprint">PiControls:PinHeader_1x06_P2.54mm_Vertical</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="PiControls" part="Conn_01x06" description="Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <property name="Sheetname" value="pi4-controls"/>
+      <property name="Sheetfile" value="pi4-controls.kicad_sch"/>
+      <property name="ki_keywords" value="connector"/>
+      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>518edea7-ad3e-5312-a13d-e5d495f3cca6</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+            <pin num="3"/>
+            <pin num="4"/>
+            <pin num="5"/>
+            <pin num="6"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R1">
+      <value>330</value>
+      <footprint>PiControls:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal_Stacked2.8</footprint>
+      <fields>
+        <field name="Footprint">PiControls:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal_Stacked2.8</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="PiControls" part="R" description="Resistor"/>
+      <property name="Sheetname" value="pi4-controls"/>
+      <property name="Sheetfile" value="pi4-controls.kicad_sch"/>
+      <property name="ki_keywords" value="R res resistor"/>
+      <property name="ki_fp_filters" value="R_*"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>65990676-badb-5ed0-b77e-0455eda5e8b1</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R2">
+      <value>330</value>
+      <footprint>PiControls:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal_Stacked2.8</footprint>
+      <fields>
+        <field name="Footprint">PiControls:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal_Stacked2.8</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="PiControls" part="R" description="Resistor"/>
+      <property name="Sheetname" value="pi4-controls"/>
+      <property name="Sheetfile" value="pi4-controls.kicad_sch"/>
+      <property name="ki_keywords" value="R res resistor"/>
+      <property name="ki_fp_filters" value="R_*"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>fc69023b-db00-5f8c-b461-ffca94bd2af5</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R3">
+      <value>330</value>
+      <footprint>PiControls:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal_Stacked2.8</footprint>
+      <fields>
+        <field name="Footprint">PiControls:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal_Stacked2.8</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="PiControls" part="R" description="Resistor"/>
+      <property name="Sheetname" value="pi4-controls"/>
+      <property name="Sheetfile" value="pi4-controls.kicad_sch"/>
+      <property name="ki_keywords" value="R res resistor"/>
+      <property name="ki_fp_filters" value="R_*"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>e48d9e5f-f9d5-554e-b175-abb8189a0381</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="SW1">
+      <value>Omron B3F-4055</value>
+      <footprint>PiControls:SW_Omron_B3F-4055_PCB</footprint>
+      <fields>
+        <field name="Footprint">PiControls:SW_Omron_B3F-4055_PCB</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="PiControls" part="SW_Push" description="Push button switch, generic, two pins"/>
+      <property name="Sheetname" value="pi4-controls"/>
+      <property name="Sheetfile" value="pi4-controls.kicad_sch"/>
+      <property name="ki_keywords" value="switch normally-open pushbutton push-button"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>7fcac9c7-4cda-52f3-9df8-7f5ab232cfaf</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+  </components>
+  <libparts>
+    <libpart lib="PiControls" part="Conn_01x06">
+      <description>Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
+      <footprints>
+        <fp>Connector*:*_1x??_*</fp>
+      </footprints>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">Conn_01x06</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
+      </fields>
+      <pins>
+        <pin num="1" name="Pin_1" type="passive"/>
+        <pin num="2" name="Pin_2" type="passive"/>
+        <pin num="3" name="Pin_3" type="passive"/>
+        <pin num="4" name="Pin_4" type="passive"/>
+        <pin num="5" name="Pin_5" type="passive"/>
+        <pin num="6" name="Pin_6" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="PiControls" part="LED_BGAR">
+      <description>RGB LED, blue/green/anode/red</description>
+      <footprints>
+        <fp>LED*</fp>
+        <fp>LED_SMD:*</fp>
+        <fp>LED_THT:*</fp>
+      </footprints>
+      <fields>
+        <field name="Reference">D</field>
+        <field name="Value">LED_BGAR</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">RGB LED, blue/green/anode/red</field>
+      </fields>
+      <pins>
+        <pin num="1" name="BK" type="passive"/>
+        <pin num="2" name="GK" type="passive"/>
+        <pin num="3" name="A" type="passive"/>
+        <pin num="4" name="RK" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="PiControls" part="R">
+      <description>Resistor</description>
+      <footprints>
+        <fp>R_*</fp>
+      </footprints>
+      <fields>
+        <field name="Reference">R</field>
+        <field name="Value">R</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Resistor</field>
+      </fields>
+      <pins>
+        <pin num="1" name="" type="passive"/>
+        <pin num="2" name="" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="PiControls" part="SW_Push">
+      <description>Push button switch, generic, two pins</description>
+      <fields>
+        <field name="Reference">SW</field>
+        <field name="Value">SW_Push</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Push button switch, generic, two pins</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+  </libparts>
+  <libraries>
+    <library logical="PiControls">
+      <uri>${KIPRJMOD}/libraries/PiControls.kicad_sym</uri>
+    </library>
+  </libraries>
+  <nets>
+    <net code="1" name="+3V3" class="Default">
+      <node ref="D1" pin="3" pinfunction="A_3" pintype="passive"/>
+      <node ref="J1" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+    </net>
+    <net code="2" name="/BTN" class="Default">
+      <node ref="J1" pin="2" pinfunction="Pin_2_2" pintype="passive"/>
+      <node ref="SW1" pin="1" pinfunction="1_1" pintype="passive"/>
+    </net>
+    <net code="3" name="/LED_B" class="Default">
+      <node ref="J1" pin="3" pinfunction="Pin_3_3" pintype="passive"/>
+      <node ref="R1" pin="1" pintype="passive"/>
+    </net>
+    <net code="4" name="/LED_B_K" class="Default">
+      <node ref="D1" pin="1" pinfunction="BK_1" pintype="passive"/>
+      <node ref="R1" pin="2" pintype="passive"/>
+    </net>
+    <net code="5" name="/LED_G" class="Default">
+      <node ref="J1" pin="6" pinfunction="Pin_6_6" pintype="passive"/>
+      <node ref="R2" pin="1" pintype="passive"/>
+    </net>
+    <net code="6" name="/LED_G_K" class="Default">
+      <node ref="D1" pin="2" pinfunction="GK_2" pintype="passive"/>
+      <node ref="R2" pin="2" pintype="passive"/>
+    </net>
+    <net code="7" name="/LED_R" class="Default">
+      <node ref="J1" pin="4" pinfunction="Pin_4_4" pintype="passive"/>
+      <node ref="R3" pin="1" pintype="passive"/>
+    </net>
+    <net code="8" name="/LED_R_K" class="Default">
+      <node ref="D1" pin="4" pinfunction="RK_4" pintype="passive"/>
+      <node ref="R3" pin="2" pintype="passive"/>
+    </net>
+    <net code="9" name="GND" class="Default">
+      <node ref="J1" pin="5" pinfunction="Pin_5_5" pintype="passive"/>
+      <node ref="SW1" pin="2" pinfunction="2_2" pintype="passive"/>
+    </net>
+  </nets>
+</export>

@@ -1,0 +1,1 @@
+(sym_lib_table (version 7) (lib (name "PiControls") (type "KiCad") (uri "${KIPRJMOD}/libraries/PiControls.kicad_sym") (options "") (descr "Vendored KiCad 10.0.6 symbols")))

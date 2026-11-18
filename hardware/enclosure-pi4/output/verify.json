@@ -1,0 +1,898 @@
+{
+  "status": "CAD checks only; physical fit untested",
+  "checks": [
+    {
+      "name": "PiPCB / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiPCB / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiPorts / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiPorts / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiHeaders / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiHeaders / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiChips / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiChips / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiSDCard / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiSDCard / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiUndersideAllowance / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PiUndersideAllowance / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "GPIOJumperAllowance / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "GPIOJumperAllowance / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PowerPlugAllowance / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "PowerPlugAllowance / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "HDMIPlugAllowance / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "HDMIPlugAllowance / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraPCB / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraPCB / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraLens / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraLens / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraFrontParts / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraFrontParts / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraConnector / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CameraConnector / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "CSIRibbon / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Switch / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Switch / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Tray / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Pi drop-in: port side to wall",
+      "kind": "margin",
+      "value_mm": 0.4,
+      "required_mm": 0.3,
+      "passed": true
+    },
+    {
+      "name": "Pi drop-in: GPIO side to wall",
+      "kind": "margin",
+      "value_mm": 1.0,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "Pi drop-in: microSD end to wall",
+      "kind": "margin",
+      "value_mm": 1.5,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "Pi parts to Lid (lip included)",
+      "kind": "gap",
+      "gap_mm": 3.156,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "USB stack top to lid underside",
+      "kind": "margin",
+      "value_mm": 10.5,
+      "required_mm": 2.0,
+      "passed": true
+    },
+    {
+      "name": "GPIO jumpers to Lid",
+      "kind": "gap",
+      "gap_mm": 4.5,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Pi underside (pin tails) to Tray floor and posts",
+      "kind": "gap",
+      "gap_mm": 0.25,
+      "required_mm": 0.0,
+      "passed": true
+    },
+    {
+      "name": "USB-C plug (13 x 7) to window edge",
+      "kind": "gap",
+      "gap_mm": 0.25,
+      "required_mm": 0.2,
+      "passed": true
+    },
+    {
+      "name": "micro-HDMI plugs (11 x 6.5) to window edge",
+      "kind": "gap",
+      "gap_mm": 0.25,
+      "required_mm": 0.2,
+      "passed": true
+    },
+    {
+      "name": "USB-C window centred on the port (Y error)",
+      "kind": "alignment",
+      "value_mm": 0.05,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "USB-C window centred on the port (Z error)",
+      "kind": "alignment",
+      "value_mm": 0.05,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "micro-HDMI 0 window centred on the port",
+      "kind": "alignment",
+      "value_mm": 0.05,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "micro-HDMI 1 window centred on the port",
+      "kind": "alignment",
+      "value_mm": 0.05,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "microSD card to slot edge",
+      "kind": "gap",
+      "gap_mm": 0.7,
+      "required_mm": 0.3,
+      "passed": true
+    },
+    {
+      "name": "microSD card reaches into the slot",
+      "kind": "margin",
+      "value_mm": 1.0,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "Lens block/barrel to Lid (bore and collar)",
+      "kind": "gap",
+      "gap_mm": 0.3,
+      "required_mm": 0.25,
+      "passed": true
+    },
+    {
+      "name": "Camera front parts to Lid collar",
+      "kind": "gap",
+      "gap_mm": 0.9,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "Lens centred in the bore",
+      "kind": "alignment",
+      "value_mm": 0.02,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Lens barrel recessed below the lid face",
+      "kind": "margin",
+      "value_mm": 1.8,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "Collar overlaps the lens block",
+      "kind": "margin",
+      "value_mm": 1.2,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Camera connector to Pi parts",
+      "kind": "gap",
+      "gap_mm": 2.653,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Camera PCB to Tray walls",
+      "kind": "gap",
+      "gap_mm": 2.0,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon bend radius",
+      "kind": "bend",
+      "value_mm": 3.5,
+      "required_mm": 3.0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon length matches the cable (error)",
+      "kind": "alignment",
+      "value_mm": 0.48,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon (outside the socket) to Pi board, low parts, GPIO, DSI",
+      "kind": "gap",
+      "gap_mm": 3.85,
+      "required_mm": 2.0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon to USB/Ethernet stacks",
+      "kind": "gap",
+      "gap_mm": 1.88,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon to GPIO jumpers",
+      "kind": "gap",
+      "gap_mm": 30.46,
+      "required_mm": 3.0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon to Lid",
+      "kind": "gap",
+      "gap_mm": 5.531,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon to Tray",
+      "kind": "gap",
+      "gap_mm": 3.112,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon to switch, carrier and LED",
+      "kind": "gap",
+      "gap_mm": 9.293,
+      "required_mm": 3.0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon fold-back to microSD-end wall",
+      "kind": "margin",
+      "value_mm": 3.262,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Ribbon first bend starts above the CSI socket",
+      "kind": "margin",
+      "value_mm": 2.03,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "ButtonCap / Switch",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ButtonCarrier / Switch",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "StatusLED / ButtonCarrier",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "Switch depth behind the lid underside, to the terminal tips (15 max)",
+      "kind": "margin",
+      "value_mm": 3.4,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "LED depth behind the lid underside, lead tails under the PCB (15 max)",
+      "kind": "margin",
+      "value_mm": 3.3,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Switch, carrier and LED to Pi parts",
+      "kind": "gap",
+      "gap_mm": 1.577,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Switch, carrier and LED to camera",
+      "kind": "gap",
+      "gap_mm": 2.102,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Switch and carrier to Tray",
+      "kind": "gap",
+      "gap_mm": 3.61,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Cap stem to lid hole (radial)",
+      "kind": "gap",
+      "gap_mm": 0.3,
+      "required_mm": 0.25,
+      "passed": true
+    },
+    {
+      "name": "Cap flange overlaps the lid hole (radial)",
+      "kind": "margin",
+      "value_mm": 1.45,
+      "required_mm": 1.2,
+      "passed": true
+    },
+    {
+      "name": "Cap stays proud of the lid when pressed",
+      "kind": "margin",
+      "value_mm": 0.9,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "Cap free play at rest (flange to lid)",
+      "kind": "margin",
+      "value_mm": 0.3,
+      "required_mm": 0.2,
+      "passed": true
+    },
+    {
+      "name": "Cap flange to the switch (4.3 mm level) beyond the pretravel",
+      "kind": "margin",
+      "value_mm": 1.7,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Cap socket sits on the plunger (error)",
+      "kind": "alignment",
+      "value_mm": 0.02,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Cap socket over the plunger (radial)",
+      "kind": "margin",
+      "value_mm": 0.3,
+      "required_mm": 0.2,
+      "passed": true
+    },
+    {
+      "name": "Switch body between its posts (per side)",
+      "kind": "margin",
+      "value_mm": 1.3,
+      "required_mm": 0.4,
+      "passed": true
+    },
+    {
+      "name": "Carrier slot over the terminal (smallest side margin)",
+      "kind": "margin",
+      "value_mm": 0.6,
+      "required_mm": 0.3,
+      "passed": true
+    },
+    {
+      "name": "Terminal tails below the carrier, for soldering",
+      "kind": "margin",
+      "value_mm": 1.9,
+      "required_mm": 1.2,
+      "passed": true
+    },
+    {
+      "name": "LED hole over the LED body (diametral)",
+      "kind": "margin",
+      "value_mm": 0.5,
+      "required_mm": 0.1,
+      "passed": true
+    },
+    {
+      "name": "Carrier hole over the locating boss (diametral)",
+      "kind": "margin",
+      "value_mm": 0.4,
+      "required_mm": 0.3,
+      "passed": true
+    },
+    {
+      "name": "Control PCB thickness equals the carrier (error)",
+      "kind": "alignment",
+      "value_mm": 0.01,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB top face is the switch seating plane (error)",
+      "kind": "alignment",
+      "value_mm": 0.01,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB and ButtonCarrier underside at the same height (error)",
+      "kind": "alignment",
+      "value_mm": 0.01,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "LED dome tip flush with the lid face (error)",
+      "kind": "alignment",
+      "value_mm": 0.02,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "LED flange above the PCB (soldering standoff)",
+      "kind": "margin",
+      "value_mm": 2.9,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "LED to the lid hole and collar (radial)",
+      "kind": "gap",
+      "gap_mm": 0.25,
+      "required_mm": 0.2,
+      "passed": true
+    },
+    {
+      "name": "LED flange below the collar",
+      "kind": "margin",
+      "value_mm": 0.5,
+      "required_mm": 0.3,
+      "passed": true
+    },
+    {
+      "name": "LED collar to the button cap flange (plan)",
+      "kind": "margin",
+      "value_mm": 1.5,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "LED collar to button cap",
+      "kind": "gap",
+      "gap_mm": 1.5,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to camera board and parts",
+      "kind": "gap",
+      "gap_mm": 2.8,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to camera posts",
+      "kind": "gap",
+      "gap_mm": 2.971,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to ribbon",
+      "kind": "gap",
+      "gap_mm": 7.303,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to button cap",
+      "kind": "gap",
+      "gap_mm": 6.312,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to switch",
+      "kind": "gap",
+      "gap_mm": 4.746,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to LED",
+      "kind": "gap",
+      "gap_mm": 4.05,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to camera board, connector and lens parts",
+      "kind": "gap",
+      "gap_mm": 1.878,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to camera posts",
+      "kind": "gap",
+      "gap_mm": 3.087,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to ribbon",
+      "kind": "gap",
+      "gap_mm": 6.0,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to Tray walls",
+      "kind": "gap",
+      "gap_mm": 1.5,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to USB/Ethernet stacks",
+      "kind": "gap",
+      "gap_mm": 1.484,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to lid features other than its four posts",
+      "kind": "gap",
+      "gap_mm": 3.087,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "J1 and R1-R3 to Pi parts",
+      "kind": "gap",
+      "gap_mm": 2.834,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "J1 and R1-R3 to Tray",
+      "kind": "gap",
+      "gap_mm": 1.81,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing + wire bend to Tray (floor, walls)",
+      "kind": "gap",
+      "gap_mm": 1.26,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing + wire bend to Pi parts (USB/Ethernet stacks)",
+      "kind": "gap",
+      "gap_mm": 2.55,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing + wire bend to ribbon",
+      "kind": "gap",
+      "gap_mm": 32.806,
+      "required_mm": 3.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing + wire bend to camera",
+      "kind": "gap",
+      "gap_mm": 28.599,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing to R1-R3",
+      "kind": "gap",
+      "gap_mm": 2.081,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "R1-R3 (lead tails on the front) to switch",
+      "kind": "gap",
+      "gap_mm": 1.15,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB parts to ribbon",
+      "kind": "gap",
+      "gap_mm": 9.293,
+      "required_mm": 3.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing bottom above the tray floor",
+      "kind": "margin",
+      "value_mm": 5.26,
+      "required_mm": 4.0,
+      "passed": true
+    }
+  ],
+  "notes": {
+    "outer_mm": [
+      65.0,
+      124.36,
+      37.0
+    ],
+    "headroom_over_pcb": 26.5,
+    "fpc": {
+      "length": 149.98,
+      "bend_radius": 3.5,
+      "lower_run_z": 19.03,
+      "upper_run_z": 26.03,
+      "fold_back_to_y": 5.762,
+      "fold_back_to_px": 1.762,
+      "min_length": 67.5,
+      "max_length": 154.5,
+      "path_yz": [
+        [
+          50.5,
+          9.5
+        ],
+        [
+          50.5,
+          19.03
+        ],
+        [
+          5.762,
+          19.03
+        ],
+        [
+          5.762,
+          26.03
+        ],
+        [
+          99.0,
+          26.03
+        ]
+      ]
+    },
+    "fpc_lengths_that_fit_mm": [
+      67.5,
+      154.5
+    ]
+  },
+  "failed": 0
+}

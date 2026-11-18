@@ -1,6 +1,6 @@
 # Daily Mirror custom PCB - A1 component study
 
-> **Status: study, not a finished board.** The board in use is `../pcb-pi4-controls`. See [`../README.md`](../README.md) for the current build.
+> **Status: legacy.** The project has moved on from the ESP32-P4. The board in use is `../pcb-pi4-controls`. See [`../README.md`](../README.md) for the current build.
 
 Open **daily-mirror-p4.kicad_pro** in KiCad 10. This is an editable starting
 project with the connected controls schematic and **64 additional candidate

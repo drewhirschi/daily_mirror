@@ -24,11 +24,11 @@ The printed `ButtonCarrier` is replaced by the control board; do not print it.
 | --- | --- | --- |
 | `enclosure-pi4` | **CURRENT** | Pi 4 tray and lid with the IMX519 camera |
 | `pcb-pi4-controls` | **CURRENT** | Button and RGB LED board for the Pi 4 lid |
-| `enclosure-p4-open` | Other device | Open tray for the ESP32-P4. Last sliced 2026-10-20. Not the current box |
-| `enclosure-p4` | Older | Closed ESP32-P4 housing from before `enclosure-p4-open` |
+| `enclosure-p4-open` | Legacy | Open tray for the ESP32-P4. Last sliced 2026-10-20. The P4 is no longer the target |
+| `enclosure-p4` | Legacy | Closed ESP32-P4 housing from before `enclosure-p4-open` |
 | `enclosure-v2` | Superseded | Rail enclosure prototype 02 for the Pi 4 (2026-09-10). The box is replaced by `enclosure-pi4`; `enclosure-p4` still refers to its rail and carriage |
 | `enclosure` | Superseded | Enclosure concept 01 |
-| `pcb-p4` | Study | ESP32-P4 board component study, never a finished board |
+| `pcb-p4` | Legacy | ESP32-P4 board component study, never a finished board |
 | `prototype-modular` | Notes | Parts comparison from 2026-09-14 |
 | `wiring` | Reference | Wiring drawings for the P4 and S3 |
 

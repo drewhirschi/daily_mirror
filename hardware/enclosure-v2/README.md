@@ -1,5 +1,7 @@
 # Daily Mirror - rail enclosure prototype 02
 
+> **Status: superseded.** The Pi 4 box is now `../enclosure-pi4`. Only the rail and carriage are still referred to, by `../enclosure-p4`. Do not print the box from here. See [`../README.md`](../README.md) for the current build.
+
 This is the September 10, 2026 revision for the **confirmed Raspberry Pi 4 Model B**.
 It replaces the old rail motion study with printable mating parts, a thumb lock,
 removable end stops, actual camera standoffs, and front control holes.

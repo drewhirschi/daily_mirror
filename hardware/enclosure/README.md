@@ -1,5 +1,7 @@
 # Daily Mirror enclosure concept 01
 
+> **Status: superseded.** This is concept 01. Do not print from it. See [`../README.md`](../README.md) for the current build.
+
 Generated with installed FreeCAD 1.1.3 via its Python API and FreeCADCmd.
 No MCP or extra Python CAD package is needed. Run from the repository:
 

@@ -218,6 +218,54 @@
       "passed": true
     },
     {
+      "name": "ControlPCB / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / Tray",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / Lid",
+      "kind": "interference",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
       "name": "Tray / Lid",
       "kind": "interference",
       "overlap_mm3": 0.0,
@@ -247,7 +295,7 @@
     {
       "name": "Pi parts to Lid (lip included)",
       "kind": "gap",
-      "gap_mm": 5.312,
+      "gap_mm": 3.156,
       "required_mm": 1.0,
       "passed": true
     },
@@ -429,7 +477,7 @@
     {
       "name": "Ribbon to switch, carrier and LED",
       "kind": "gap",
-      "gap_mm": 10.508,
+      "gap_mm": 9.293,
       "required_mm": 3.0,
       "passed": true
     },
@@ -473,9 +521,9 @@
       "passed": true
     },
     {
-      "name": "LED depth behind the lid underside, leads bent (15 max)",
+      "name": "LED depth behind the lid underside, lead tails under the PCB (15 max)",
       "kind": "margin",
-      "value_mm": 8.8,
+      "value_mm": 3.3,
       "required_mm": 0,
       "passed": true
     },
@@ -489,7 +537,7 @@
     {
       "name": "Switch, carrier and LED to camera",
       "kind": "gap",
-      "gap_mm": 3.48,
+      "gap_mm": 2.102,
       "required_mm": 1.0,
       "passed": true
     },
@@ -573,22 +621,8 @@
     {
       "name": "LED hole over the LED body (diametral)",
       "kind": "margin",
-      "value_mm": 0.3,
+      "value_mm": 0.5,
       "required_mm": 0.1,
-      "passed": true
-    },
-    {
-      "name": "LED window narrower than the LED body (radial)",
-      "kind": "margin",
-      "value_mm": 0.35,
-      "required_mm": 0.2,
-      "passed": true
-    },
-    {
-      "name": "LED dome to the window lip",
-      "kind": "gap",
-      "gap_mm": 0.0,
-      "required_mm": 0.0,
       "passed": true
     },
     {
@@ -599,10 +633,220 @@
       "passed": true
     },
     {
-      "name": "LED tip not proud of the lid face",
+      "name": "Control PCB thickness equals the carrier (error)",
+      "kind": "alignment",
+      "value_mm": 0.01,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB top face is the switch seating plane (error)",
+      "kind": "alignment",
+      "value_mm": 0.01,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB and ButtonCarrier underside at the same height (error)",
+      "kind": "alignment",
+      "value_mm": 0.01,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "LED dome tip flush with the lid face (error)",
+      "kind": "alignment",
+      "value_mm": 0.02,
+      "required_mm": 0,
+      "passed": true
+    },
+    {
+      "name": "LED flange above the PCB (soldering standoff)",
       "kind": "margin",
-      "value_mm": 0.1,
-      "required_mm": 0.0,
+      "value_mm": 2.9,
+      "required_mm": 0.5,
+      "passed": true
+    },
+    {
+      "name": "LED to the lid hole and collar (radial)",
+      "kind": "gap",
+      "gap_mm": 0.25,
+      "required_mm": 0.2,
+      "passed": true
+    },
+    {
+      "name": "LED flange below the collar",
+      "kind": "margin",
+      "value_mm": 0.5,
+      "required_mm": 0.3,
+      "passed": true
+    },
+    {
+      "name": "LED collar to the button cap flange (plan)",
+      "kind": "margin",
+      "value_mm": 1.5,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "LED collar to button cap",
+      "kind": "gap",
+      "gap_mm": 1.5,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to camera board and parts",
+      "kind": "gap",
+      "gap_mm": 2.8,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to camera posts",
+      "kind": "gap",
+      "gap_mm": 2.971,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to ribbon",
+      "kind": "gap",
+      "gap_mm": 7.303,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to button cap",
+      "kind": "gap",
+      "gap_mm": 6.312,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to switch",
+      "kind": "gap",
+      "gap_mm": 4.746,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "New LED posts to LED",
+      "kind": "gap",
+      "gap_mm": 4.05,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to camera board, connector and lens parts",
+      "kind": "gap",
+      "gap_mm": 1.878,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to camera posts",
+      "kind": "gap",
+      "gap_mm": 3.087,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to ribbon",
+      "kind": "gap",
+      "gap_mm": 6.0,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to Tray walls",
+      "kind": "gap",
+      "gap_mm": 1.5,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to USB/Ethernet stacks",
+      "kind": "gap",
+      "gap_mm": 1.484,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB to lid features other than its four posts",
+      "kind": "gap",
+      "gap_mm": 3.087,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "J1 and R1-R3 to Pi parts",
+      "kind": "gap",
+      "gap_mm": 2.834,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "J1 and R1-R3 to Tray",
+      "kind": "gap",
+      "gap_mm": 1.81,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing + wire bend to Tray (floor, walls)",
+      "kind": "gap",
+      "gap_mm": 1.26,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing + wire bend to Pi parts (USB/Ethernet stacks)",
+      "kind": "gap",
+      "gap_mm": 2.55,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing + wire bend to ribbon",
+      "kind": "gap",
+      "gap_mm": 32.806,
+      "required_mm": 3.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing + wire bend to camera",
+      "kind": "gap",
+      "gap_mm": 28.599,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing to R1-R3",
+      "kind": "gap",
+      "gap_mm": 2.081,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "R1-R3 (lead tails on the front) to switch",
+      "kind": "gap",
+      "gap_mm": 1.15,
+      "required_mm": 1.0,
+      "passed": true
+    },
+    {
+      "name": "Control PCB parts to ribbon",
+      "kind": "gap",
+      "gap_mm": 9.293,
+      "required_mm": 3.0,
+      "passed": true
+    },
+    {
+      "name": "Dupont housing bottom above the tray floor",
+      "kind": "margin",
+      "value_mm": 5.26,
+      "required_mm": 4.0,
       "passed": true
     }
   ],

@@ -4,7 +4,10 @@ A closed version of the `../enclosure-p4-open` tray for the **Raspberry Pi 4
 Model B**: the same 2.5 mm walls, 4 mm corners and screw ears, but with a full
 lid. The **Arducam IMX519** hangs under the lid with its lens in a bore. Next to
 it are a **12 mm tactile switch** (Omron B3F-4055) under a printed cap and a
-**3 mm status LED** (Kingbright WP710A10SGD).
+**5 mm RGB status LED**, both on a small **control PCB**
+([`../pcb-pi4-controls`](../pcb-pi4-controls)) that replaces the printed
+ButtonCarrier. (Draft, 2026-11-16: the PCB and the lid changes for it are not
+printed or ordered yet; see [Control PCB](#control-pcb-draft).)
 
 Outer size: **65 x 124.4 x 37 mm** (76.6 mm wide across the lid screw ears).
 Inside: 60 x 119.4 x 32 mm. The switch reaches **11.6 mm** behind the lid
@@ -24,7 +27,9 @@ and the check reports.
 ![preview](output/enclosure-preview.png)
 
 More views: [exterior](output/exterior.png), [cutaway](output/cutaway.png),
-[exploded](output/exploded.png), [lid off](output/lid-off.png).
+[exploded](output/exploded.png), [lid off](output/lid-off.png). Control PCB:
+[lid posts](output/pcb-lid-posts.png), [PCB in the lid + stack](output/pcb-lid-assembled.png),
+[front LED opening](output/pcb-front-led-opening.png).
 
 ## Layout
 
@@ -77,7 +82,7 @@ depends on the length.
 | Vents | 6 slits in the left wall, 7 in the top wall, 4 in the bottom wall | 2.5 x 15 mm |
 | Lens | lid | 8.5 mm bore |
 | Button cap | lid | 10.6 mm, for the 10 mm printed cap |
-| LED | lid | 3.2 mm bore ending in a 2.2 mm window |
+| LED | lid | 5.5 mm through-hole with a 7.5 mm light collar behind it (was a 3.2 mm bore ending in a 2.2 mm window) |
 
 - The power plug enters from the right side, 15 mm above the bottom, and sticks
   out about 30 mm. Use a right-angle plug if the cable should run down the wall.
@@ -116,29 +121,53 @@ How it goes together:
   with a 13.5 mm flange under the lid that keeps it captive. A 4.4 mm square
   socket, 1 mm deep, sits on the plunger head. It has 0.3 mm of free play at
   rest and is still 0.9 mm proud when pressed.
-- **ButtonCarrier** (printed): a 17 x 25 x 1.6 mm plate under the switch. The
+- **ButtonCarrier** (printed): **superseded by the control PCB**, which has the
+  same thickness, screw holes and switch holes. It is still built (and sliced
+  into the existing plate) so the old assembly can be reproduced. A 17 x 25 x 1.6 mm plate under the switch. The
   four terminals pass through 2.0 x 2.2 mm slots and the two bosses through
   2 mm holes; two M2 x 6 screws hold it to 8.1 mm posts on the lid. The
   terminal tails stand 1.9 mm below the plate for soldering.
 - Order: drop the cap into the lid from inside, set the switch on it, screw the
-  carrier on.
+  carrier (now the control PCB, switch soldered in) on.
 
-**LED: Kingbright WP710A10SGD**, 3 mm green diffused, 2.2 V at 20 mA.
-From its datasheet, p.1
-(<https://www.kingbrightusa.com/images/catalog/SPEC/WP710A10SGD.pdf>): body
-2.9 mm, flange 3.2 mm x 1.0, 4.6 mm from the flange underside to the tip, leads
-0.5 mm square at 2.54 mm.
-Buy: [DigiKey](https://www.digikey.com/en/products/detail/kingbright/WP710A10SGD/3084199)
-or [Mouser](https://www.mouser.com/ProductDetail/604-WP710A10SGD); I could not
-load either to read a price or stock. Use a series resistor (about 220 ohm from
-a 3.3 V GPIO pin).
+**LED** (was a 3 mm Kingbright WP710A10SGD in a 3.2 mm bore with a 2.2 mm
+window): now the EBOOT 5 mm RGB LED on the control PCB, below.
 
-- The LED pushes into a 3.2 mm bore from inside until its dome meets a 2.2 mm
-  window in the last 0.6 mm of the lid. The tip ends about 0.1 mm below the
-  face. A dab of glue on the back holds it.
-- The flange is the same diameter as the bore, so it is the window that stops
-  the LED, not the flange.
-- With the leads bent over it needs about 6 mm behind the lid.
+## Control PCB (draft)
+
+A 30 x 27.1 x 1.6 mm board ([`../pcb-pi4-controls`](../pcb-pi4-controls)) takes
+the ButtonCarrier's place and widens toward the left wall to carry the LED, J1
+and three resistors. The switch, cap and the two existing posts are unchanged:
+the board is the carrier's thickness, has the carrier's two 2.4 mm screw holes
+at (18.5, 96.25) and (18.5, 115.25), the carrier's 2.0 x 2.2 mm terminal slots
+and 2.0 mm boss holes, and its top face is the switch seating plane (Z 26.4).
+
+- **Outline** X 4.0 to 34.0, Y 93.25 to 120.35 (`pcb_outline`). 1.5 mm to the
+  left and top walls, 1.5 mm to the camera board edge in plan (1.9 mm in 3D;
+  the camera board is 1.1 mm higher). The bottom edge is where the carrier's
+  was, 1.25 mm past the USB stack face.
+- **LED posts (new)**: (30.5, 96.25) and (30.5, 115.25), the same 4.4 mm x
+  8.1 mm posts with 1.6 mm pilots as the button posts, in line with them. They
+  clear the camera posts by 3.0 mm and the camera board by 2.8 mm; nothing had
+  to move. Four M2 x 6 screws hold the board.
+- **LED opening (new)**: a plain 5.5 mm through-hole at (30.5, 105.75) and a
+  7.5 mm collar from the lid underside down to Z 30.8, 0.5 mm above the LED
+  flange. The collar keeps the LED's side glow away from the lens bore; it
+  clears the button cap flange by 1.5 mm. The old 3.2 mm bore, 2.2 mm window
+  and 6 mm collar are gone.
+- **LED height**: the 5 mm LED is 7.7 mm from flange underside to tip, so its
+  **flange stands 2.9 mm above the board** for the tip to sit flush with the
+  lid face (Z 37). Easiest: push the LED through the board, screw the board in,
+  press the dome flush with the face, then solder.
+- **J1** is a straight 1x6 header on the back near the left wall, pins toward
+  the tray floor. A straight six-wire ribbon with a 1x6 housing at each end goes
+  to the Pi's inner header column, pins 1 to 11 (pinout and build steps in
+  `../pcb-pi4-controls/ASSEMBLY.md`). With a Dupont housing on it the housing ends 5.3 mm above the
+  floor (Z 7.76); the model reserves another 4 mm under it for the wires to
+  turn. The housing is 2.55 mm from the Ethernet jack face.
+- **R1-R3** lie flat on the back above J1; their trimmed lead tails on the front are 1.15 mm from the switch body.
+
+The checks for all of this are in `verify.py` (search "Control PCB").
 
 ## Raspberry Pi 5
 
@@ -175,8 +204,8 @@ drawing; the ones below are scaled from it or assumed.
 | `cap_rest_gap` | 0.3 | Free play of the cap; the switch height is ±0.2 |
 | `cap_socket_clearance` | 0.3 | Around the 3.8 mm plunger head |
 | `carrier_slot` | 2.0 x 2.2 | Terminal span is 12.5 ±0.5 at the tips |
-| `led_window` | 2.2 | Sets how far the dome pokes in; the dome radius is not on the drawing |
-| `led_lead_allowance` | 4.0 | Room for the bent leads |
+| `led_height` | 7.7 | LED flange underside to tip; sets the 2.9 mm standoff |
+| `pcb_outline` | 4, 93.25, 34, 120.35 | Control PCB outline; the KiCad board reads it |
 
 Three things I could not confirm from documents and that the layout depends on:
 
@@ -195,13 +224,14 @@ Three things I could not confirm from documents and that the layout depends on:
 | File | Orientation as exported | Time |
 | --- | --- | --- |
 | `PiFitCoupon` | back on bed | ~30 min, 16 g. Bottom 15 mm of the Tray: Pi posts, USB-C and HDMI windows, microSD slot. Print it **first** |
-| `LidFitCoupon` | outer face on bed | ~18 min, 6 g. Camera end of the Lid: camera posts, bore, collar, cap hole, switch posts, LED bore |
+| `LidFitCoupon` | outer face on bed | ~18 min, 6 g (not re-sliced since the LED change). Camera end of the Lid: camera posts, bore, collar, cap hole, switch posts, LED posts and hole |
 | `ButtonCap` | flange on bed | ~6 min, 1 g |
-| `ButtonCarrier` | flat | ~6 min, 1 g |
+| `ButtonCarrier` | flat | ~6 min, 1 g. Superseded by the control PCB |
 | `Tray` | back on bed | ~1.7 h, 60 g |
 | `Lid` | outer face on bed, posts up | ~36 min, 22 g |
 
-`output/TrayAndLid.gcode.3mf` is the Tray, Lid, ButtonCap and ButtonCarrier
+**The sliced file below predates the control-PCB lid change** and still holds
+the old Lid (3 mm LED bore, no LED posts). `output/TrayAndLid.gcode.3mf` is the Tray, Lid, ButtonCap and ButtonCarrier
 sliced on one plate (2.4 h, 83 g). `output/TrayAndLid.3mf` is the same four
 parts as a plain model file. Print the cap and carrier with the LidFitCoupon to
 try the button before the full lid.
@@ -215,9 +245,9 @@ with its front face on the plate, so the front takes the plate's texture.
 | Part | Qty | Use |
 | --- | --- | --- |
 | M2.5 x 6 thread-forming | 4 | Pi to tray posts (`pi_pilot` 2.1, 5.5 deep) |
-| M2 x 6 thread-forming | 6 | Camera (4) and switch carrier (2) to lid posts (`camera_pilot` 1.6) |
+| M2 x 6 thread-forming | 8 | Camera (4) and control PCB (4) to lid posts (`camera_pilot` 1.6) |
 | Omron B3F-4055 | 1 | Button |
-| Kingbright WP710A10SGD + resistor | 1 | Status light |
+| Control PCB with EBOOT 5 mm RGB LED, 3 x 330 ohm, 1x6 header | 1 | Status light and button board, see `../pcb-pi4-controls` |
 | M3 x 10 thread-forming | 6 | Lid to tray ears (`case_pilot` 2.5; 3.4 clearance in the lid) |
 | 15-pin 1.0 mm camera ribbon, 150 mm | 1 | The one supplied with the camera |
 
@@ -231,9 +261,10 @@ clears the parts under the board.
 - `output/PiFitCoupon.step|stl`, `output/LidFitCoupon.step|stl`
 - `output/TrayAndLid.3mf`, `output/TrayAndLid.gcode.3mf`, `output/Assembly.step`
 - `output/enclosure-preview.png`, `exterior.png`, `cutaway.png`, `exploded.png`, `lid-off.png`
-- `output/verify.json` (92 fit checks), `output/validation.json`, `output/layout.json`, `output/manifest.json`
+- `output/pcb-lid-posts.png`, `pcb-lid-assembled.png`, `pcb-front-led-opening.png` (control PCB change)
+- `output/verify.json` (128 fit checks), `output/validation.json`, `output/layout.json`, `output/manifest.json`
 - `output/DailyMirror-Pi4.FCStd` is rebuilt by `./build.sh` and not committed.
 
-The Pi, camera, ribbon, switch and LED in the renders and checks are stand-ins I
+The Pi, camera, ribbon, switch, LED, control PCB, header and Dupont housing in the renders and checks are stand-ins I
 modelled from the drawings, not vendor STEP files. Nothing has been printed or
 test-fitted.

@@ -2,7 +2,9 @@
 
 Closed tray + full lid for the Raspberry Pi 4 Model B, an Arducam IMX519 behind
 the lid (lens out through a bore), and beside it a 12 mm tactile switch under a
-printed cap plus a 3 mm status LED.
+printed cap plus a 5 mm RGB status LED. Switch and LED sit on a small control
+PCB (../pcb-pi4-controls) that replaces the printed ButtonCarrier; the carrier
+is still built for reference.
 Axes as in enclosure-p4-open: X across, Y along (microSD end at Y=0, camera end
 at Y=L), Z out from the flat back (Z=0). Seen from the front, USB-C and the
 lens are on the right.
@@ -116,9 +118,26 @@ sw_posts = [(btn_x, btn_y+s*C['switch_post_spacing']/2) for s in (-1, 1)]
 sw_pins = [(btn_x+a*C['switch_terminal_pitch_wide']/2, btn_y+b*C['switch_terminal_pitch_narrow']/2)
            for a in (-1, 1) for b in (-1, 1)]
 sw_bosses = [(btn_x, btn_y+s*C['switch_boss_spacing']/2) for s in (-1, 1)]
+# Control PCB (replaces the carrier): same plate thickness and screw holes, so its
+# top face is the switch seating plane. It also carries the 5 mm RGB LED, J1 and
+# the three resistors, and is screwed to two more lid posts beside the LED.
+pcb_top = sw_seat
+pcb_bot = pcb_top - C['carrier_thickness']
+px0, py0, px1, py1 = C['pcb_outline']
 led_x, led_y = C['led_x'], lens_y
-led_collar_h = round(C['led_height'] - C['led_flange_thickness'] - LT + C['led_tip_recess'], 3)
-led_seat = RIM - led_collar_h                   # the LED's flange stops here
+led_posts = [(led_x, y) for _, y in sw_posts]   # same Y, length and pilot as the switch posts
+led_tip = H                                     # dome tip flush with the lid's outer face
+led_flange_bot = led_tip - C['led_height']
+led_flange_top = led_flange_bot + C['led_flange_thickness']
+led_standoff = round(led_flange_bot - pcb_top, 3)   # set when soldering
+led_collar_bot = led_flange_top + C['led_collar_gap']
+led_collar_h = round(RIM - led_collar_bot, 3)
+led_leads = [(led_x, led_y + C['led_lead_spacing']*k) for k in (-1.5, -.5, .5, 1.5)]   # R, +, G, B upward (lead order only; geometry is symmetric)
+j1_pins = [(C['j1_x'], C['j1_pin1_y'] + 2.54*i) for i in range(6)]
+j1_plastic_bot = pcb_bot - C['j1_plastic_height']
+du_w, du_l, du_h = C['dupont_housing']
+dupont_bot = j1_plastic_bot - du_h - C['dupont_wire_bend']
+res_pads = [(x, y) for y in C['resistor_rows_y'] for x in C['resistor_x']]
 ear_d, ear_off = C['lid_ear_diameter'], C['lid_ear_offset']
 ear_ys = (C['lid_ear_bottom_y'], round((Y0 + 45.25 + pi_end) / 2, 2), L - C['lid_ear_inset_from_end'])
 ears = [(x, y) for x in (-ear_off, W + ear_off) for y in ear_ys]
@@ -164,10 +183,14 @@ assert cap_bottom - (sw_seat + C['switch_body_height']) > C['switch_travel'] + 1
 assert C['cap_proud'] > C['switch_travel'] + .5, 'cap goes below the lid face when pressed'
 assert (C['cap_flange_diameter'] - C['cap_hole'])/2 >= 1.2, 'cap flange too small to stay captive'
 assert C['switch_post_spacing']/2 - C['camera_post_diameter']/2 > max(C['switch_body'], C['cap_flange_diameter'])/2 + .4, 'switch posts too close'
-assert led_x - C['led_collar_diameter']/2 > btn_x + C['carrier_width']/2, 'LED collar hits the switch carrier'
-assert cam_x - CBW/2 - (led_x + C['led_collar_diameter']/2) > 1.0, 'LED hits the camera'
-assert led_collar_h >= 0, 'LED shorter than the lid is thick'
-assert C['led_window'] < C['led_diameter'] - .4, 'LED window too wide to stop the dome'
+assert led_x - C['led_collar_diameter']/2 - (btn_x + C['cap_flange_diameter']/2) >= 1.0, 'LED collar hits the button cap flange'
+assert cam_x - CBW/2 - (led_x + C['led_collar_diameter']/2) > 1.0, 'LED collar hits the camera'
+assert cam_x - CBW/2 - px1 >= 1.0, 'control PCB reaches under the camera board'
+assert led_standoff > 0.5 and led_collar_h > 1.0, ('LED stack does not fit', led_standoff, led_collar_h)
+assert C['led_hole'] > C['led_diameter'] + .3, 'LED hole too tight'
+assert px0 - T >= 1.0 and L - T - py1 >= 1.0, 'control PCB too close to the walls'
+assert py0 > pi_end + 1.0, 'control PCB over the USB/Ethernet stacks'
+assert dupont_bot > T + 1.0, ('Dupont housing and wire bend reach the tray floor', dupont_bot)
 assert RIM - (ZP + C['gpio_jumper_height']) > C['lid_lip_depth'], 'GPIO jumpers reach the lid'
 
 # TRAY: flat back on the bed, four Pi posts, three screw ears per side.
@@ -209,20 +232,19 @@ collar = box(cam_x-co/2, lens_y-co/2, RIM-chh, co, co, chh+.01).cut(box(cam_x-ci
 lid = union([roundbox(0, 0, RIM, W, L, LT, r), lip, collar] +
             [cylinder(x, y, RIM, ear_d, LT) for x, y in ears] +
             [cylinder(x, y, cam_front, C['camera_post_diameter'], cam_post_h+.01) for x, y in cam_holes] +
-            [cylinder(x, y, sw_seat, C['camera_post_diameter'], sw_post_h+.01) for x, y in sw_posts] +
-            ([cylinder(led_x, led_y, led_seat, C['led_collar_diameter'], led_collar_h+.01)] if led_collar_h > 0 else []))
+            [cylinder(x, y, sw_seat, C['camera_post_diameter'], sw_post_h+.01) for x, y in sw_posts + led_posts] +
+            [cylinder(led_x, led_y, led_collar_bot, C['led_collar_diameter'], led_collar_h+.01)])
 bore, cham = C['camera_lens_bore'], C['camera_lens_chamfer']
 cuts = [cylinder(x, y, RIM-1, C['lid_screw_clearance'], LT+2) for x, y in ears]
 cuts += [cylinder(x, y, cam_front-.1, C['camera_pilot'], cam_post_h+LT-.8+.1) for x, y in cam_holes]
 cuts += [cylinder(cam_x, lens_y, RIM-.1, bore, LT+.2),
          Part.makeCone(bore/2, bore/2+cham+.01, cham+.01, V(cam_x, lens_y, H-cham)),
          cylinder(btn_x, btn_y, RIM-1, C['cap_hole'], LT+2),
-         cylinder(led_x, led_y, led_seat-1, C['led_hole'], led_collar_h+LT-C['led_window_lip']+1),
-         cylinder(led_x, led_y, RIM, C['led_window'], LT+1)]
-cuts += [cylinder(x, y, sw_seat-.1, C['camera_pilot'], sw_post_h+LT-.8+.1) for x, y in sw_posts]
+         cylinder(led_x, led_y, led_collar_bot-1, C['led_hole'], led_collar_h+LT+2)]
+cuts += [cylinder(x, y, sw_seat-.1, C['camera_pilot'], sw_post_h+LT-.8+.1) for x, y in sw_posts + led_posts]
 lid = add('Lid', subtract(lid, cuts), (.91, .90, .85), flip=True,
     note='Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws. '
-         'Switch carrier: two M2 x 6. The LED pushes into its collar from inside.')
+         'Control PCB: four M2 x 6 (two switch posts, two LED posts). The LED dome sits in a 5.5 mm hole with a light collar.')
 
 # BUTTON CAP: stem through the lid, flange under it, shallow socket over the plunger.
 pl = C['switch_plunger_head'] + 2*C['cap_socket_clearance']
@@ -237,7 +259,8 @@ carrier = roundbox(btn_x-cw/2, btn_y-cl/2, sw_seat-ct, cw, cl, ct, 2.0)
 carrier = add('ButtonCarrier', subtract(carrier, [cylinder(x, y, sw_seat-ct-1, C['carrier_screw_clearance'], ct+2) for x, y in sw_posts] +
     [box(x-sx/2, y-sy/2, sw_seat-ct-1, sx, sy, ct+2) for x, y in sw_pins] +
     [cylinder(x, y, sw_seat-ct-1, C['carrier_boss_hole'], ct+2) for x, y in sw_bosses]), (.28, .34, .38),
-    note='Print flat, no supports. Switch terminals go through the four slots; two M2 x 6 screws into the lid posts.')
+    note='Superseded by the control PCB (../pcb-pi4-controls), which has the same thickness and screw holes. '
+         'Print flat, no supports. Switch terminals go through the four slots; two M2 x 6 screws into the lid posts.')
 
 # REFERENCES -----------------------------------------------------------------
 GREEN, SILVER, BLACK, DARK = (.10, .42, .24), (.72, .73, .74), (.10, .10, .10), (.22, .22, .24)
@@ -314,14 +337,39 @@ add('Switch', switch, DARK, REF,
     note='Omron B3F-4055: 12 x 12 mm tactile switch, 3.8 mm square projected plunger, 7.3 mm tall, four terminals 3.5 mm long. '
          'Boss length (1 mm) and neck width (3 mm) are not on the drawing.')
 lr = C['led_diameter']/2
-led_tip = led_seat + C['led_height'] - C['led_flange_thickness']
-add('StatusLED', union([cylinder(led_x, led_y, led_seat, C['led_diameter'], led_tip-lr-led_seat+.01),
+add('StatusLED', union([cylinder(led_x, led_y, led_flange_top-.01, C['led_diameter'], led_tip-lr-led_flange_top+.02),
                         Part.makeSphere(lr, V(led_x, led_y, led_tip-lr)),
-                        cylinder(led_x, led_y, led_seat-C['led_flange_thickness'], C['led_flange_diameter'], C['led_flange_thickness']+.01)] +
-                       [box(led_x+a*C['led_lead_spacing']/2-.25, led_y-.25, led_seat-C['led_flange_thickness']-C['led_lead_allowance'],
-                            .5, .5, C['led_lead_allowance']+.01) for a in (-1, 1)]), (.25, .75, .35), REF,
-    note='Kingbright WP710A10SGD 3 mm LED pushed into the lid from inside until the dome meets the 2.2 mm window; '
-         'leads bent over within led_lead_allowance. The dome is drawn as a hemisphere; its radius is not on the drawing.')
+                        cylinder(led_x, led_y, led_flange_bot, C['led_flange_diameter'], C['led_flange_thickness'])] +
+                       [box(x-.25, y-.25, pcb_bot-C['led_lead_tail'], .5, .5, led_flange_bot-pcb_bot+C['led_lead_tail']+.01)
+                        for x, y in led_leads]), (.80, .85, .90), REF,
+    note=f'EBOOT 5 mm clear RGB LED, common anode, flange {led_standoff} mm above the control PCB so the dome tip is flush '
+         'with the lid face. Four 0.5 mm leads at 2.0 mm pitch through the PCB. The dome is drawn as a hemisphere.')
+r_ = C['pcb_corner_radius']
+cpcb = roundbox(px0, py0, pcb_bot, px1-px0, py1-py0, C['carrier_thickness'], r_)
+cpcb = subtract(cpcb, [cylinder(x, y, pcb_bot-1, C['pcb_hole'], 4) for x, y in sw_posts + led_posts] +
+    [box(x-sx/2, y-sy/2, pcb_bot-1, sx, sy, 4) for x, y in sw_pins] +
+    [cylinder(x, y, pcb_bot-1, C['carrier_boss_hole'], 4) for x, y in sw_bosses] +
+    [cylinder(x, y, pcb_bot-1, .9, 4) for x, y in led_leads] +
+    [cylinder(x, y, pcb_bot-1, 1.0, 4) for x, y in j1_pins] +
+    [cylinder(x, y, pcb_bot-1, .8, 4) for x, y in res_pads])
+add('ControlPCB', cpcb, (.10, .42, .24), REF,
+    note='Control PCB, 1.6 mm FR4, replaces the ButtonCarrier: same screw holes and seating plane, plus D1, J1, R1-R3 '
+         'and two more holes on the LED posts.')
+jp = C['j1_pin_above_plastic']
+add('J1Header', union([box(C['j1_x']-1.27, j1_pins[0][1]-1.27, j1_plastic_bot, 2.54, 15.24, C['j1_plastic_height'])] +
+                      [box(x-.32, y-.32, j1_plastic_bot-jp, .64, .64, jp+C['j1_tail']) for x, y in j1_pins]), BLACK, REF,
+    note='1x6 2.54 mm straight header on the back of the control PCB, pins toward the tray floor.')
+jy = (j1_pins[0][1] + j1_pins[-1][1]) / 2
+add('DupontAllowance', box(C['j1_x']-du_w/2, jy-du_l/2, dupont_bot, du_w, du_l, j1_plastic_bot-dupont_bot-.05), (.85, .75, .35), REF,
+    note=f'1x6 Dupont housing ({du_h} mm) on J1 plus {C["dupont_wire_bend"]} mm for the wires to turn.')
+rl, rd = C['resistor_body']
+rx0, rx1 = C['resistor_x']
+add('ControlResistors', Part.makeCompound([
+    union([cylinder((rx0+rx1)/2-rl/2, y, pcb_bot-rd/2, rd, rl, (1, 0, 0))] +
+          [cylinder(x, y, pcb_bot-rd/2, .6, rd/2+C['carrier_thickness']+1.0) for x in (rx0, rx1)] +
+          [cylinder(min(x, (rx0+rx1)/2), y, pcb_bot-rd/2, .6, abs(x-(rx0+rx1)/2), (1, 0, 0)) for x in (rx0, rx1)])
+    for y in C['resistor_rows_y']]), (.55, .70, .85), REF,
+    note='R1-R3, 330 ohm 1/4 W axial (6.3 x 2.5 mm), lying flat on the back of the control PCB.')
 
 # COUPONS: slices of the real parts.
 c1 = tray.common(box(-10, -5, 0, W+20, Y0+69+5, ZP+7.0)).cut(box(13, 13, -1, W-26, Y0+47, T+2))
@@ -350,12 +398,18 @@ def mesh_record(name, kind, color, note, shape, deflection=.15):
 
 scene, manifest, plate = [], [], []
 section = box(cam_x, -50, -50, 200, L+100, H+100)        # everything right of the ribbon centreline
+row_cut = box(-50, -50, -50, W+100, btn_y+50, H+100).fuse(box(-50, L-T-.3, -50, W+100, 50, H+100))
+                                                         # keep the slab from the button/LED/lens row to the top wall
+ROW = {'Tray', 'Lid', 'ButtonCap', 'Switch', 'StatusLED', 'ControlPCB', 'J1Header', 'DupontAllowance', 'ControlResistors',
+       'CameraPCB', 'CameraLens', 'CameraFrontParts', 'CameraConnector', 'CSIRibbon', 'PiPCB', 'PiPorts', 'PiHeaders', 'PiChips'}
 for rec in parts + refs + coupons:
     s = rec['obj'].Shape
     kind = 'part' if rec in parts else 'reference' if rec in refs else 'coupon'
     scene.append(mesh_record(rec['name'], kind, rec['color'], rec['note'], s))
     if kind != 'coupon':
         scene.append(mesh_record(rec['name']+'#cut', 'section', rec['color'], rec['note'], s.cut(section)))
+    if rec['name'] in ROW:
+        scene.append(mesh_record(rec['name']+'#row', 'section', rec['color'], rec['note'], s.cut(row_cut)))
     if kind == 'reference':
         continue
     ps = print_shape(rec)
@@ -426,6 +480,18 @@ for a, b in (('ButtonCap', 'Switch'), ('ButtonCarrier', 'Switch'), ('ButtonCap',
 for a in ('ButtonCap', 'ButtonCarrier'):
     clearance(a+' / Tray', named[a], tray)
     clearance(a+' / Lid', named[a], lid)
+# Control PCB and what hangs off it. It replaces the ButtonCarrier, so the two are
+# alternatives and are not checked against each other.
+board = ('ControlPCB', 'StatusLED', 'J1Header', 'DupontAllowance', 'ControlResistors')
+for a in board[2:]:
+    for b in pi_names + cam_names + ('CSIRibbon', 'Switch', 'ButtonCap'):
+        clearance(a+' / '+b, named[a], named[b])
+for b in pi_names + cam_names + ('CSIRibbon', 'Switch', 'ButtonCap', 'StatusLED'):
+    clearance('ControlPCB / '+b, named['ControlPCB'], named[b])
+for a, b in (('J1Header', 'StatusLED'), ('J1Header', 'ControlResistors'), ('DupontAllowance', 'ControlResistors'),
+             ('DupontAllowance', 'StatusLED'), ('ControlResistors', 'StatusLED'), ('J1Header', 'ControlPCB'),
+             ('ControlResistors', 'ControlPCB'), ('DupontAllowance', 'ControlPCB')):
+    clearance(a+' / '+b, named[a], named[b])
 # The ribbon may only touch the CSI socket itself among the headers.
 others = Part.makeCompound(named['PiHeaders'].Solids[:1] + named['PiHeaders'].Solids[2:])
 clearance('CSIRibbon / GPIO, DSI, PoE', named['CSIRibbon'], others)
@@ -444,8 +510,16 @@ layout = dict(outer_mm=[W, L, H], outer_with_ears_mm=[round(W+2*(ear_off+ear_d/2
               switch_posts=[[round(x, 3), round(y, 3)] for x, y in sw_posts],
               switch_depth_behind_lid=round(RIM-sw_tip, 3), switch_depth_behind_lid_face=round(H-sw_tip, 3),
               cap_proud=C['cap_proud'], cap_rest_gap=C['cap_rest_gap'],
-              led_centre=[led_x, round(led_y, 3)], led_collar_height=led_collar_h,
-              led_depth_behind_lid=round(led_collar_h+C['led_flange_thickness']+C['led_lead_allowance'], 3),
+              led_centre=[led_x, round(led_y, 3)], led_collar_height=led_collar_h, led_collar_z=[round(led_collar_bot, 3), RIM],
+              led_posts=[[round(x, 3), round(y, 3)] for x, y in led_posts],
+              led_tip_z=led_tip, led_flange_z=[round(led_flange_bot, 3), round(led_flange_top, 3)],
+              led_standoff_above_pcb=led_standoff, led_leads_yz=[[round(y, 3), led_x] for x, y in led_leads],
+              led_depth_behind_lid=round(RIM-(pcb_bot-C['led_lead_tail']), 3),
+              control_pcb=dict(outline=[px0, py0, px1, py1], size=[round(px1-px0, 3), round(py1-py0, 3)],
+                               z=[round(pcb_bot, 3), round(pcb_top, 3)], holes=[[round(x, 3), round(y, 3)] for x, y in sw_posts + led_posts],
+                               j1_pins=[[round(x, 3), round(y, 3)] for x, y in j1_pins], j1_plastic_bottom_z=round(j1_plastic_bot, 3),
+                               dupont_housing_bottom_z=round(j1_plastic_bot-du_h, 3), dupont_allowance_bottom_z=round(dupont_bot, 3),
+                               resistor_pads=[[round(x, 3), round(y, 3)] for x, y in res_pads]),
               fpc=dict(length=round(fpc_len, 2), bend_radius=R, lower_run_z=round(fpc_z0, 3), upper_run_z=round(fpc_z1, 3),
                        fold_back_to_y=round(fpc_yb, 3), fold_back_to_px=round(fpc_yb-Y0, 3),
                        min_length=round(fixed+2*R, 1), max_length=round(fixed+2*(fpc_ys-T-1.0), 1),
@@ -461,5 +535,5 @@ report = dict(status='CAD validated; physical fit untested', freecad=App.Version
 (OUT/'validation.json').write_text(json.dumps(report, indent=2)+'\n')
 print('BUILD_OK', len(parts), 'printable parts;', len(coupons), 'coupons;', len(checks), 'clearance checks')
 print('LAYOUT', json.dumps({k: layout[k] for k in ('outer_mm', 'outer_with_ears_mm', 'inner_mm', 'headroom_over_pcb',
-      'headroom_over_usb', 'lens_centre', 'button_centre', 'switch_depth_behind_lid', 'led_centre', 'led_collar_height', 'fpc')}))
+      'headroom_over_usb', 'lens_centre', 'button_centre', 'switch_depth_behind_lid', 'led_centre', 'led_collar_height', 'led_posts', 'led_standoff_above_pcb', 'control_pcb')}))
 App.closeDocument(DOC.Name)

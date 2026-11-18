@@ -19,13 +19,13 @@
     "solid_count": 1,
     "valid": true,
     "closed_mesh": true,
-    "volume_mm3": 21940.199,
+    "volume_mm3": 22156.56,
     "print_size_mm": [
       76.6,
       124.36,
       10.6
     ],
-    "note": "Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws. Switch carrier: two M2 x 6. The LED pushes into its collar from inside."
+    "note": "Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws. Control PCB: four M2 x 6 (two switch posts, two LED posts). The LED dome sits in a 5.5 mm hole with a light collar."
   },
   {
     "name": "ButtonCap",
@@ -53,7 +53,7 @@
       25.0,
       1.6
     ],
-    "note": "Print flat, no supports. Switch terminals go through the four slots; two M2 x 6 screws into the lid posts."
+    "note": "Superseded by the control PCB (../pcb-pi4-controls), which has the same thickness and screw holes. Print flat, no supports. Switch terminals go through the four slots; two M2 x 6 screws into the lid posts."
   },
   {
     "name": "PiFitCoupon",
@@ -75,7 +75,7 @@
     "solid_count": 1,
     "valid": true,
     "closed_mesh": true,
-    "volume_mm3": 5782.0,
+    "volume_mm3": 5998.361,
     "print_size_mm": [
       76.599,
       31.36,

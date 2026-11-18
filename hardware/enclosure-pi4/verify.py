@@ -50,7 +50,8 @@ def value(name, got, need, kind='margin'):
 
 refs = ['PiPCB', 'PiPorts', 'PiHeaders', 'PiChips', 'PiSDCard', 'PiUndersideAllowance', 'GPIOJumperAllowance',
         'PowerPlugAllowance', 'HDMIPlugAllowance', 'CameraPCB', 'CameraLens', 'CameraFrontParts',
-        'CameraConnector', 'CSIRibbon', 'Switch', 'StatusLED', 'ButtonCap', 'ButtonCarrier']
+        'CameraConnector', 'CSIRibbon', 'Switch', 'StatusLED', 'ButtonCap', 'ButtonCarrier',
+        'ControlPCB', 'J1Header', 'DupontAllowance', 'ControlResistors']
 for n in refs:
     overlap(n + ' / Tray', obj(n), tray)
     overlap(n + ' / Lid', obj(n), lid)
@@ -119,7 +120,7 @@ overlap('ButtonCarrier / Switch', carrier, switch)
 overlap('StatusLED / ButtonCarrier', led, carrier)
 stack = Part.makeCompound([switch, carrier, led])
 value('Switch depth behind the lid underside, to the terminal tips (15 max)', 15.0 - lay['switch_depth_behind_lid'], 0)
-value('LED depth behind the lid underside, leads bent (15 max)', 15.0 - lay['led_depth_behind_lid'], 0)
+value('LED depth behind the lid underside, lead tails under the PCB (15 max)', 15.0 - lay['led_depth_behind_lid'], 0)
 gap('Switch, carrier and LED to Pi parts', stack, pi, 1.0)
 gap('Switch, carrier and LED to camera', stack, Part.makeCompound([obj('CameraPCB'), obj('CameraConnector')]), 1.0)
 gap('Switch and carrier to Tray', Part.makeCompound([switch, carrier]), tray, 1.0)
@@ -141,10 +142,56 @@ value('Carrier slot over the terminal (smallest side margin)', min(C['carrier_sl
       C['carrier_slot'][1] - C['switch_terminal_section'][0]) / 2, 0.3)
 value('Terminal tails below the carrier, for soldering', C['switch_terminal_length'] - C['carrier_thickness'], 1.2)
 value('LED hole over the LED body (diametral)', C['led_hole'] - C['led_diameter'], 0.1)
-value('LED window narrower than the LED body (radial)', (C['led_diameter'] - C['led_window']) / 2, 0.2)
-gap('LED dome to the window lip', led, lid, 0.0)
 value('Carrier hole over the locating boss (diametral)', C['carrier_boss_hole'] - C['switch_boss_diameter'], 0.3)
-value('LED tip not proud of the lid face', H - (RIM - lay['led_collar_height'] + C['led_height'] - C['led_flange_thickness']), 0.0)
+
+# Control PCB (replaces the ButtonCarrier) with the 5 mm RGB LED, J1 and R1-R3.
+cp, j1, du, res = obj('ControlPCB'), obj('J1Header'), obj('DupontAllowance'), obj('ControlResistors')
+pcb = lay['control_pcb']
+value('Control PCB thickness equals the carrier (error)', 0.01 - abs((pcb['z'][1] - pcb['z'][0]) - C['carrier_thickness']), 0, 'alignment')
+value('Control PCB top face is the switch seating plane (error)', 0.01 - abs(pcb['z'][1] - lay['switch_seat_z']), 0, 'alignment')
+value('Control PCB and ButtonCarrier underside at the same height (error)', 0.01 - abs(cp.BoundBox.ZMin - carrier.BoundBox.ZMin), 0, 'alignment')
+for i, (x, y) in enumerate(lay['switch_posts'] + lay['led_posts']):
+    probe = Part.makeCylinder(.3, 1, V(x, y, lay['switch_seat_z']))
+    assert lid.common(probe).Volume < 1e-6 and abs(lid.distToShape(probe)[0] - (C['camera_pilot']/2 - .3)) < .05, ('post misses', i)
+    hole = Part.makeCylinder(.3, 5, V(x, y, lay['switch_seat_z'] - 3))
+    assert cp.common(hole).Volume < 1e-6, ('PCB hole misses the post', i)
+value('LED dome tip flush with the lid face (error)', 0.02 - abs(led.BoundBox.ZMax - H), 0, 'alignment')
+value('LED flange above the PCB (soldering standoff)', lay['led_standoff_above_pcb'], 0.5)
+gap('LED to the lid hole and collar (radial)', led, lid, 0.2)
+value('LED flange below the collar', lay['led_collar_z'][0] - lay['led_flange_z'][1], 0.3)
+cap_flange = C['cap_flange_diameter'] / 2
+value('LED collar to the button cap flange (plan)', C['led_x'] - C['led_collar_diameter']/2 - (lay['button_centre'][0] + cap_flange), 1.0)
+gap('LED collar to button cap', cap, lid.common(Part.makeCylinder(C['led_collar_diameter']/2 + .05, RIM - lay['led_collar_z'][0] - .01,
+    V(C['led_x'], lay['led_centre'][1], lay['led_collar_z'][0]))), 1.0)
+led_posts = Part.makeCompound([lid.common(Part.makeCylinder(C['camera_post_diameter']/2 + .05, RIM - lay['switch_seat_z'] + .01,
+                                V(x, y, lay['switch_seat_z']))) for x, y in lay['led_posts']])
+cam_all = Part.makeCompound([obj(n) for n in ('CameraPCB', 'CameraLens', 'CameraFrontParts', 'CameraConnector')])
+cam_posts = Part.makeCompound([lid.common(Part.makeCylinder(C['camera_post_diameter']/2 + .05, lay['camera_post_height'] + .01,
+                               V(x, y, lay['camera_pcb_z'][1]))) for x, y in lay['camera_holes']])
+gap('New LED posts to camera board and parts', led_posts, cam_all, 1.0)
+gap('New LED posts to camera posts', led_posts, cam_posts, 1.0)
+gap('New LED posts to ribbon', led_posts, ribbon, 1.0)
+gap('New LED posts to button cap', led_posts, cap, 1.0)
+gap('New LED posts to switch', led_posts, switch, 1.0)
+gap('New LED posts to LED', led_posts, led, 1.0)
+gap('Control PCB to camera board, connector and lens parts', cp, cam_all, 1.0)
+gap('Control PCB to camera posts', cp, cam_posts, 1.0)
+gap('Control PCB to ribbon', cp, ribbon, 1.0)
+gap('Control PCB to Tray walls', cp, tray, 1.0)
+gap('Control PCB to USB/Ethernet stacks', cp, Part.makeCompound(obj('PiPorts').Solids[4:]), 1.0)
+gap('Control PCB to lid features other than its four posts', cp, lid.common(Part.makeBox(W + 20, L + 20, RIM - lay['switch_seat_z'] - .01, V(-10, -10, lay['switch_seat_z'] + .01))).cut(
+    Part.makeCompound([Part.makeCylinder(C['camera_post_diameter']/2 + .05, 40, V(x, y, 0)) for x, y in lay['switch_posts'] + lay['led_posts']])), 1.0)
+parts_back = Part.makeCompound([j1, res])
+gap('J1 and R1-R3 to Pi parts', parts_back, pi, 1.0)
+gap('J1 and R1-R3 to Tray', parts_back, tray, 1.0)
+gap('Dupont housing + wire bend to Tray (floor, walls)', du, tray, 1.0)
+gap('Dupont housing + wire bend to Pi parts (USB/Ethernet stacks)', du, pi, 1.0)
+gap('Dupont housing + wire bend to ribbon', du, ribbon, 3.0)
+gap('Dupont housing + wire bend to camera', du, cam_all, 1.0)
+gap('Dupont housing to R1-R3', du, res, 1.0)
+gap('R1-R3 (lead tails on the front) to switch', res, switch, 1.0)
+gap('Control PCB parts to ribbon', Part.makeCompound([j1, res, led]), ribbon, 3.0)
+value('Dupont housing bottom above the tray floor', pcb['dupont_housing_bottom_z'] - T, 4.0)
 
 failed = [c for c in checks if not c['passed']]
 notes = dict(outer_mm=lay['outer_mm'], headroom_over_pcb=lay['headroom_over_pcb'], fpc=f,

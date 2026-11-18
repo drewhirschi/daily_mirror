@@ -116,15 +116,13 @@
   ],
   "carrier_screw_clearance": 2.4,
   "led_x": 30.5,
-  "led_hole": 3.2,
-  "led_diameter": 2.9,
-  "led_flange_diameter": 3.2,
+  "led_hole": 5.5,
+  "led_diameter": 5.0,
+  "led_flange_diameter": 5.8,
   "led_flange_thickness": 1.0,
-  "led_height": 4.6,
-  "led_lead_spacing": 2.54,
-  "led_lead_allowance": 4.0,
-  "led_tip_recess": 0.1,
-  "led_collar_diameter": 6.0,
+  "led_height": 7.7,
+  "led_lead_spacing": 2.0,
+  "led_collar_diameter": 7.5,
   "switch_plunger_base_diameter": 7.1,
   "switch_plunger_base_height": 4.3,
   "switch_plunger_head": 3.8,
@@ -132,6 +130,38 @@
   "switch_boss_diameter": 1.6,
   "switch_boss_spacing": 9.0,
   "carrier_boss_hole": 2.0,
-  "led_window": 2.2,
-  "led_window_lip": 0.6
+  "led_lead_tail": 2.0,
+  "led_collar_gap": 0.5,
+  "pcb_outline": [
+    4.0,
+    93.25,
+    34.0,
+    120.35
+  ],
+  "pcb_corner_radius": 2.0,
+  "pcb_hole": 2.4,
+  "j1_x": 6.0,
+  "j1_pin1_y": 96.0,
+  "j1_plastic_height": 2.54,
+  "j1_pin_above_plastic": 6.0,
+  "j1_tail": 3.0,
+  "dupont_housing": [
+    2.8,
+    15.6,
+    14.5
+  ],
+  "dupont_wire_bend": 4.0,
+  "resistor_x": [
+    6.0,
+    13.62
+  ],
+  "resistor_rows_y": [
+    113.2,
+    116.0,
+    118.8
+  ],
+  "resistor_body": [
+    6.3,
+    2.5
+  ]
 }

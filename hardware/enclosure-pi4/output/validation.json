@@ -129,8 +129,135 @@
       30.5,
       105.75
     ],
-    "led_collar_height": 1.2,
-    "led_depth_behind_lid": 6.2,
+    "led_collar_height": 3.7,
+    "led_collar_z": [
+      30.8,
+      34.5
+    ],
+    "led_posts": [
+      [
+        30.5,
+        96.25
+      ],
+      [
+        30.5,
+        115.25
+      ]
+    ],
+    "led_tip_z": 37.0,
+    "led_flange_z": [
+      29.3,
+      30.3
+    ],
+    "led_standoff_above_pcb": 2.9,
+    "led_leads_yz": [
+      [
+        102.75,
+        30.5
+      ],
+      [
+        104.75,
+        30.5
+      ],
+      [
+        106.75,
+        30.5
+      ],
+      [
+        108.75,
+        30.5
+      ]
+    ],
+    "led_depth_behind_lid": 11.7,
+    "control_pcb": {
+      "outline": [
+        4.0,
+        93.25,
+        34.0,
+        120.35
+      ],
+      "size": [
+        30.0,
+        27.1
+      ],
+      "z": [
+        24.8,
+        26.4
+      ],
+      "holes": [
+        [
+          18.5,
+          96.25
+        ],
+        [
+          18.5,
+          115.25
+        ],
+        [
+          30.5,
+          96.25
+        ],
+        [
+          30.5,
+          115.25
+        ]
+      ],
+      "j1_pins": [
+        [
+          6.0,
+          96.0
+        ],
+        [
+          6.0,
+          98.54
+        ],
+        [
+          6.0,
+          101.08
+        ],
+        [
+          6.0,
+          103.62
+        ],
+        [
+          6.0,
+          106.16
+        ],
+        [
+          6.0,
+          108.7
+        ]
+      ],
+      "j1_plastic_bottom_z": 22.26,
+      "dupont_housing_bottom_z": 7.76,
+      "dupont_allowance_bottom_z": 3.76,
+      "resistor_pads": [
+        [
+          6.0,
+          113.2
+        ],
+        [
+          13.62,
+          113.2
+        ],
+        [
+          6.0,
+          116.0
+        ],
+        [
+          13.62,
+          116.0
+        ],
+        [
+          6.0,
+          118.8
+        ],
+        [
+          13.62,
+          118.8
+        ]
+      ]
+    },
     "fpc": {
       "length": 149.98,
       "bend_radius": 3.5,
@@ -354,6 +481,46 @@
     },
     {
       "name": "StatusLED / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / Lid",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / Tray",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / Lid",
       "overlap_mm3": 0.0,
       "passed": true
     },
@@ -743,6 +910,291 @@
       "passed": true
     },
     {
+      "name": "J1Header / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / CameraPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / CameraLens",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / CameraFrontParts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / CameraConnector",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / CSIRibbon",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / Switch",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / ButtonCap",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / CameraPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / CameraLens",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / CameraFrontParts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / CameraConnector",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / CSIRibbon",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / Switch",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / ButtonCap",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / CameraPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / CameraLens",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / CameraFrontParts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / CameraConnector",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / CSIRibbon",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / Switch",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / ButtonCap",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / PiPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / PiPorts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / PiHeaders",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / PiChips",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / GPIOJumperAllowance",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / CameraPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / CameraLens",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / CameraFrontParts",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / CameraConnector",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / CSIRibbon",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / Switch",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / ButtonCap",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlPCB / StatusLED",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / StatusLED",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / ControlResistors",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / ControlResistors",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / StatusLED",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / StatusLED",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "J1Header / ControlPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "ControlResistors / ControlPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
+      "name": "DupontAllowance / ControlPCB",
+      "overlap_mm3": 0.0,
+      "passed": true
+    },
+    {
       "name": "CSIRibbon / GPIO, DSI, PoE",
       "overlap_mm3": 0.0,
       "passed": true
@@ -769,13 +1221,13 @@
       "solid_count": 1,
       "valid": true,
       "closed_mesh": true,
-      "volume_mm3": 21940.199,
+      "volume_mm3": 22156.56,
       "print_size_mm": [
         76.6,
         124.36,
         10.6
       ],
-      "note": "Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws. Switch carrier: two M2 x 6. The LED pushes into its collar from inside."
+      "note": "Print outer face on the bed, posts up, no supports. Camera: four M2 x 6 thread-forming screws. Control PCB: four M2 x 6 (two switch posts, two LED posts). The LED dome sits in a 5.5 mm hole with a light collar."
     },
     {
       "name": "ButtonCap",
@@ -803,7 +1255,7 @@
         25.0,
         1.6
       ],
-      "note": "Print flat, no supports. Switch terminals go through the four slots; two M2 x 6 screws into the lid posts."
+      "note": "Superseded by the control PCB (../pcb-pi4-controls), which has the same thickness and screw holes. Print flat, no supports. Switch terminals go through the four slots; two M2 x 6 screws into the lid posts."
     },
     {
       "name": "PiFitCoupon",
@@ -825,7 +1277,7 @@
       "solid_count": 1,
       "valid": true,
       "closed_mesh": true,
-      "volume_mm3": 5782.0,
+      "volume_mm3": 5998.361,
       "print_size_mm": [
         76.599,
         31.36,

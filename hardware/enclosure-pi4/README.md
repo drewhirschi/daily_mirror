@@ -1,5 +1,7 @@
 # Daily Mirror — Raspberry Pi 4 tray and lid
 
+> **Status: current.** This is the box to print. See [`../README.md`](../README.md) for the current build.
+
 A closed version of the `../enclosure-p4-open` tray for the **Raspberry Pi 4
 Model B**: the same 2.5 mm walls, 4 mm corners and screw ears, but with a full
 lid. The **Arducam IMX519** hangs under the lid with its lens in a bore. Next to
@@ -230,11 +232,11 @@ Three things I could not confirm from documents and that the layout depends on:
 | `Tray` | back on bed | ~1.7 h, 60 g |
 | `Lid` | outer face on bed, posts up | ~36 min, 22 g |
 
-**The sliced file below predates the control-PCB lid change** and still holds
-the old Lid (3 mm LED bore, no LED posts). `output/TrayAndLid.gcode.3mf` is the Tray, Lid, ButtonCap and ButtonCarrier
-sliced on one plate (2.4 h, 83 g). `output/TrayAndLid.3mf` is the same four
-parts as a plain model file. Print the cap and carrier with the LidFitCoupon to
-try the button before the full lid.
+`output/Lid-v2.gcode.3mf` is the current Lid sliced for the Bambu A1, the exact
+job printed on 2026-11-16. `output/TrayAndLid.3mf` is the Tray, Lid, ButtonCap
+and ButtonCarrier as a plain model file. The old one-plate
+`TrayAndLid.gcode.3mf` held the previous Lid (3 mm LED bore, no board posts)
+and was removed so it cannot be printed by mistake.
 
 No supports are needed. The port windows bridge up to 13.5 mm, the wall over
 the microSD slot bridges 16 mm, and the vents bridge 2.5 mm. The lid prints
@@ -259,7 +261,7 @@ clears the parts under the board.
 
 - `output/Tray.step|stl`, `output/Lid.step|stl`, `output/ButtonCap.step|stl`, `output/ButtonCarrier.step|stl`
 - `output/PiFitCoupon.step|stl`, `output/LidFitCoupon.step|stl`
-- `output/TrayAndLid.3mf`, `output/TrayAndLid.gcode.3mf`, `output/Assembly.step`
+- `output/TrayAndLid.3mf`, `output/Lid-v2.gcode.3mf`, `output/Assembly.step`
 - `output/enclosure-preview.png`, `exterior.png`, `cutaway.png`, `exploded.png`, `lid-off.png`
 - `output/pcb-lid-posts.png`, `pcb-lid-assembled.png`, `pcb-front-led-opening.png` (control PCB change)
 - `output/verify.json` (128 fit checks), `output/validation.json`, `output/layout.json`, `output/manifest.json`

@@ -1,5 +1,7 @@
 # Daily Mirror - Pi 4 case control board (draft v0.4)
 
+> **Status: current, v0.4, not ordered yet.** This is the board for the current box. See [`../README.md`](../README.md) for the current build.
+
 A 2-layer, all-through-hole board that **replaces the printed ButtonCarrier**
 in `../enclosure-pi4` and also carries the status LED. Same 1.6 mm thickness,
 same two screw holes on the existing button posts, same switch seating plane,

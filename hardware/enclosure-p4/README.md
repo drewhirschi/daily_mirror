@@ -1,5 +1,7 @@
 # Daily Mirror — ESP32-P4-WIFI6 housing
 
+> **Status: older design.** The later ESP32-P4 design is `../enclosure-p4-open`, and the current box is `../enclosure-pi4`. See [`../README.md`](../README.md) for the current build.
+
 Housing for the Waveshare **ESP32-P4-WIFI6** (71 x 21 mm Pico-style strip),
 plugged into a **70 x 50 mm perfboard**, with the Arducam IMX519 on the front
 panel. It mounts on the **enclosure-v2 rail and carriage, unchanged**: the four

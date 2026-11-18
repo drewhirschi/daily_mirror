@@ -1,5 +1,7 @@
 # Daily Mirror — ESP32-P4 open tray
 
+> **Status: other device, not the current box.** This is for the ESP32-P4. The current box is `../enclosure-pi4`. See [`../README.md`](../README.md) for the current build.
+
 A low, open-top tray for the Waveshare **ESP32-P4-WIFI6** plugged into a
 **50 x 70 mm perfboard**, with a short screwed-on **CameraLid** over the top
 end of the board that carries the Arducam IMX519. The button and RGB LED on the

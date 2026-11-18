@@ -145,6 +145,8 @@ void board_camera_last_size(uint32_t *w, uint32_t *h);
  *   mean_luma     -1  (otherwise 0-255)
  *   af_state      "unknown" | "focused" | "failed" | "searching"
  *   focus_score   -1
+ *   face_steered  -1  (otherwise 1 if a detected face was steering AE/AF for
+ *                      this frame, 0 if the default metering was)
  */
 typedef struct {
     bool        valid;
@@ -158,10 +160,30 @@ typedef struct {
     const char *af_state;
     int         focus_score;
     bool        flash;        /* the capture light was on for this frame */
+    int         face_steered;
 } board_camera_capture_info_t;
 
 /** The latch described above. Always fills `out`; never fails. */
 void board_camera_capture_info(board_camera_capture_info_t *out);
+
+/**
+ * Face-steered metering, on a board that has it (the P4, CONFIG_MIRROR_FACE_AE):
+ * append its key=value lines for /stats - face=, face_box=, face_age_ms=,
+ * detect_ms= and the ISP windows actually in force. Returns the bytes written;
+ * 0 on a board without it.
+ */
+int board_camera_face_stats(char *out, size_t cap);
+
+/**
+ * Debug: run the face detector once on a JPEG and describe what it found in
+ * `out`. With `steer`, the largest face also steers AE/AF as if the camera had
+ * seen it, until the usual timeout - the way to test the steering with nobody
+ * in front of the lens. ESP_ERR_NOT_SUPPORTED on a board without detection.
+ *
+ * On ESP_ERR_TIMEOUT the detector may still read `jpeg` later, so the caller
+ * must not free it.
+ */
+esp_err_t board_camera_face_test(const uint8_t *jpeg, size_t len, bool steer, char *out, size_t cap);
 
 /** One line about the camera for /stats, e.g. "IMX519 1920x1080, AF continuous". */
 const char *board_camera_status(void);

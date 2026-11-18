@@ -39,9 +39,16 @@
  * milliseconds. These are stills modes, so each VTS below is chosen for 30 fps
  * (VTS = pixel_rate / (HTS * 30)), doubling or nearly tripling the exposure
  * ceiling. The override is written after the mode table.
+ *
+ * 1080p, the mode the mirror uses, goes further, to ~15 fps. Indoors under
+ * lamps 33 ms was not enough: AE sat at its ceiling and faces came out dark.
+ * And with 60 Hz anti-flicker exposure moves in 8.33 ms steps, so a 33 ms
+ * ceiling really meant 25 ms. 4760 lines puts the ceiling at 66.8 ms, just
+ * past eight flicker periods (66.7 ms), which is about what libcamera picks on
+ * the Pi for the same room (~60 ms).
  */
 #define IMX519_HTS_1080P    0x178b   /* 6027 */
-#define IMX519_VTS_1080P    2358     /* 426666667 / (6027 * 30) */
+#define IMX519_VTS_1080P    4760     /* 426666667 / (6027 * 4760) = 14.9 fps */
 #define IMX519_HTS_720P     0x1800   /* 6144 */
 #define IMX519_VTS_720P     2314
 #define IMX519_HTS_FULLBIN  0x1970   /* 6512 */
@@ -52,7 +59,7 @@
 static const char *TAG = "imx519";
 
 enum {
-    IMX519_FMT_1920x1080_RAW10_30FPS = 0,
+    IMX519_FMT_1920x1080_RAW10_15FPS = 0,
     IMX519_FMT_1280x720_RAW10_30FPS,
     IMX519_FMT_2328x1748_RAW10_30FPS,
     IMX519_FMT_MAX,
@@ -64,13 +71,13 @@ typedef struct {
 } imx519_mode_timing_t;
 
 static const imx519_mode_timing_t imx519_timing[IMX519_FMT_MAX] = {
-    [IMX519_FMT_1920x1080_RAW10_30FPS] = { IMX519_HTS_1080P,   IMX519_VTS_1080P },
+    [IMX519_FMT_1920x1080_RAW10_15FPS] = { IMX519_HTS_1080P,   IMX519_VTS_1080P },
     [IMX519_FMT_1280x720_RAW10_30FPS]  = { IMX519_HTS_720P,    IMX519_VTS_720P },
     [IMX519_FMT_2328x1748_RAW10_30FPS] = { IMX519_HTS_FULLBIN, IMX519_VTS_FULLBIN },
 };
 
 static const esp_cam_sensor_isp_info_t imx519_isp_info[] = {
-    [IMX519_FMT_1920x1080_RAW10_30FPS] = {
+    [IMX519_FMT_1920x1080_RAW10_15FPS] = {
         .isp_v1_info = {
             .version = SENSOR_ISP_INFO_VERSION_DEFAULT,
             .pclk = IMX519_PIXEL_RATE,
@@ -109,8 +116,8 @@ static const esp_cam_sensor_isp_info_t imx519_isp_info[] = {
 };
 
 static const esp_cam_sensor_format_t imx519_format_info[] = {
-    [IMX519_FMT_1920x1080_RAW10_30FPS] = {
-        .name = "MIPI_2lane_24Minput_RAW10_1920x1080_binned_30fps",
+    [IMX519_FMT_1920x1080_RAW10_15FPS] = {
+        .name = "MIPI_2lane_24Minput_RAW10_1920x1080_binned_15fps",
         .format = ESP_CAM_SENSOR_PIXFORMAT_RAW10,
         .port = ESP_CAM_SENSOR_MIPI_CSI,
         .xclk = IMX519_INCLK_FREQ_HZ,
@@ -118,14 +125,14 @@ static const esp_cam_sensor_format_t imx519_format_info[] = {
         .height = 1080,
         .regs = imx519_mode_1920x1080_regs,
         .regs_size = sizeof(imx519_mode_1920x1080_regs) / sizeof(imx519_mode_1920x1080_regs[0]),
-        .fps = 30,
-        .isp_info = &imx519_isp_info[IMX519_FMT_1920x1080_RAW10_30FPS],
+        .fps = 15,
+        .isp_info = &imx519_isp_info[IMX519_FMT_1920x1080_RAW10_15FPS],
         .mipi_info = {
             .mipi_clk = IMX519_MIPI_CSI_LINE_RATE,
             .lane_num = 2,
             .line_sync_en = IMX519_LINESYNC_ENABLE,
         },
-        .reserved = (void *)&imx519_timing[IMX519_FMT_1920x1080_RAW10_30FPS],
+        .reserved = (void *)&imx519_timing[IMX519_FMT_1920x1080_RAW10_15FPS],
     },
     [IMX519_FMT_1280x720_RAW10_30FPS] = {
         .name = "MIPI_2lane_24Minput_RAW10_1280x720_binned_30fps",

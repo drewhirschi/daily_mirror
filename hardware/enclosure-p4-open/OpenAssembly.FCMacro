@@ -1,0 +1,37 @@
+"""Open the open P4 tray assembly in desktop FreeCAD: freecad OpenAssembly.FCMacro
+
+The first open imports the Waveshare board STEP (about 30 s) and saves it into
+the file, so later opens are quick.
+"""
+from pathlib import Path
+import json
+import FreeCAD as App
+import FreeCADGui as Gui
+import ImportGui
+
+root = Path(__file__).resolve().parent
+path = str(root / 'output' / 'FullAssembly.FCStd')
+doc = next((d for d in App.listDocuments().values() if d.FileName == path), None) or App.openDocument(path)
+
+for obj in doc.Objects:
+    if hasattr(obj, 'DisplayColor'):
+        obj.ViewObject.ShapeColor = tuple(json.loads(obj.DisplayColor))
+        obj.ViewObject.Transparency = obj.DisplayTransparency
+        obj.ViewObject.Visibility = obj.DisplayVisible
+
+if not doc.getObject('P4Board'):
+    pose = json.loads((root / 'output' / 'assembly-board-pose.json').read_text())
+    before = set(doc.Objects)
+    ImportGui.insert(str(root.parent / 'enclosure-p4' / 'reference' / 'ESP32-P4-WIFI6-3d-20260109.stp'), doc.Name)
+    board = doc.addObject('App::Part', 'P4Board')
+    for obj in [o for o in doc.Objects if o not in before and o is not board]:
+        if not [p for p in obj.InList if p in doc.Objects and p is not board]:
+            board.addObject(obj)
+    board.Placement = App.Placement(App.Vector(*pose['board_translate']),
+                                    App.Rotation(App.Vector(0, 0, 1), pose['board_rotate_z']))
+    board.Label = 'P4Board (Waveshare ESP32-P4-WIFI6)'
+    doc.recompute()
+    doc.save()
+
+Gui.activeDocument().activeView().viewAxonometric()
+Gui.SendMsgToActiveView('ViewFit')

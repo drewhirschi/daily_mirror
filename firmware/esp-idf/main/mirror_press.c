@@ -383,6 +383,15 @@ static void button_task(void *arg)
     };
     gpio_config(&io);
     ESP_LOGI(TAG, "button on GPIO %d (active low, internal pull-up)", pin);
+    if (CONFIG_MIRROR_BUTTON_RETURN_GPIO >= 0) {
+        gpio_config_t ret = {
+            .pin_bit_mask = 1ULL << CONFIG_MIRROR_BUTTON_RETURN_GPIO,
+            .mode = GPIO_MODE_OUTPUT,
+        };
+        gpio_config(&ret);
+        gpio_set_level(CONFIG_MIRROR_BUTTON_RETURN_GPIO, 0);
+        ESP_LOGI(TAG, "button return on GPIO %d, held low", CONFIG_MIRROR_BUTTON_RETURN_GPIO);
+    }
 
     gesture_t g = { .pressed_since = -1 };
 
@@ -399,6 +408,7 @@ static void button_task(void *arg)
             candidate_since = now_ms();
         } else if (raw != debounced && now_ms() - candidate_since >= DEBOUNCE_MS) {
             debounced = raw;
+            ESP_LOGI(TAG, "button %s", debounced ? "down" : "up");
         }
 
         gesture_poll(&g, debounced);

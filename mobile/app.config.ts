@@ -30,6 +30,11 @@ const config: ExpoConfig = {
     // /.well-known/apple-app-site-association route.
     associatedDomains: ["webcredentials:daily-mirror-pearl.vercel.app"],
     infoPlist: {
+      // Where ESPProvision sends SoftAP provisioning requests. The firmware's
+      // setup network is 10.10.0.1, not Espressif's 192.168.4.1, because that
+      // subnet collides with the household LAN (see start_ap() in
+      // firmware/esp-idf/main/mirror_net.c).
+      WifiBaseUrl: "10.10.0.1:80",
       // The app speaks only standard HTTPS/TLS to its own server, which is
       // exempt encryption. Declaring it here skips the export-compliance
       // questions on every single upload.
@@ -108,8 +113,9 @@ const config: ExpoConfig = {
     "expo-status-bar",
     "expo-dev-client",
     "@react-native-community/datetimepicker",
-    // BLE is the provisioning transport the app uses; SoftAP stays available as
-    // a bench fallback, so both permission sets are requested.
+    // BLE is the provisioning transport the app uses; SoftAP is the path for
+    // a camera without Bluetooth (the ESP32-P4), so both permission sets are
+    // requested.
     [
       "@orbital-systems/react-native-esp-idf-provisioning",
       {

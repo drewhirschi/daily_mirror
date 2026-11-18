@@ -28,12 +28,12 @@ const loc={};['uCenter','uOffset','uYaw','uPitch','uScale','uColor','uShortRail'
 const pos=gl.getAttribLocation(program,'aPos'),norm=gl.getAttribLocation(program,'aNormal');
 const meshes=scene.map(s=>{const data=[];for(const f of s.faces){const a=s.vertices[f[0]],b=s.vertices[f[1]],c=s.vertices[f[2]],u=b.map((x,i)=>x-a[i]),v=c.map((x,i)=>x-a[i]);const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],l=Math.hypot(...n)||1;for(const p of [a,b,c])data.push(...p,...n.map(x=>x/l));}const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);return {...s,buffer,count:data.length/6};});
 let yaw=-.42,pitch=.23,zoom=1,mode='front',height=146,explode=0;
-const fixed=new Set(['RailLower','RailUpper','StopLower','StopUpper']);
+const fixed={has:n=>/^(RailSection|RailKey|Stop)/.test(n)};
 const panel=new Set(['FrontPanel','CameraPCB','CameraLensAllowance','LEDAllowance','ButtonCap','ButtonAllowance','FutureFlashReserve']);
 const frontSet=new Set(['Housing','FrontPanel','CameraLensAllowance','LEDAllowance','ButtonCap','LockKnob']);
-const railSet=new Set([...fixed,'Carriage','LockKnob','LockNut','LockScrew','BrakePad']);
+const railSet={has:n=>fixed.has(n)||['Carriage','LockKnob','LockNut','LockScrew','BrakePad'].includes(n)};
 function visible(s){
- if(mode==='attachment')return ['Housing','Carriage','RailLower','RailUpper','LockKnob','LockScrew','LockNut','BrakePad'].includes(s.name)||s.name.startsWith('RearMountScrew');
+ if(mode==='attachment')return ['Housing','Carriage','RailSection','RailSection2','RailKey','LockKnob','LockScrew','LockNut','BrakePad'].includes(s.name)||s.name.startsWith('RearMountScrew');
  if(mode==='pimount')return ['Housing','Pi4PCB'].includes(s.name)||s.name.startsWith('PiMountScrew');
  if(s.kind==='reference'&&!document.getElementById('electronics').checked&&s.name!=='FutureFlashReserve')return false;
  if(s.name==='FutureFlashReserve')return document.getElementById('flash').checked&&['front','inside','assembly','panel'].includes(mode);

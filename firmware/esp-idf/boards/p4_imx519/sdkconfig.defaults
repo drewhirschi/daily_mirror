@@ -61,6 +61,30 @@ CONFIG_ESP_IPA_AF_ALGORITHM=y
 CONFIG_ESP_VIDEO_ENABLE_CAMERA_MOTOR_CONTROLLER=y
 CONFIG_ESP_VIDEO_ISP_PIPELINE_CONTROL_CAMERA_MOTOR=y
 
+# --- Face-steered AE/AF -----------------------------------------------------
+# AE metering and the AF windows follow the largest detected face, falling back
+# to the tuning file's centre-weighted windows when nobody is in frame. See
+# components/mirror_board/src/face_ae_p4.c. The model is ESP-DL's MSR+MNP,
+# packed into flash rodata (the default location), which needs no partition.
+CONFIG_MIRROR_FACE_AE=y
+# ESP-DL compiles a SIMD kernel for every pixel-format conversion it knows,
+# about 1 MB of flash in all. The face detector is only ever handed the ISP's
+# RGB565 and converts it to the model's RGB888, so that is the one kept.
+# CONFIG_PIX_CVT_RGB565_TO_RGB565_SUPPORT is not set
+# CONFIG_PIX_CVT_RGB565_TO_GRAY_SUPPORT is not set
+# CONFIG_PIX_CVT_RGB565_TO_HSV_SUPPORT is not set
+# CONFIG_PIX_CVT_RGB888_TO_RGB888_SUPPORT is not set
+# CONFIG_PIX_CVT_RGB888_TO_RGB565_SUPPORT is not set
+# CONFIG_PIX_CVT_RGB888_TO_GRAY_SUPPORT is not set
+# CONFIG_PIX_CVT_RGB888_TO_HSV_SUPPORT is not set
+# CONFIG_PIX_CVT_GRAY_TO_GRAY_SUPPORT is not set
+# CONFIG_PIX_CVT_HSV_TO_HSV_MASK_SUPPORT is not set
+# CONFIG_PIX_CVT_YUV_TO_RGB888_SUPPORT is not set
+# CONFIG_PIX_CVT_YUV_TO_RGB565_SUPPORT is not set
+# CONFIG_PIX_CVT_YUV_TO_GRAY_SUPPORT is not set
+# CONFIG_PIX_CVT_YUV_TO_HSV_SUPPORT is not set
+# CONFIG_PIX_CVT_YUV_TO_YUV_SUPPORT is not set
+
 # --- Wi-Fi through the ESP32-C6 ----------------------------------------------
 # The P4 has no radio. esp_wifi_remote routes esp_wifi calls to the C6 and
 # esp_hosted carries them over SDIO; the P4<->C6 pins are esp_hosted's built-in
@@ -106,6 +130,8 @@ CONFIG_MIRROR_CAM_SCCB_SCL_GPIO=8
 
 # Button: momentary switch to GND, internal pull-up.
 CONFIG_MIRROR_BUTTON_GPIO=20
+# The bench button's other leg is on GPIO 28, not GND; hold it low.
+CONFIG_MIRROR_BUTTON_RETURN_GPIO=28
 
 # Signal LED: a four-leg common-anode RGB LED on three LEDC PWM channels.
 CONFIG_MIRROR_LED_R_GPIO=21

@@ -96,13 +96,22 @@ async def main(args):
     if len(ports) > 350 or any(p < 1024 or p > 65535 for p in ports):
         raise ValueError("Use at most 350 explicit unprivileged ports")
     try:
+        skipped = []
         for port in sorted(ports):
-            servers.append(await asyncio.start_server(
-                lambda r, w, p=port: tcp(r, w, p), args.bind, port))
+            # Ports in the ephemeral range are sometimes held by an outgoing
+            # connection on this Mac; relay the rest rather than fail.
+            try:
+                server = await asyncio.start_server(
+                    lambda r, w, p=port: tcp(r, w, p), args.bind, port)
+            except OSError:
+                skipped.append(port)
+                continue
+            servers.append(server)
             transport, _ = await loop.create_datagram_endpoint(
                 lambda p=port: UDP(p), local_addr=(args.bind, port))
             datagrams.append(transport)
-        print("Relay listening on", args.bind, "ports", sorted(ports), flush=True)
+        print("Relay listening on", args.bind, "ports", sorted(set(ports) - set(skipped)),
+              "skipped", skipped, flush=True)
         proc = await asyncio.create_subprocess_exec(
             "/usr/bin/dns-sd", "-P", args.instance, "_remotepairing._tcp", "local",
             str(args.service_port), args.hostname, args.bind, *args.txt)
